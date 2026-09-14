@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+runs/
+uploads/
+models/
+experiments/
+evaluation-results/
+.streamlit/secrets.toml

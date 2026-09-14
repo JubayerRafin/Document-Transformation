@@ -1,0 +1,54 @@
+{
+  "reference_version": "1.0",
+  "source_name": "Synthetic walkthrough - not a supplied sample",
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": true,
+  "reviewed_by": "Synthetic fixture author; demonstration only",
+  "pages": [
+    {
+      "number": 1,
+      "width": 100,
+      "height": 100,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Hello world",
+      "tables": [
+        {
+          "id": "rt",
+          "bbox": [
+            10,
+            40,
+            80,
+            70
+          ],
+          "cells": [
+            [
+              "Name",
+              "Value"
+            ],
+            [
+              "A",
+              "10"
+            ]
+          ]
+        }
+      ],
+      "figures": [
+        {
+          "id": "rf",
+          "bbox": [
+            10,
+            75,
+            50,
+            95
+          ]
+        }
+      ]
+    }
+  ]
+}

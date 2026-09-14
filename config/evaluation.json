@@ -1,0 +1,8 @@
+{
+  "protocol": "extraction-eval-v1",
+  "iou_threshold": 0.5,
+  "text_normalization": "NFKC-collapse-whitespace-case-sensitive",
+  "matching": "maximum-cardinality-iou-priority",
+  "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
+  "table_scoring": "exact-normalized-grid-slots-and-dimensions"
+}

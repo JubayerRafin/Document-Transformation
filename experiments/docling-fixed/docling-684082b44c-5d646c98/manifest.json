@@ -1,0 +1,57 @@
+{
+  "status": "completed",
+  "source_name": "Sample02.pdf",
+  "source_sha256": "684082b44c8c554ac095b31ab6c70d326a4f73fc02bb62fd1adbe68c92dcb772",
+  "backend": "docling",
+  "options": {
+    "ocr": true,
+    "artifacts_path": null,
+    "ocr_model_dir": null,
+    "adapter_version": "1.1.0",
+    "included_content_layers": [
+      "body",
+      "furniture"
+    ],
+    "ocr_models": {
+      "det_model_path": "PP-OCRv6_det_small.onnx",
+      "rec_model_path": "PP-OCRv6_rec_small.onnx",
+      "cls_model_path": "ch_ppocr_mobile_v2.0_cls_mobile.onnx"
+    },
+    "ocr_configuration": {
+      "profile": "rapidocr-ppocrv6-small-v1",
+      "engine": "rapidocr",
+      "runtime": "onnxruntime",
+      "config_sha256": "b9c9d9edc4612f2d27a48ce260e795f7b9d46e8b4cd84dc2ede4378e38479a5f",
+      "models": {
+        "det_model_path": {
+          "filename": "PP-OCRv6_det_small.onnx",
+          "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+        },
+        "rec_model_path": {
+          "filename": "PP-OCRv6_rec_small.onnx",
+          "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+        },
+        "cls_model_path": {
+          "filename": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+        }
+      },
+      "engine_version": "3.9.0",
+      "runtime_version": "1.25.1"
+    }
+  },
+  "created_at": "2026-09-14T04:42:06.113329+00:00",
+  "python": "3.14.3",
+  "platform": "Windows-11-10.0.26200-SP0",
+  "backend_version": "2.107.0",
+  "seconds": 91.467,
+  "pages": 1,
+  "regions": {
+    "text": 13,
+    "figure": 3,
+    "table": 1
+  },
+  "warnings": 2,
+  "quality_score": null,
+  "quality_note": "Counts and runtime are diagnostics, not accuracy scores. Ground-truth evaluation is pending."
+}

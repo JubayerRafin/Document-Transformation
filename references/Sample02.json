@@ -1,0 +1,50 @@
+{
+  "reference_version": "1.0",
+  "source_name": "PDF_version_Sample02.pdf",
+  "source_sha256": "684082b44c8c554ac095b31ab6c70d326a4f73fc02bb62fd1adbe68c92dcb772",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": true,
+  "reviewed_by": "Jubayer",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "CONFIDENTIAL — Internal Use Only\nEmployee Onboarding Record\nDocument ID: HR-2024-00417 | Classification: Internal\n1. Employee Summary\nThis record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789.\nResident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432.\nFields highlighted in this document contain sample PII and must be masked before external distribution.\n2. Personnel Data Table\n3. ID Photo on File\nPlaceholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction.\n4. Notes\nThis paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table — so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.\nReviewer: Park Ji-hoon\nSignature date: 2024-03-20\nInternal ext.: 04512\nPage 1",
+      "tables": [
+        {
+          "id": "p1_table1",
+          "bbox": [72.0, 246.84, 522.48, 342.36],
+          "cells": [
+            ["Field", "Value", "Field", "Value"],
+            ["Full Name", "Kim Min-jun", "Department", "Enterprise Solutions"],
+            ["Employee ID", "EMP-2024-8831", "Title", "Software Engineer II"],
+            ["Email", "minjun.kim@example-corp.com", "Phone", "010-2345-6789"],
+            ["Bank Account", "KB 123-456-789012", "Annual Salary", "KRW 68,000,000"],
+            ["Home Address", "12, Teheran-ro 4-gil, Gangnam-gu, Seoul", "Start Date", "2024-03-18"]
+          ]
+        }
+      ],
+      "figures": [
+            {
+              "id": "p1_figure1",
+              "bbox": [72.0, 72.0, 102.0, 102.0]
+            },
+            {
+              "id": "p1_figure2",
+              "bbox": [72.0, 190.2881, 93.0, 211.2881]
+            },
+            {
+              "id": "p1_figure3",
+              "bbox": [72.0, 382.2393, 139.5, 463.2393]
+            }
+      ]
+    }
+  ]
+}

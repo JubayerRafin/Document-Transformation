@@ -1,0 +1,149 @@
+{
+  "report_version": "1.0",
+  "evaluator_version": "1.0.0",
+  "experiment": "docling-fixed",
+  "created_at": "2026-09-14T04:43:58.715103+00:00",
+  "dataset_sha256": "8f9bd772bf93ac429d3aed2b75281ffa00070b8630b16bc2d41372163052cc32",
+  "protocol": {
+    "protocol": "extraction-eval-v1",
+    "iou_threshold": 0.5,
+    "text_normalization": "NFKC-collapse-whitespace-case-sensitive",
+    "matching": "maximum-cardinality-iou-priority",
+    "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
+    "table_scoring": "exact-normalized-grid-slots-and-dimensions"
+  },
+  "evaluator_sha256": "6c6d621050473c7b3e4b417838ae141520f3e6772728847477e4b8286258e6fd",
+  "comparison_key": "abbd5335b7956bbce04f83f11a39f57ce13da23b0cefa3287083d88389443add",
+  "configuration": {
+    "backend": "docling",
+    "backend_version": "2.107.0",
+    "settings": {
+      "ocr": true,
+      "artifacts_path": null,
+      "ocr_model_dir": null,
+      "adapter_version": "1.1.0",
+      "included_content_layers": [
+        "body",
+        "furniture"
+      ],
+      "ocr_models": {
+        "det_model_path": "PP-OCRv6_det_small.onnx",
+        "rec_model_path": "PP-OCRv6_rec_small.onnx",
+        "cls_model_path": "ch_ppocr_mobile_v2.0_cls_mobile.onnx"
+      },
+      "ocr_configuration": {
+        "profile": "rapidocr-ppocrv6-small-v1",
+        "engine": "rapidocr",
+        "runtime": "onnxruntime",
+        "config_sha256": "b9c9d9edc4612f2d27a48ce260e795f7b9d46e8b4cd84dc2ede4378e38479a5f",
+        "models": {
+          "det_model_path": {
+            "filename": "PP-OCRv6_det_small.onnx",
+            "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+          },
+          "rec_model_path": {
+            "filename": "PP-OCRv6_rec_small.onnx",
+            "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+          },
+          "cls_model_path": {
+            "filename": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+            "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+          }
+        },
+        "engine_version": "3.9.0",
+        "runtime_version": "1.25.1"
+      }
+    }
+  },
+  "documents_expected": 1,
+  "documents_missing": 0,
+  "counts": {
+    "evaluated_pages": 1,
+    "missing_pages": 0,
+    "character_errors": 8,
+    "reference_characters": 1260,
+    "word_errors": 13,
+    "reference_words": 173,
+    "text_pages": 1
+  },
+  "metrics": {
+    "text": {
+      "pages": 1,
+      "cer": 0.006349206349206349,
+      "wer": 0.07514450867052024,
+      "character_errors": 8,
+      "reference_characters": 1260,
+      "word_errors": 13,
+      "reference_words": 173
+    },
+    "table_cells": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null
+    },
+    "table_dimensions_recall": null,
+    "tables": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "pages": 0,
+      "matched_mean_iou": null
+    },
+    "figures": {
+      "tp": 0,
+      "fp": 0,
+      "fn": 0,
+      "precision": null,
+      "recall": null,
+      "f1": null,
+      "pages": 0,
+      "matched_mean_iou": null
+    }
+  },
+  "documents": [
+    {
+      "source_sha256": "684082b44c8c554ac095b31ab6c70d326a4f73fc02bb62fd1adbe68c92dcb772",
+      "source_name": "PDF_version_Sample02.pdf",
+      "missing_prediction": false,
+      "counts": {
+        "evaluated_pages": 1,
+        "missing_pages": 0,
+        "character_errors": 8,
+        "reference_characters": 1260,
+        "word_errors": 13,
+        "reference_words": 173,
+        "text_pages": 1
+      },
+      "pages": [
+        {
+          "page": 1,
+          "missing": false,
+          "tasks": [
+            "text"
+          ],
+          "text": {
+            "character_errors": 8,
+            "reference_characters": 1260,
+            "word_errors": 13,
+            "reference_words": 173,
+            "reference": "CONFIDENTIAL — Internal Use Only\nEmployee Onboarding Record\nDocument ID: HR-2024-00417 | Classification: Internal\n1. Employee Summary\nThis record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789.\nResident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432.\nFields highlighted in this document contain sample PII and must be masked before external distribution.\n2. Personnel Data Table\n3. ID Photo on File\nPlaceholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction.\n4. Notes\nThis paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table — so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.\nReviewer: Park Ji-hoon\nSignature date: 2024-03-20\nInternal ext.: 04512\nPage 1",
+            "prediction": "CONFIDENTIAL - Internal Use Only Employee Onboarding Record Document ID: HR-2024-00417   |   Classification: Internal 1. Employee Summary This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831 ), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com , mobile 010-2345-6789 . Resident registration number on file: 901231-1****** . Emergency contact: Lee Soo-jin , 010-9876-5432. Fields highlighted in this document contain sample PII and must be masked before external distribution. 2. Personnel Data Table 3. ID Photo on File Placeholder ID photo (synthetic, non-personal) - used to verify that embedded images are preserved and left untouched during text-only redaction. 4. Notes This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table - so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution. Reviewer: Park Ji-hoon Signature date: 2024-03-20   Internal ext.: 04512 Page 1"
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "CER/WER include missing text and are order-sensitive; whitespace and NFKC normalized, case preserved.",
+    "Missing documents/pages count as empty predictions. No overall winner score is calculated.",
+    "Null means undefined or unannotated. Empty-reference text insertions remain in error counts; CER/WER can exceed 1.",
+    "Table scoring checks grid slots and dimensions, not full merged-cell topology/TEDS.",
+    "Figure detection evaluates region boxes, not image fidelity or caption association."
+  ]
+}

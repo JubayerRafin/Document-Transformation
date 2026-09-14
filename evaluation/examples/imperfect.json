@@ -1,0 +1,50 @@
+{
+  "schema_version": "0.1.0",
+  "source_name": "Synthetic walkthrough - not a supplied sample",
+  "source_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "backend": "demo-imperfect",
+  "backend_version": "1",
+  "settings": {},
+  "pages": [
+    {
+      "number": 1,
+      "width": 100,
+      "height": 100,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "ptext",
+          "kind": "text",
+          "bbox": [
+            5,
+            5,
+            90,
+            20
+          ],
+          "text": "Hello"
+        },
+        {
+          "id": "pt",
+          "kind": "table",
+          "bbox": [
+            10,
+            40,
+            80,
+            70
+          ],
+          "cells": [
+            [
+              "Name",
+              "Value"
+            ],
+            [
+              "A",
+              "20"
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

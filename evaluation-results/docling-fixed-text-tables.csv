@@ -1,0 +1,2 @@
+experiment,documents,missing_documents,missing_pages,CER_lower_better,WER_lower_better,character_errors,table_detection_F1,table_cell_exact_F1,table_dimensions_recall,figure_detection_F1,figure_matched_mean_IoU,comparison_key
+docling-fixed,1,0,0,0.006349206349206349,0.07514450867052024,8,1.0,0.9166666666666666,1.0,1.0,0.8453170903172769,5eece309d77ef4868a0539dedb7e3bb47153e22f859d7fd2a0325e064aee7f18

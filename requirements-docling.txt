@@ -1,0 +1,5 @@
+-r requirements.txt
+docling==2.107.0
+docling-core==2.85.0
+rapidocr>=3,<4
+onnxruntime>=1.20,<2
