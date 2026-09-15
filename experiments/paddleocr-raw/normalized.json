@@ -1,0 +1,223 @@
+{
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p1_text1",
+          "kind": "text",
+          "bbox": [
+            43.5,
+            0.0,
+            222.0,
+            14.5
+          ],
+          "text": "CONFIDENTIAL— Internal Use Only"
+        },
+        {
+          "id": "p1_figure1",
+          "kind": "figure",
+          "bbox": [
+            48.5,
+            45.5,
+            80.5,
+            77.5
+          ]
+        },
+        {
+          "id": "p1_text2",
+          "kind": "text",
+          "bbox": [
+            98.0,
+            64.5,
+            367.5,
+            87.5
+          ],
+          "text": "a"
+        },
+        {
+          "id": "p1_text3",
+          "kind": "text",
+          "bbox": [
+            46.5,
+            87.0,
+            322.5,
+            100.5
+          ],
+          "text": "Document ID: HR-2024-00417 | Classification: Internal"
+        },
+        {
+          "id": "p1_text4",
+          "kind": "text",
+          "bbox": [
+            48.5,
+            115.0,
+            219.5,
+            132.0
+          ],
+          "text": "1. Employee Summary"
+        },
+        {
+          "id": "p1_text5",
+          "kind": "text",
+          "bbox": [
+            48.0,
+            135.5,
+            551.5,
+            173.5
+          ],
+          "text": "This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18.Contact: minjun.kim@example-corp.com, mobile 010-2345-6789.Resident registration number on file: 901231-1******.Emergency contact: Lee Soo-jin, 010-9876-5432."
+        },
+        {
+          "id": "p1_figure2",
+          "kind": "figure",
+          "bbox": [
+            53.0,
+            185.5,
+            75.0,
+            207.5
+          ]
+        },
+        {
+          "id": "p1_text6",
+          "kind": "text",
+          "bbox": [
+            82.0,
+            199.0,
+            551.5,
+            211.0
+          ],
+          "text": "Fields highlighted in this document contain sample PII and must be masked before external distribution."
+        },
+        {
+          "id": "p1_text7",
+          "kind": "text",
+          "bbox": [
+            51.0,
+            229.5,
+            226.5,
+            244.5
+          ],
+          "text": "2. Personnel Data Table"
+        },
+        {
+          "id": "p1_table1",
+          "kind": "table",
+          "bbox": [
+            53.5,
+            247.5,
+            556.5,
+            352.0
+          ],
+          "cells": [
+            [
+              "Field",
+              "Value",
+              "Field",
+              "Value"
+            ],
+            [
+              "Full Name",
+              "Kim Min-jun",
+              "Department",
+              "Enterprise Solutions"
+            ],
+            [
+              "Employee ID",
+              "EMP-2024-8831",
+              "Title",
+              "Software Engineer II"
+            ],
+            [
+              "Email",
+              "minjun.kim@example- corp.com",
+              "Phone",
+              "010-2345-6789"
+            ],
+            [
+              "Bank Account",
+              "KB 123-456-789012",
+              "Annual Salary",
+              "KRW 68,000,000"
+            ],
+            [
+              "Home Address",
+              "12, Teheran-ro 4-gil, Gangnam-gu, Seoul",
+              "Start Date",
+              "2024-03-18"
+            ]
+          ]
+        },
+        {
+          "id": "p1_text8",
+          "kind": "text",
+          "bbox": [
+            55.0,
+            378.5,
+            193.0,
+            393.0
+          ],
+          "text": "3. ID Photo on File"
+        },
+        {
+          "id": "p1_figure3",
+          "kind": "figure",
+          "bbox": [
+            56.5,
+            398.5,
+            131.5,
+            485.5
+          ]
+        },
+        {
+          "id": "p1_text9",
+          "kind": "text",
+          "bbox": [
+            54.0,
+            475.0,
+            546.5,
+            499.5
+          ],
+          "text": "Placeholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction."
+        },
+        {
+          "id": "p1_text10",
+          "kind": "text",
+          "bbox": [
+            55.0,
+            520.5,
+            116.0,
+            533.5
+          ],
+          "text": "4.Notes"
+        },
+        {
+          "id": "p1_text11",
+          "kind": "text",
+          "bbox": [
+            54.5,
+            537.5,
+            562.0,
+            586.0
+          ],
+          "text": "This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table— so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution."
+        },
+        {
+          "id": "p1_text12",
+          "kind": "text",
+          "bbox": [
+            55.0,
+            597.5,
+            391.5,
+            609.0
+          ],
+          "text": "Reviewer: Park Ji-hoon Signature date: 2024-03-20 Internal ext.: 04512"
+        }
+      ]
+    }
+  ]
+}

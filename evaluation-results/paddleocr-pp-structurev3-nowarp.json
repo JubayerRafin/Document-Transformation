@@ -1,0 +1,188 @@
+{
+  "report_version": "1.0",
+  "evaluator_version": "1.0.0",
+  "experiment": "paddleocr-pp-structurev3-nowarp",
+  "created_at": "2026-09-15T11:54:06.124689+00:00",
+  "dataset_sha256": "2830bd7828b5da8d8dcad0ee0d75881cf104fee6ae1ed0a26c181a8586a7867b",
+  "protocol": {
+    "protocol": "extraction-eval-v1",
+    "iou_threshold": 0.5,
+    "text_normalization": "NFKC-collapse-whitespace-case-sensitive",
+    "matching": "maximum-cardinality-iou-priority",
+    "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
+    "table_scoring": "exact-normalized-grid-slots-and-dimensions"
+  },
+  "evaluator_sha256": "8457f6614da457d05cac4ceca81a4993d5229b80d9905e55f302343acbeb8f51",
+  "comparison_key": "80014a63d68631b3bd0761cf2a6651d326dc229a56e0689dcf340c7cd4cf9a48",
+  "configuration": {
+    "backend": "paddleocr-pp-structurev3-nowarp",
+    "backend_version": "3.7.0",
+    "settings": {
+      "ocr_engine": "PaddleOCR PP-StructureV3",
+      "ocr_version": "3.7.0",
+      "paddlepaddle_version": "3.3.1",
+      "ocr_weights_sha256": "unavailable: PaddleX official model hub does not publish per-file checksums for the auto-downloaded PP-OCRv5_server_det/rec weights used here",
+      "ocr_mode": "automatic (PP-OCRv5_server_det + PP-OCRv5_server_rec, default PPStructureV3 model set)",
+      "languages": [
+        "en"
+      ],
+      "layout_model": "PP-DocLayout_plus-L",
+      "table_model": "SLANet_plus / SLANeXt_wired (wired-table classification via PP-LCNet_x1_0_table_cls)",
+      "preprocessing": "use_doc_unwarping=False, use_doc_orientation_classify=False (disabled after the default run showed bbox drift vs reference on this born-digital, non-scanned PDF); enable_mkldnn=False (required to work around a PaddlePaddle 3.3.1 CPU oneDNN/PIR NotImplementedError on this machine, see https://github.com/PaddlePaddle/Paddle/issues/77340)",
+      "hardware": "CPU only (no GPU used)"
+    }
+  },
+  "documents_expected": 1,
+  "documents_missing": 0,
+  "counts": {
+    "evaluated_pages": 1,
+    "missing_pages": 0,
+    "character_errors": 4,
+    "reference_characters": 1260,
+    "word_errors": 8,
+    "reference_words": 173,
+    "text_pages": 1,
+    "tables_pages": 1,
+    "tables_tp": 1,
+    "tables_fn": 0,
+    "tables_fp": 0,
+    "tables_iou_sum": 0.9709159388061123,
+    "table_dimensions_correct": 1,
+    "cell_tp": 23,
+    "cell_fn": 1,
+    "cell_fp": 1,
+    "figures_pages": 1,
+    "figures_tp": 3,
+    "figures_fn": 0,
+    "figures_fp": 0,
+    "figures_iou_sum": 2.616252467747713
+  },
+  "metrics": {
+    "text": {
+      "pages": 1,
+      "cer": 0.0031746031746031746,
+      "wer": 0.046242774566473986,
+      "character_errors": 4,
+      "reference_characters": 1260,
+      "word_errors": 8,
+      "reference_words": 173
+    },
+    "table_cells": {
+      "tp": 23,
+      "fp": 1,
+      "fn": 1,
+      "precision": 0.9583333333333334,
+      "recall": 0.9583333333333334,
+      "f1": 0.9583333333333334
+    },
+    "table_dimensions_recall": 1.0,
+    "tables": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 1,
+      "matched_mean_iou": 0.9709159388061123
+    },
+    "figures": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 1,
+      "matched_mean_iou": 0.8720841559159043
+    }
+  },
+  "documents": [
+    {
+      "source_sha256": "684082b44c8c554ac095b31ab6c70d326a4f73fc02bb62fd1adbe68c92dcb772",
+      "source_name": "PDF_version_Sample02.pdf",
+      "missing_prediction": false,
+      "counts": {
+        "evaluated_pages": 1,
+        "missing_pages": 0,
+        "character_errors": 4,
+        "reference_characters": 1260,
+        "word_errors": 8,
+        "reference_words": 173,
+        "text_pages": 1,
+        "tables_pages": 1,
+        "tables_tp": 1,
+        "tables_fn": 0,
+        "tables_fp": 0,
+        "tables_iou_sum": 0.9709159388061123,
+        "table_dimensions_correct": 1,
+        "cell_tp": 23,
+        "cell_fn": 1,
+        "cell_fp": 1,
+        "figures_pages": 1,
+        "figures_tp": 3,
+        "figures_fn": 0,
+        "figures_fp": 0,
+        "figures_iou_sum": 2.616252467747713
+      },
+      "pages": [
+        {
+          "page": 1,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 4,
+            "reference_characters": 1260,
+            "word_errors": 8,
+            "reference_words": 173,
+            "reference": "CONFIDENTIAL — Internal Use Only\nEmployee Onboarding Record\nDocument ID: HR-2024-00417 | Classification: Internal\n1. Employee Summary\nThis record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789.\nResident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432.\nFields highlighted in this document contain sample PII and must be masked before external distribution.\n2. Personnel Data Table\n3. ID Photo on File\nPlaceholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction.\n4. Notes\nThis paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table — so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.\nReviewer: Park Ji-hoon\nSignature date: 2024-03-20\nInternal ext.: 04512\nPage 1",
+            "prediction": "CONFIDENTIAL— Internal Use Only Employee Onboarding Record Document ID: HR-2024-00417 | Classification: Internal 1. Employee Summary This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789.Resident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432. Fields highlighted in this document contain sample PII and must be masked before external distribution. 2. Personnel Data Table 3. ID Photo on File Placeholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction. 4.Notes This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table— so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution. Reviewer: Park Ji-hoon Signature date: 2024-03-20 Internal ext.: 04512 Page 1"
+          },
+          "tables": {
+            "matches": [
+              {
+                "reference_id": "p1_table1",
+                "prediction_id": "p1_table1",
+                "iou": 0.9709159388061123
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [
+              {
+                "reference_id": "p1_figure1",
+                "prediction_id": "p1_figure1",
+                "iou": 0.8402777777777778
+              },
+              {
+                "reference_id": "p1_figure2",
+                "prediction_id": "p1_figure2",
+                "iou": 0.8180272108843537
+              },
+              {
+                "reference_id": "p1_figure3",
+                "prediction_id": "p1_figure3",
+                "iou": 0.9579474790855813
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "CER/WER include missing text and are order-sensitive; whitespace and NFKC normalized, case preserved.",
+    "Missing documents/pages count as empty predictions. No overall winner score is calculated.",
+    "Null means undefined or unannotated. Empty-reference text insertions remain in error counts; CER/WER can exceed 1.",
+    "Table scoring checks grid slots and dimensions, not full merged-cell topology/TEDS.",
+    "Figure detection evaluates region boxes, not image fidelity or caption association."
+  ]
+}

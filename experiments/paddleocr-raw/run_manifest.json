@@ -1,0 +1,7 @@
+{
+  "tool": "PaddleOCR PP-StructureV3",
+  "paddleocr_version": "3.7.0",
+  "source_pdf": "samples\\Sample02.pdf",
+  "pages_processed": 1,
+  "elapsed_seconds": 301.06571102142334
+}
