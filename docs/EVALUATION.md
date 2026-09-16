@@ -93,7 +93,7 @@ Every expected document is counted. If a tool failed and there is no prediction,
 python main.py compare evaluation-results/docling-baseline.json evaluation-results/their-tool.json --output evaluation-results/comparison.csv
 ```
 
-Reports are comparable only if the reviewed references, protocol and evaluator implementation fingerprints match. Share report JSONs; the comparison command produces a CSV without rerunning the tools. It does not rank by one invented overall score.
+Reports are comparable only if the reviewed references, protocol and evaluator implementation fingerprints match. Evaluator 1.0.1 normalizes Python source line endings before hashing, so equivalent Windows and Linux checkouts match. After upgrading from 1.0.0, regenerate reports from the saved predictions; do not rerun extraction or manually edit comparison keys. Share report JSONs; the comparison command produces a CSV without rerunning the tools. It does not rank by one invented overall score.
 
 The app also has an Evaluation tab. Open a run, upload its reviewed reference JSON, inspect scores and reference-versus-prediction overlays, and download a single-document report. The CLI remains the canonical way to score the full shared dataset.
 
