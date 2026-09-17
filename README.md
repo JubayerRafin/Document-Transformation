@@ -1,4 +1,4 @@
-# Document Extraction Lab
+# Document Transformation
 
 A working extraction-first capstone foundation: run a whole-document backend, inspect text/tables/figures together, and export one intermediate representation (IR).
 
@@ -6,7 +6,7 @@ A working extraction-first capstone foundation: run a whole-document backend, in
 
 This is a standalone companion prototype for Deep Doc Extractor. It does not modify the upstream repository or implement translation, redaction, or document reconstruction yet. Those features follow after the extraction baseline is selected.
 
-The working folder contains actual sample runs. The downloadable source ZIP excludes uploads and extracted document content. See `docs/VALIDATION.md` for measured execution results, `docs/ARCHITECTURE.md` for the Python flow, and `docs/TEAM_START.md` for the first team sprint.
+This repository includes Sample02, its reviewed reference, saved Docling predictions, and evaluation reports. Follow docs/TEAM_START.md to reproduce the baseline or submit another tool. See `docs/VALIDATION.md` for measured execution results, `docs/ARCHITECTURE.md` for the Python flow, and `docs/TEAM_START.md` for the first team sprint.
 
 ## Start the application
 
@@ -108,14 +108,16 @@ Documents are untrusted input data. No document text is executed or interpreted 
 
 ## Team ownership
 
-| Owner | Starting files | First useful task |
+| Owner | Tool | Current task |
 |---|---|---|
-| Text member | `backends/native.py`, `backends/docling_backend.py` | Compare text/OCR and reading order on the same saved runs |
-| Table member | Same backend adapters; `models.py` | Label table cells/spans and check duplicates or missing content |
-| You: figures + lead | Backend adapters, `reconcile.py`, `pipeline.py` | Compare complete figures, caption relationships, raster fragments and vector-only graphics |
-| Fourth member | `app.py`, `main.py`, `tests/` | Maintain benchmark reproducibility, viewer and evaluation references |
+| Jubayer | Docling | Baseline, shared evaluator and integration |
+| Nahid | BabelDOC | Parsing/intermediate extraction feasibility |
+| Mashrur | Marker | Whole-document extraction and adapter |
+| Hyun | PaddleOCR PP-StructureV3 | Whole-document extraction and adapter |
 
-Do not create three independent pipelines. Once a specific failure is measured, extract the relevant improvement into a focused module with shared IR inputs and outputs.
+Every tool handles text, tables and figures together. Other tools run separately and import their normalized output; they are not yet built-in backends. See [team setup and submission instructions](docs/TEAM_START.md).
+
+Streamlit discovers completed visual-review runs recursively under both `runs/` and `experiments/`. Imported predictions without manifests/previews can still be scored using the CLI.
 
 ## Next engineering milestones
 

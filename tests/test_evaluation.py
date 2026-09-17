@@ -29,6 +29,20 @@ class EvaluationTests(unittest.TestCase):
     def score(self, r, p):
         return evaluate_collection([r], [p] if p is not None else [], PROTOCOL, "test")
 
+    def test_fingerprint_ignores_checkout_newlines_but_detects_code_changes(self):
+        from temp_workspace import temporary_workspace
+        from unittest.mock import patch
+        from evaluation.evaluate import implementation_hash
+        with temporary_workspace() as directory:
+            module = Path(directory) / "evaluate.py"
+            with patch("evaluation.evaluate.__file__", str(module)):
+                module.write_bytes(b"VERSION = 1\n# scoring\n")
+                lf = implementation_hash()
+                module.write_bytes(b"VERSION = 1\r\n# scoring\r\n")
+                self.assertEqual(lf, implementation_hash())
+                module.write_bytes(b"VERSION = 2\n# scoring\n")
+                self.assertNotEqual(lf, implementation_hash())
+
     def test_perfect_prediction(self):
         result = self.score(*fixtures())["metrics"]
         self.assertEqual(result["text"]["cer"], 0)

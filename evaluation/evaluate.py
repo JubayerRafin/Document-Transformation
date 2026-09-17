@@ -6,7 +6,7 @@ from pathlib import Path
 from .contracts import fingerprint, require, validate_document
 from .metrics import match_regions, prf, table_slots, text_counts
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 
 def score_document(reference, prediction, protocol):
@@ -90,7 +90,8 @@ def summarize(counts):
 
 
 def implementation_hash():
-    return fingerprint({p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path(__file__).parent.glob("*.py"))})
+    # Universal newline decoding keeps Git LF/CRLF checkouts comparable.
+    return fingerprint({p.name: hashlib.sha256(p.read_text(encoding="utf-8").encode("utf-8")).hexdigest() for p in sorted(Path(__file__).parent.glob("*.py"))})
 
 
 def evaluate_collection(references, predictions, protocol, experiment):

@@ -8,6 +8,7 @@ from PIL import Image, ImageDraw
 import streamlit as st
 
 from extraction.pipeline import export_zip, run_pipeline, write_json
+from extraction.saved_runs import discover_saved_runs
 
 ROOT = Path(__file__).resolve().parent
 RUNS = ROOT / "runs"
@@ -41,17 +42,9 @@ with st.sidebar:
         ocr_models = st.text_input("RapidOCR models folder (optional)")
     extract_clicked = st.button("Extract document", type="primary", disabled=upload is None, width="stretch")
     st.divider()
-    manifests = sorted(RUNS.glob("*/manifest.json"), key=lambda p: p.stat().st_mtime, reverse=True) if RUNS.exists() else []
-    saved = []
-    for entry in manifests:
-        try:
-            record = json.loads(entry.read_text(encoding="utf-8"))
-            if record["status"] == "completed":
-                saved.append((entry.parent, record))
-        except (OSError, ValueError, KeyError):
-            continue
+    saved = discover_saved_runs(ROOT)
     if saved:
-        choice = st.selectbox("Previous runs", range(len(saved)), format_func=lambda i: f'{saved[i][1]["source_name"]} · {saved[i][1]["backend"]} · {saved[i][1]["created_at"][11:19]}')
+        choice = st.selectbox("Previous runs", range(len(saved)), format_func=lambda i: f'{saved[i][1]["source_name"]} · {saved[i][1]["backend"]} · {saved[i][0].relative_to(ROOT).as_posix()}')
         if st.button("Open saved run", width="stretch"):
             st.session_state["run_dir"] = str(saved[choice][0])
     st.caption("Local research prototype · extraction phase")

@@ -1,8 +1,8 @@
 {
   "report_version": "1.0",
-  "evaluator_version": "1.0.0",
+  "evaluator_version": "1.0.1",
   "experiment": "docling-fixed",
-  "created_at": "2026-09-14T05:04:50.975341+00:00",
+  "created_at": "2026-09-16T03:40:38.131201+00:00",
   "dataset_sha256": "2830bd7828b5da8d8dcad0ee0d75881cf104fee6ae1ed0a26c181a8586a7867b",
   "protocol": {
     "protocol": "extraction-eval-v1",
@@ -12,8 +12,8 @@
     "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
     "table_scoring": "exact-normalized-grid-slots-and-dimensions"
   },
-  "evaluator_sha256": "6c6d621050473c7b3e4b417838ae141520f3e6772728847477e4b8286258e6fd",
-  "comparison_key": "5eece309d77ef4868a0539dedb7e3bb47153e22f859d7fd2a0325e064aee7f18",
+  "evaluator_sha256": "5b74a29d57bc039453c5f349af9ad86aebef0eb88bbe9bd90ed69226432c2793",
+  "comparison_key": "9c97266ac248d9046245180751ad545238f6201ca091e4bf571b70958ab792f8",
   "configuration": {
     "backend": "docling",
     "backend_version": "2.107.0",
