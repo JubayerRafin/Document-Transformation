@@ -1,0 +1,2 @@
+experiment,documents,missing_documents,missing_pages,CER_lower_better,WER_lower_better,character_errors,table_detection_F1,table_cell_exact_F1,table_dimensions_recall,figure_detection_F1,figure_matched_mean_IoU,comparison_key
+babeldoc-sample03,1,0,0,0.007513661202185792,0.06060606060606061,11,1.0,0.44642857142857145,0.5,1.0,0.9999994063790392,737cb68eb00476903fdf913e43b002e69f013ed40dc7ba2083993fdcfb1e7627

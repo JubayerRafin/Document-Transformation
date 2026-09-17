@@ -1,0 +1,235 @@
+{
+  "report_version": "1.0",
+  "evaluator_version": "1.0.1",
+  "experiment": "babeldoc-sample04",
+  "created_at": "2026-09-17T18:13:22.656322+00:00",
+  "dataset_sha256": "8684882bf76778a23100401d217fad5169e4c559da56ce4b234abccd617db296",
+  "protocol": {
+    "protocol": "extraction-eval-v1",
+    "iou_threshold": 0.5,
+    "text_normalization": "NFKC-collapse-whitespace-case-sensitive",
+    "matching": "maximum-cardinality-iou-priority",
+    "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
+    "table_scoring": "exact-normalized-grid-slots-and-dimensions"
+  },
+  "evaluator_sha256": "5b74a29d57bc039453c5f349af9ad86aebef0eb88bbe9bd90ed69226432c2793",
+  "comparison_key": "b46c0bf9ec54faa40d6aa09c1dba9adae37fb373607f3ad059a1836b9fbf7fb1",
+  "configuration": {
+    "backend": "babeldoc",
+    "backend_version": "0.6.4",
+    "settings": {
+      "ocr_engine": "BabelDOC internal parsing/OCR pipeline; no separate OCR engine explicitly configured in this run",
+      "ocr_version": "not explicitly exposed by the CLI run; record installed BabelDOC dependency versions if required",
+      "ocr_weights_sha256": "unavailable: BabelDOC installation did not expose/publish a single OCR-weights checksum for this experiment",
+      "ocr_mode": "BabelDOC default parsing behavior; translation skipped",
+      "languages": [
+        "en"
+      ],
+      "layout_model": "BabelDOC 0.6.4 default layout pipeline",
+      "table_model": "No structured table-cell model output exposed in inspected intermediate table object",
+      "preprocessing": "BabelDOC 0.6.4 default preprocessing; --skip-translation; --no-auto-extract-glossary; --debug. Adapter converts bottom-left PDF coordinates to TransformX top-left coordinates, uses geometric reading order, reconstructs the Sample02 table grid from BabelDOC-positioned table text, and maps non-full-page BabelDOC image forms to figure predictions.",
+      "translation": "skipped",
+      "translation_api_calls": "none observed; BabelDOC log reported 0 prompt and 0 completion tokens",
+      "adapter_notes": [
+        "BabelDOC page_layout exposed a table box but no explicit rows/columns/cells fields.",
+        "The adapter reconstructs a rectangular grid from positioned BabelDOC paragraph text inside the predicted table box without consulting the reference JSON.",
+        "BabelDOC exposed three image forms on Sample02; the adapter maps non-full-page image forms to figures."
+      ]
+    }
+  },
+  "documents_expected": 1,
+  "documents_missing": 0,
+  "counts": {
+    "evaluated_pages": 2,
+    "missing_pages": 0,
+    "character_errors": 491,
+    "reference_characters": 2091,
+    "word_errors": 75,
+    "reference_words": 304,
+    "text_pages": 2,
+    "tables_pages": 2,
+    "tables_tp": 1,
+    "tables_fn": 0,
+    "tables_fp": 0,
+    "tables_iou_sum": 0.9760768770411914,
+    "table_dimensions_correct": 1,
+    "cell_tp": 20,
+    "cell_fn": 0,
+    "cell_fp": 0,
+    "figures_pages": 2,
+    "figures_tp": 6,
+    "figures_fn": 0,
+    "figures_fp": 0,
+    "figures_iou_sum": 6.0
+  },
+  "metrics": {
+    "text": {
+      "pages": 2,
+      "cer": 0.2348158775705404,
+      "wer": 0.24671052631578946,
+      "character_errors": 491,
+      "reference_characters": 2091,
+      "word_errors": 75,
+      "reference_words": 304
+    },
+    "table_cells": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "table_dimensions_recall": 1.0,
+    "tables": {
+      "tp": 1,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 2,
+      "matched_mean_iou": 0.9760768770411914
+    },
+    "figures": {
+      "tp": 6,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 2,
+      "matched_mean_iou": 1.0
+    }
+  },
+  "documents": [
+    {
+      "source_sha256": "2ba9ac9c9a42981800f85318d68959cef042b2921445777a963b09734ca14f0d",
+      "source_name": "Sample04.pdf",
+      "missing_prediction": false,
+      "counts": {
+        "evaluated_pages": 2,
+        "missing_pages": 0,
+        "character_errors": 491,
+        "reference_characters": 2091,
+        "word_errors": 75,
+        "reference_words": 304,
+        "text_pages": 2,
+        "tables_pages": 2,
+        "tables_tp": 1,
+        "tables_fn": 0,
+        "tables_fp": 0,
+        "tables_iou_sum": 0.9760768770411914,
+        "table_dimensions_correct": 1,
+        "cell_tp": 20,
+        "cell_fn": 0,
+        "cell_fp": 0,
+        "figures_pages": 2,
+        "figures_tp": 6,
+        "figures_fn": 0,
+        "figures_fp": 0,
+        "figures_iou_sum": 6.0
+      },
+      "pages": [
+        {
+          "page": 1,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 489,
+            "reference_characters": 1764,
+            "word_errors": 73,
+            "reference_words": 252,
+            "reference": "Asset & Access Report ??Redaction Test Sample\nDocument ID: SEC-2024-0093 | Classification: Internal | Purpose: verify text-in-image and image-in-table handling during redaction\nThis document mixes normal selectable text with images that contain their own baked-in text (not part of the PDF text layer). Use it to confirm a redaction pipeline correctly leaves image-embedded text alone (or flags it separately) while masking real text-layer PII.\n1. Images with baked-in text (non-selectable)\nThe three images below each contain text that is part of the pixel data, not the PDF text layer ??a plain text-extraction pass will NOT find Kim Min-jun, EMP-2024-8831, or the API key inside them.\nHP ENTERPRISE ??STAFF ID\nKim Min-jun\nID: EMP-2024-8831\nTitle: Software Engineer II\nDept: Enterprise Solutions\nIssued: 2024-03-18\nStaff ID badge scan\nCAUTION\nRestricted access area.\nBadge EMP-2024-8831\nauthorized only.\nsecurity@example-corp.com\nFacility warning label\nApp Center ??Device Console\nDevice: WPX-0042 Owner: minjun.kim@example-corp.com\nAPI Key: sk_live_4f9a...REDACT_ME\nLast login IP: 172.16.5.114\nScreenshot captured 2024-03-20 09:41 KST\nApp console screenshot\nFor comparison, here is the same kind of information as real selectable text (the redaction engine SHOULD catch this): employee Kim Min-jun, ID EMP-2024-8831, email minjun.kim@example-corp.com, API key sk_live_4f9a-REDACT_ME.\n2. Table with images embedded in cells\nEach row below mixes a real text-layer SKU/price with a product photo that has its own price sticker baked into the image ??useful for testing whether a redaction pass preserves embedded images inside table cells while still finding the text-layer values in adjacent cells.\n??.2M\nLaserJet Pro X1\n??.4M\nEliteBook 840\n??50K\nField Scanner T3",
+            "prediction": "Asset & Access Report — Redaction Test Sample Document ID: SEC-2024- 0093 | Classification: Internal | Purpose: verify text-in-image and image-in-table handling during redacti on This document mixes normal selectable text with images that contain their own baked-in text (not part of the PDF text layer). Use it to confirm a redaction pipeline correctly leaves image-embedded text alone (or flags it separately) while masking real text-layer PII. 1. Images with baked-in text (non-selectable) The three images below each contain text that is part of the pixel data, not the PDF text layer — a plain text-extraction pass will NOT find Kim Min-jun, EMP-2024-8831, or the API key inside them. Staff ID badge scan Facility warning label App console screenshot For comparison, here is the same kind of information as real selectable text (the redaction engine SHOULD catch this): employee Kim Min-jun, ID EMP-2024-8831, email minjun.kim@example-corp.com, API key sklive 4f9a-REDACT ME. _ _ _ 2. Table with images embedded in cells Each row below mixes a real text-layer SKU/price with a product photo that has its own price sticker baked into the image — useful for testing whether a redaction pass preserves embedded images inside table cells while still finding the text-layer values in adjacent cells."
+          },
+          "tables": {
+            "matches": [
+              {
+                "reference_id": "p1_table1",
+                "prediction_id": "p1_table1",
+                "iou": 0.9760768770411914
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [
+              {
+                "reference_id": "p1_figure1",
+                "prediction_id": "p1_figure1",
+                "iou": 1.0
+              },
+              {
+                "reference_id": "p1_figure2",
+                "prediction_id": "p1_figure2",
+                "iou": 1.0
+              },
+              {
+                "reference_id": "p1_figure3",
+                "prediction_id": "p1_figure3",
+                "iou": 1.0
+              },
+              {
+                "reference_id": "p1_figure4",
+                "prediction_id": "p1_figure4",
+                "iou": 1.0
+              },
+              {
+                "reference_id": "p1_figure5",
+                "prediction_id": "p1_figure5",
+                "iou": 1.0
+              },
+              {
+                "reference_id": "p1_figure6",
+                "prediction_id": "p1_figure6",
+                "iou": 1.0
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "page": 2,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 2,
+            "reference_characters": 327,
+            "word_errors": 2,
+            "reference_words": 52,
+            "reference": "Note: the price sticker visible on each photo (e.g. \"KRW 1.2M\") is baked into the image and will differ slightly in formatting from the text-layer \"List Price\" column ??both should be checked independently by an OCR-aware redaction pass.\nGenerated as a synthetic test document. All names, IDs, keys, and figures are fictitious.",
+            "prediction": "Note: the price sticker visible on each photo (e.g. \"KRW 1.2M\") is baked into the image and will differ slightly in formatting from the text-layer \"List Price\" column — both should be checked independently by an OCR-aware redaction pass. Generated as a synthetic test document. All names, IDs, keys, and figures are fictitious."
+          },
+          "tables": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "CER/WER include missing text and are order-sensitive; whitespace and NFKC normalized, case preserved.",
+    "Missing documents/pages count as empty predictions. No overall winner score is calculated.",
+    "Null means undefined or unannotated. Empty-reference text insertions remain in error counts; CER/WER can exceed 1.",
+    "Table scoring checks grid slots and dimensions, not full merged-cell topology/TEDS.",
+    "Figure detection evaluates region boxes, not image fidelity or caption association."
+  ]
+}

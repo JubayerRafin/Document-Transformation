@@ -1,0 +1,442 @@
+﻿{
+    "reference_version":  "1.0",
+    "source_name":  "TrafficSF.pdf",
+    "source_sha256":  "b1bfc94aec044ff514c1621de6c2c8ef5cf4322199e11a3313988e328e269b32",
+    "coordinate_system":  "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+    "reviewed":  true,
+    "reviewed_by":  "self-review",
+    "pages":  [
+                  {
+                      "number":  1,
+                      "width":  612.0,
+                      "height":  792.0,
+                      "rotation":  0,
+                      "tasks":  [
+                                    "text",
+                                    "tables",
+                                    "figures"
+                                ],
+                      "text":  "NHTSA?셲 Office of Behavioral Safety Research\n1200 New Jersey Avenue SE., Washington, DC 20590\nTRAFFIC SAFETY FACTS\nResearch Note\nOffice of Behavioral Safety Research\nDOT HS 812 118\nFebruary 2015\nof drivers using alcohol or drugs and adjusted with an\nappropriate weighting scheme.\nSummary of Results\nPrevalence of Alcohol Use by Drivers\nThe NRS surveys reveal a decreasing trend in alcohol use\nfrom the first survey in 1973 to the most recent one in 2013??n2014. Figure 1 shows the percentage of weekend nighttime\ndrivers with BrACs across three categories: BrAC of .005 to\n.049 g/210 L; 2 BrACs of .050 to .079; and BrACs of .080 and\nhigher. The surveys found a decline in each BrAC category.\nFurther, there has been a large decrease in the percentage of\ndrivers who were alcohol positive, from 35.9 percent in 1973\nto 8.3 percent in 2013??014. For BrACs of .08 and higher,\nthere was a decrease from 7.5 percent in 1973 to 1.5 percent\nin 2013??014, revealing an impressive 80 percent reduction\nin the percentage of alcohol-impaired drivers on the road\non weekend nights. Also of importance is the decrease\nOver the last four decades, the National Highway Traffic\nSafety Administration and/or the Insurance Institute for\nHighway Safety (IIHS) conducted four national surveys\nto estimate the prevalence of drinking and driving in the\nUnited States (Wolfe, 1974; Lund \u0026 Wolfe, 1991; Voas et al,\n1998; Compton \u0026 Berning, 2009; Lacey et al, 2009). The first\nNational Roadside Survey (NRS) was conducted in 1973,\nfollowed by national surveys of drivers in 1986, 1996, 2007,\nand now 2013??014. These surveys used a stratified random\nsample of weekend nighttime drivers in the contiguous 48\nStates and collected data directly from drivers on the road.\nThe 2007 NRS added procedures to the NRS for the first\ntime to estimate the use by drivers of other potentially\nimpairing drugs. Prior roadside surveys had only collected\nbreath samples to determine breath alcohol concentration\n(BrAC). Due to developments in analytical toxicology,\nNHTSA determined it would be feasible in the 2007 and\n2013??014 surveys to determine driver use of a variety of\npotentially impairing drugs including illegal drugs as well\nas legal medications.\nIn 2013??014, the National Highway Traffic Safety\nAdministration conducted the most recent National\nRoadside Survey of Alcohol and Drug Use by Drivers.1\nThis voluntary and anonymous study is the second to col\nlect data on drug use, presenting our first opportunity to\nexamine drug use trends on a national scale. The 2013??n2014 NRS was designed to produce national estimates of\nalcohol and drug use by weekday daytime and weekend\nnighttime drivers. Thus, the use rates presented below are\nnational prevalence rates calculated from the percentage\nResults of the 2013??014 National Roadside\nSurvey of Alcohol and Drug Use by Drivers\nBy Amy Berning, Richard Compton, and Kathryn Wochinger\n1 The Office of National Drug Control Policy provided funds to\nNHTSA for this study. The National Institute on Drug Abuse, and\nthe Insurance Institute for Highway Safety provided additional\nfunding through investigator initiated grants and contracts to the\nPacific Institute for Research and Evaluation, NHTSA?셲 contractor\nfor the 2013??014 NRS.\n2 .08 g/210 L = grams per 210 liters of breath. The illegal limit in all\nStates is .08.\n3 From 1973 to 2004, the States had BrAC limits that ranged from .08\nto .15. After 2004, all States had BrAC limits of .08.\nFigure 1.\nPercentage of Weekend Nighttime Drivers by BrAC\nCategory in the Five National Roadside Surveys3\n0\n5\n10\n15\n20\n25\n1986\n1973\nBrAC .005??049\nBrAC .050??079\nBrAC .08+\n1996\n2007\n2013??014\n22.3\n6.17.5\n17.6\n3\n5.4\n9.2\n3.44.3\n7.9\n2.32.2\n5.2\n1.61.5\nPercentage of Drivers",
+                      "tables":  [
+
+                                 ],
+                      "figures":  [
+                                      {
+                                          "id":  "p1_figure1",
+                                          "bbox":  [
+                                                       315.0,
+                                                       533.0,
+                                                       576.0,
+                                                       665.5
+                                                   ]
+                                      }
+                                  ]
+                  },
+                  {
+                      "number":  2,
+                      "width":  612.0,
+                      "height":  792.0,
+                      "rotation":  0,
+                      "tasks":  [
+                                    "text",
+                                    "tables",
+                                    "figures"
+                                ],
+                      "text":  "2\nNHTSA?셲 Office of Behavioral Safety Research\n1200 New Jersey Avenue SE., Washington, DC 20590\nfrom 6.1 percent to 1.6 percent from 1973 to 2013??014 for\nBrACs of .050 to .079 category.\nThe 2013??014 survey found large differences by the day of\nweek and the time of day in the likelihood of drivers being\nalcohol positive or having an illegal BrAC (Table 1). During\nweekday daytime hours (Friday), only 1.1 percent of drivers\nwere alcohol positive, while at weekend nighttime hours\n(Friday and Saturday), 8.3 percent of drivers were alcohol\npositive. During weekday daytime hours there were very\nfew drivers with illegal BrACs (BrAC ??.08), just 0.4 percent,\nwhile at weekend nighttime hours 1.5 percent drivers had\nillegal BrACs. Daytime compared to nighttime percentages\nare statistically significant. Compared with the NRS 2007,\nthe 2013??014 NRS BrAC prevalence shown in Figure 1 was\nsignificantly lower only for the .005 to .049 BrAC category.\nTable 1\nAlcohol Prevalence by Data Collection Period and BrAC in\nthe 2013??014 NRS\nPrevalence of Drug Use by Drivers\nThe 2013??014 study examined the use of drugs, focus\ning on drugs with the potential to impair driving skills,\nincluding over-the-counter, prescription, and illegal drugs.\nParticipants were asked to provide an oral fluid and blood\nsample in addition to a breath sample. The oral fluid and\nblood samples were tested for the presence of a large num\nber of potentially impairing drugs including cannabinoids,\nstimulants, sedatives, antidepressants, and narcotic analge\nsics. Not all drivers provided both an oral fluid and blood\nsample; some drivers provided just one sample but many\nprovided both.\nThe reader is cautioned that drug presence does not neces\nsarily imply impairment. For many drug substances, drug\npresence can be detected after impairment that might affect\ndriving has passed. For example, traces of marijuana use\ncan be detected in blood samples several weeks after heavy\nchronic users stop ingestion. In this study, for marijuana,\nwe tested only for THC (delta 9 tetrahydrocannabinol), the\npsychoactive substance in marijuana, and 11-OH-THC, its\nactive metabolite. When marijuana is smoked or ingested,\nTHC is absorbed into the blood stream and is distributed\ninto areas of the body, including the brain. There are over\n100 marijuana metabolites detectable in blood that research\nhas not associated with the psychoactive effects of mari\njuana use. Whereas the impairment effects for various con\ncentration levels of alcohol in the blood or breath are well\nunderstood, there is little evidence available to link concen\ntrations of other drugs to driver performance.\nTable 2\nOverall Drug Prevalence by Data Collection Period and Type\nof Test in the 2013??014 NRS\nIn contrast to alcohol use, overall drug prevalence (shown\nin Table 2), did not appear to differ between daytime and\nnighttime, regardless of whether oral fluid or blood tests\nwere conducted. The much higher nighttime use of alco\nhol appears to represent recreational use. For other drugs, a\ndifferent pattern emerges.\nAs shown in Table 3, the pattern of drug use among driv\ners varies by day and category of drug. The prevalence of\nillegal drug use increases from daytime to nighttime, but\nthere is a countervailing pattern of a reduction in preva\nlence of driver use of medicinal drugs in nighttime drivers\ncompared to daytime drivers.4\nTable 3\nDrug Prevalence by Data Collection Period, Drug Category,\nand Type of Drug Test in the 2013??014 NRS\n4 Despite recent changes in the legal status of marijuana in some\nStates, for simplicity and to allow inter-survey comparisons, this\ndrug remained included within the ?쐇llegal??category in the 2013??n2014 NRS.\n5 ?쏛ny Illegal Drug??includes drivers who tested positive for one\nor more illegal drugs, whether or not they also tested positive for\nmedications.\n6 ?쏰nly Medications??includes drivers who tested positive for one\nor more medications, but did not test positive for illegal drugs.",
+                      "tables":  [
+                                     {
+                                         "id":  "p2_table1",
+                                         "bbox":  [
+                                                      315.0,
+                                                      120.801,
+                                                      576.0,
+                                                      197.187
+                                                  ],
+                                         "cells":  [
+                                                       [
+                                                           "Time of Day",
+                                                           "% Drug-Positive\nOral Fluid Test",
+                                                           "% Drug-Positive\nBlood Test",
+                                                           "% Drug-Positive Oral\nFluid and/or Blood Test"
+                                                       ],
+                                                       [
+                                                           "Weekday\nDaytime",
+                                                           "19.0%",
+                                                           "21.6%",
+                                                           "22.4%"
+                                                       ],
+                                                       [
+                                                           "Weekend\nNighttime",
+                                                           "19.8%",
+                                                           "21.2%",
+                                                           "22.5%"
+                                                       ]
+                                                   ]
+                                     },
+                                     {
+                                         "id":  "p2_table2",
+                                         "bbox":  [
+                                                      36.0,
+                                                      298.801,
+                                                      297.0,
+                                                      353.187
+                                                  ],
+                                         "cells":  [
+                                                       [
+                                                           "Data Collection Time Period",
+                                                           "% Alcohol Positive\n(%BrAC \u003e .005)",
+                                                           "% BrAC \u003e .08"
+                                                       ],
+                                                       [
+                                                           "Weekday Daytime",
+                                                           "1.1%",
+                                                           "0.4%"
+                                                       ],
+                                                       [
+                                                           "Weekend Nighttime",
+                                                           "8.3%",
+                                                           "1.5%"
+                                                       ]
+                                                   ]
+                                     },
+                                     {
+                                         "id":  "p2_table3",
+                                         "bbox":  [
+                                                      315.0,
+                                                      431.687,
+                                                      576.0,
+                                                      576.382
+                                                  ],
+                                         "cells":  [
+                                                       [
+                                                           "Drug Category",
+                                                           "Oral Fluid\nTest",
+                                                           null,
+                                                           "Blood Test",
+                                                           null,
+                                                           "Oral Fluid and/or\nBlood Test",
+                                                           null
+                                                       ],
+                                                       [
+                                                           null,
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%"
+                                                       ],
+                                                       [
+                                                           "Weekday Daytime",
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null
+                                                       ],
+                                                       [
+                                                           "Any Illegal Drug5",
+                                                           "189",
+                                                           "10.6%",
+                                                           "137",
+                                                           "11.3%",
+                                                           "221",
+                                                           "12.1%"
+                                                       ],
+                                                       [
+                                                           "Only Medications6\n(prescription and over-the-counter)",
+                                                           "197",
+                                                           "8.4%",
+                                                           "128",
+                                                           "10.3%",
+                                                           "234",
+                                                           "10.3%"
+                                                       ],
+                                                       [
+                                                           "Weekend Nighttime",
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null
+                                                       ],
+                                                       [
+                                                           "Any Illegal Drug",
+                                                           "783",
+                                                           "13.9%",
+                                                           "423",
+                                                           "14.3%",
+                                                           "852",
+                                                           "15.2%"
+                                                       ],
+                                                       [
+                                                           "Only Medications\n(prescription and over-the-counter)",
+                                                           "317",
+                                                           "5.9%",
+                                                           "216",
+                                                           "6.9%",
+                                                           "391",
+                                                           "7.3%"
+                                                       ]
+                                                   ]
+                                     }
+                                 ],
+                      "figures":  [
+
+                                  ]
+                  },
+                  {
+                      "number":  3,
+                      "width":  612.0,
+                      "height":  792.0,
+                      "rotation":  0,
+                      "tasks":  [
+                                    "text",
+                                    "tables",
+                                    "figures"
+                                ],
+                      "text":  "3\nNHTSA?셲 Office of Behavioral Safety Research\n1200 New Jersey Avenue SE., Washington, DC 20590\nComparison of Drug Prevalence Between the 2007\nNRS and 2013??014 NRS\nThe specific drugs and detection thresholds changed\nsomewhat between the 2007 NRS and 2013??014 NRS. A\nfew drugs that were either not detected or rarely detected\nin the 2007 NRS were not included on the 2013??014 NRS,\nand a few new drugs were added in the 2013??014 NRS.\nFor example, we tested for selected synthetic cannabinoids\nin the new survey. Also, improvements in analytical tech\nnology allowed the detection thresholds to be lowered\nsignificantly for a number of drugs in the 2013??014 NRS.\nTo compare the prevalence rates between the 2007 NRS\nand 2013??014 NRS, we included only the drugs that were\ntested for in both surveys and based 2013??014 NRS preva\nlence rates using the cutoff levels from the 2007 NRS.\nTo account for these refinements in lab testing since 2007,\nTable 4 presents the 2013??014 NRS data after applying the\nsame set of drugs and drug cutoff levels as used for 2007\nsurvey. The results from either oral fluid tests or blood\ntests, or both oral fluid and/or blood tests, show a small\nincrease in drug-positive drivers using medications (from\n3.9% in 2007 to 4.9% in 2013??014), and a larger increase in\nthe prevalence of illegal drugs (from 12.4% in 2007 to 15.1%\nin 2013??014). In 2007, 16.3 percent of weekend nighttime\ndrivers were drug-positive based on the combined results\nof either or both oral fluid and blood tests (Compton \u0026\nBerning, 2009). In 2013??014, 20.0 percent of weekend\nnighttime drivers tested positive for drugs using the 2007\ncut-off criteria.\nThe drug with the largest increase in weekend night\ntime prevalence was THC (Table 5). In the 2007 NRS, 8.6\npercent of weekend nighttime drivers tested positive for\nTHC (based on the combined oral fluid and/or blood tests),\nwhereas in the 2013??014 NRS, 12.6 percent of weekend\nnighttime drivers tested positive for THC, a 48 percent\nincrease.\nChanges in State policy on marijuana use, including\nmedical and recreational use, may have contributed to an\nincrease in marijuana use by drivers. However, the survey\ndoes not permit a state-by-state comparison. The change in\nuse may reflect the emergence of a new trend in the coun\ntry that warrants monitoring.\nSurvey Methodology\nThis most recent NRS started in the summer of 2013, contin\nued through the spring of 2014, and involved 60 sites across\nthe contiguous United States. The study used a multistage\nsampling procedure based on the National Automotive\nSampling System?봆eneral Estimates System (NHTSA,\n2008). The sites were large cities, counties, or groups of\ncounties representing four regions within the United States\nand three levels of population density. As a whole, the 60\nsites provide a representative sample of drivers across the\ncountry. The 2013??014 NRS attempted to re-visit the same\nsites as 2007; however, because not all sites were avail\nable, statistical sampling techniques were used to identify\nreplacement sites with similar characteristics.\nRoadside survey data were collected in 5 different loca\ntions at each site (for a total of 300 locations). Although\nthere were practical considerations for selecting a site, such\nas traffic flow and safety, the 5 locations were randomly\nchosen within the boundaries of the cooperating local law\nenforcement agency?셲 area of jurisdiction. This approach\nprovided, as much as possible, a representative sample\nof drivers for that site. Locations were not selected on the\nbasis of assumptions of where there would be a high per\nTable 4\nWeekend Nighttime Drug Prevalence by Drug Category and Test Type Comparing 2007 Data to 2013??014 Comparable Data\nTable 5\nWeekend Nighttime Prevalence of THC in 2007 Compared to 2013??014 Comparable Data",
+                      "tables":  [
+                                     {
+                                         "id":  "p3_table1",
+                                         "bbox":  [
+                                                      36.167,
+                                                      70.64,
+                                                      576.125,
+                                                      162.95
+                                                  ],
+                                         "cells":  [
+                                                       [
+                                                           "Drug Category",
+                                                           "2007 Data",
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           "2013??014 Comparable Data",
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null
+                                                       ],
+                                                       [
+                                                           null,
+                                                           "Oral Fluid Test",
+                                                           null,
+                                                           "Blood Test",
+                                                           null,
+                                                           "Oral Fluid and/or\nBlood Test",
+                                                           null,
+                                                           "Oral Fluid Test",
+                                                           null,
+                                                           "Blood Test",
+                                                           null,
+                                                           "Oral Fluid and/or\nBlood Test",
+                                                           null
+                                                       ],
+                                                       [
+                                                           null,
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%"
+                                                       ],
+                                                       [
+                                                           "Any Illegal Drug",
+                                                           "635",
+                                                           "11.4%",
+                                                           "297",
+                                                           "9.8%",
+                                                           "699",
+                                                           "12.4%",
+                                                           "779",
+                                                           "13.8%",
+                                                           "422",
+                                                           "14.3%",
+                                                           "849",
+                                                           "15.1%"
+                                                       ],
+                                                       [
+                                                           "Only Medications\n(prescription and over-the-counter)",
+                                                           "201",
+                                                           "3.0%",
+                                                           "169",
+                                                           "4.0%",
+                                                           "277",
+                                                           "3.9%",
+                                                           "211",
+                                                           "3.9%",
+                                                           "155",
+                                                           "4.9%",
+                                                           "266",
+                                                           "4.9%"
+                                                       ]
+                                                   ]
+                                     },
+                                     {
+                                         "id":  "p3_table2",
+                                         "bbox":  [
+                                                      36.167,
+                                                      674.112,
+                                                      576.125,
+                                                      731.959
+                                                  ],
+                                         "cells":  [
+                                                       [
+                                                           "2007 Data",
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           "2013??014 Comparable Data",
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null,
+                                                           null
+                                                       ],
+                                                       [
+                                                           "Oral Fluid Test",
+                                                           null,
+                                                           "Blood Test",
+                                                           null,
+                                                           "Oral Fluid and/or Blood Test",
+                                                           null,
+                                                           "Oral Fluid Test",
+                                                           null,
+                                                           "Blood Test",
+                                                           null,
+                                                           "Oral Fluid and/or Blood Test",
+                                                           null
+                                                       ],
+                                                       [
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%",
+                                                           "N",
+                                                           "%"
+                                                       ],
+                                                       [
+                                                           "438",
+                                                           "7.7%",
+                                                           "234",
+                                                           "7.6%",
+                                                           "499",
+                                                           "8.6%",
+                                                           "597",
+                                                           "11.3%",
+                                                           "332",
+                                                           "11.7%",
+                                                           "663",
+                                                           "12.6%"
+                                                       ]
+                                                   ]
+                                     }
+                                 ],
+                      "figures":  [
+
+                                  ]
+                  },
+                  {
+                      "number":  4,
+                      "width":  612.0,
+                      "height":  792.0,
+                      "rotation":  0,
+                      "tasks":  [
+                                    "text",
+                                    "tables",
+                                    "figures"
+                                ],
+                      "text":  "4\nNHTSA?셲 Office of Behavioral Safety Research\n1200 New Jersey Avenue SE., Washington, DC 20590\ncentage of alcohol- or drug-positive drivers. The objective\nof this study was to estimate the alcohol and other drug\nprevalence of all drivers ?쐎n the road in the United States??nduring the given time periods.\nIn the 2007 NRS, in an effort to learn more about the\npresence of alcohol and drug use during daytime driv\ning, we added data collection on Fridays during the day,\nfrom either 9:30 to 11:30 a.m., or 1:30 to 3:30 p.m. (the times\nwere randomized across sites). This additional data collec\ntion allowed us to examine drug use and alcohol trends\namong daytime drivers. This method was repeated for\nthe 2013??014 NRS, and data were collected on weekend\nnights, from 10:00 p.m. to midnight, and from 1 to 3 a.m. on\nFridays (i.e., early Saturday mornings) and from 1 to 3 a.m.\non Saturdays (i.e., early Sunday mornings). By using these\nsame time frames for each NRS, we can compare data on\nBrACs and drug use over time.\nParticipation in the survey was entirely voluntary and\nanonymous. When a data collector was available, drivers\nwere allowed to enter the data collection location. Where\nresearchers described the project and offered incentives\nfor participation. Drivers were informed that participation\nwas voluntary and that they were free to leave at any time.\nData collectors asked participants for a breath test, an oral\nfluid sample, and a blood sample. The vast majority of eli\ngible drivers entering the research area participated in the\nstudy (see Table 6). The number of drivers who entered the\nsite and were eligible to participate (e.g., non-commercial\ndrivers 16 and older, English- or Spanish-speaking) was\n11,100. Out of the 11,100 eligible drivers, 85.2 percent (9,455\ndrivers) provided breath samples; 71 percent (7,881 drivers)\nprovided oral fluid samples; and 42.2 percent (4,686 drivers)\nprovided blood samples.\nNational prevalence rates were derived from a complex\nweighting scheme based on the volume of serious crashes\nat each site and the probability of a survey driver being ran\ndomly selected from the total driving trips at that site.\nTable 6\nNumber of Participants and Participation Rates in the\n2013??014 NRS\nChallenges in Determining How Drugs\nAffect Driving\nMost psychoactive drugs are chemically complex mol\necules, whose absorption, action, and elimination from\nthe body are difficult to predict, and considerable differ\nences exist between individuals with regard to the rates\nwith which these processes occur. Alcohol, in comparison,\nis more predictable. A strong relationship between alco\nhol concentration and impairment has been established,\nas has the correlation between alcohol concentration and\ncrash risk.\nFactors that make similar prediction difficult for most other\npsychoactive drugs include:\n??n?쟕he large number of different drugs that would need to\nbe tested (extensive testing of alcohol has been under\ntaken over many decades, whereas relatively little simi\nlar testing has occurred for most other drugs).\n??n?쟑oor correlation between the effects on psychomotor,\nbehavioral, and/or executive functions and blood or\nplasma drug concentrations (peak psychomotor, behav\nioral, and executive function effects do not necessarily\ncorrespond to peak blood levels; detectable blood levels\nmay persist beyond the impairing effects or the impair\ning effects may be measurable when the drug cannot be\ndetected in the blood).\n??n?쟔ensitivity and tolerance (accentuation and diminution\nof the impairing effects with repeated exposure).\n??n?쟅ndividual differences in absorption, distribution, action,\nand metabolism (some individuals will show evidence\nof impairment at drug concentrations that are not asso\nciated with impairment in others; wide ranges of drug\nconcentrations in different individuals have been associ\nated with equivalent levels of impairment).\n??n?잸ccumulation (blood levels of some drugs or their\nmetabolites may accumulate with repeated administra\ntions if the time-course of elimination is insufficient to\nreduce or remove the drug or metabolite before the next\ndose is administered).\n??n?잸cute versus chronic administration (it is not unusual to\nobserve greater impairment during initial administra\ntions of drugs than is observed when the drug is admin\nistered over a long period of time).\nAt the current time, specific drug concentration levels can\nnot be reliably equated with a specific degree of driver\nimpairment.",
+                      "tables":  [
+                                     {
+                                         "id":  "p4_table1",
+                                         "bbox":  [
+                                                      36.0,
+                                                      602.873,
+                                                      297.0,
+                                                      704.106
+                                                  ],
+                                         "cells":  [
+                                                       [
+                                                           "Drivers",
+                                                           "Participants",
+                                                           null
+                                                       ],
+                                                       [
+                                                           null,
+                                                           "N",
+                                                           "%"
+                                                       ],
+                                                       [
+                                                           "Eligible and Entered Site",
+                                                           "11,100",
+                                                           "100.0%"
+                                                       ],
+                                                       [
+                                                           "Breath Test",
+                                                           "9,455",
+                                                           "85.2%"
+                                                       ],
+                                                       [
+                                                           "Oral Fluid Test",
+                                                           "7,881",
+                                                           "71.0%"
+                                                       ],
+                                                       [
+                                                           "Blood Test",
+                                                           "4,686",
+                                                           "42.2%"
+                                                       ],
+                                                       [
+                                                           "Oral Fluid and/or Blood",
+                                                           "7,898",
+                                                           "71.2%"
+                                                       ]
+                                                   ]
+                                     }
+                                 ],
+                      "figures":  [
+
+                                  ]
+                  },
+                  {
+                      "number":  5,
+                      "width":  612.0,
+                      "height":  792.0,
+                      "rotation":  0,
+                      "tasks":  [
+                                    "text",
+                                    "tables",
+                                    "figures"
+                                ],
+                      "text":  "5\nNHTSA?셲 National Center for Statistics and Analysis\n1200 New Jersey Avenue SE., Washington, DC 20590\nThis and other behavioral-related research notes\nmay be accessed by Internet users at: www.nhtsa.\ngov/Driving+Safety/Research+\u0026+Evaluation/\nImpaired+driving+(drug-related)+reports.\nFor More Information\nFor questions on this document, please contact Amy\nBerning at amy.berning@dot.gov.\nDetailed information about the study and results will\nbe available in upcoming publications. Three technical\nreports are under development: one provides a complete\ndescription of the methodology used (sampling, analy\nsis, weighting, and imputation procedures) and subject\nparticipation rates (report entitled, 2013??014 National\nRoadside Survey of Alcohol and Drug Use: Methodology).\nDetailed information on the use of alcohol by drivers and\nthe relationship of alcohol to various factors like time of\nday and vehicle type will be available in a report entitled,\n2013??014 National Roadside Survey of Alcohol and Drug\nUse: Alcohol Prevalence Rates. Detailed information on\nthe use of drugs by drivers and the combined use of drugs\nand alcohol, as well as more detailed trend analysis exam\nining changes in drug prevalence from 2007 to 2013??014\nwill be provided in a third report titled 2013??014 National\nRoadside Survey of Alcohol and Drug Use: Drug Prevalence\nRates. These upcoming reports will be posted on NHTSA?셲\nWeb site.\nReferences\nCompton, R., \u0026 Berning, A. (2009). Results of the 2007\nNational Roadside Survey of Alcohol and Drug Use by Drivers\n(Report No. DOT HS 811 175). Washington, DC: National\nHighway Traffic Safety Administration. Available at\nwww.nhtsa.gov/DOT/NHTSA/Traffic%20Injury%20\nControl/Articles/Associated%20Files/811175.pdf.\nLacey, J. H., Kelley-Baker, T., Furr-Holden, D., Voas, R.\nB., Moore, C., Brainard, K., ... \u0026 Berning, A. (2009,\nDecember). 2007 National Roadside Survey of Alcohol and\nDrug Use by Drivers: Methodology. (Report No. DOT HS\n811 237). Washington, DC: National Highway Traffic\nSafety Administration. Available at www.nhtsa.gov/\nstaticfiles/nti/pdf/811237.pdf.\nLacey, J. H., Kelley-Baker, T., Furr-Holden, D., Voas, R.\nB., Romano, E., Ramirez, A., ... \u0026 Berning, A. (2009,\nDecember). 2007 National Roadside Survey of Alcohol and\nDrug Use by Drivers: Drug Results (Report No. DOT HS\n811 249). Washington, DC: National Highway Traffic\nSafety Administration. Available at www.nhtsa.gov/\nDOT/NHTSA/Traffic%20Injury%20Control/Articles/\nAssociated%20Files/811249.pdf.\nLacey, J. H., Kelley-Baker, T., Furr-Holden, D., Voas, R.\nB., Romano, E., Torres, P., ... \u0026 Berning, A. (2009,\nDecember). 2007 National Roadside Survey of Alcohol\nand Drug Use by Drivers: Alcohol Results (Report No.\nDOT HS 811 248). Washington, D.C: National Highway\nTraffic Safety Administration. Available at ntl.bts.gov/\nlib/31000/31600/31643/811248.pdf.\nLund, A. K., \u0026 Wolfe, A. C. (1991). Changes in the incidence\nof alcohol-impaired driving in the United States, 1973-\n1986. Journal of Studies on Alcohol, 52(4), 293??01.\nNHTSA. (2008). National Automotive Sampling System\nBrochure (Report No. DOT HS 807 304). Washington,\nD.C: National Highway Traffic Safety Administration.\nAvailable\nat\nwww.nhtsa.gov/DOT/NHTSA/NCSA/\nContent/PDF/NASSbrochure.pdf.\nVoas, R. B., Wells, J., Lestina, D., Williams, A., \u0026 Greene, M.\n(1998). Drinking and driving in the United States: The\n1996 National Roadside Survey. Accident Analysis and\nPrevention, 30(2), 267??75.\nWolfe, A. C. (1974). 1973 US National Roadside Breath Testing\nSurvey: Procedures and Results. Ann Arbor, MI: University\nof Michigan Safety Research Institute.\nSuggested APA format citation for this document:\nBerning, A., Compton, R., \u0026 Wochinger, K. (2015, February). Results\nof the 2013??014 National Roadside Survey of alcohol and drug\nuse by drivers. (Traffic Safety Facts Research Note. Report No.\nDOT HS 812 118). Washington, DC: National Highway Traffic\nSafety Administration.\n11326-020515-v3",
+                      "tables":  [
+
+                                 ],
+                      "figures":  [
+
+                                  ]
+                  }
+              ]
+}

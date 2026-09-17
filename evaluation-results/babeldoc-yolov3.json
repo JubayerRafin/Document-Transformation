@@ -1,0 +1,433 @@
+{
+  "report_version": "1.0",
+  "evaluator_version": "1.0.1",
+  "experiment": "babeldoc-yolov3",
+  "created_at": "2026-09-17T18:13:51.367020+00:00",
+  "dataset_sha256": "1d43dcb48be92ca3fd2030ff3355548862f238343559e737137c95b9ef2cc2ab",
+  "protocol": {
+    "protocol": "extraction-eval-v1",
+    "iou_threshold": 0.5,
+    "text_normalization": "NFKC-collapse-whitespace-case-sensitive",
+    "matching": "maximum-cardinality-iou-priority",
+    "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
+    "table_scoring": "exact-normalized-grid-slots-and-dimensions"
+  },
+  "evaluator_sha256": "5b74a29d57bc039453c5f349af9ad86aebef0eb88bbe9bd90ed69226432c2793",
+  "comparison_key": "2ad55ae2fcecd3aea098e7802d28e8bad03fd1c8ffa4f666c092876a99f39ec1",
+  "configuration": {
+    "backend": "babeldoc",
+    "backend_version": "0.6.4",
+    "settings": {
+      "ocr_engine": "BabelDOC internal parsing/OCR pipeline; no separate OCR engine explicitly configured in this run",
+      "ocr_version": "not explicitly exposed by the CLI run; record installed BabelDOC dependency versions if required",
+      "ocr_weights_sha256": "unavailable: BabelDOC installation did not expose/publish a single OCR-weights checksum for this experiment",
+      "ocr_mode": "BabelDOC default parsing behavior; translation skipped",
+      "languages": [
+        "en"
+      ],
+      "layout_model": "BabelDOC 0.6.4 default layout pipeline",
+      "table_model": "No structured table-cell model output exposed in inspected intermediate table object",
+      "preprocessing": "BabelDOC 0.6.4 default preprocessing; --skip-translation; --no-auto-extract-glossary; --debug. Adapter converts bottom-left PDF coordinates to TransformX top-left coordinates, uses geometric reading order, reconstructs the Sample02 table grid from BabelDOC-positioned table text, and maps non-full-page BabelDOC image forms to figure predictions.",
+      "translation": "skipped",
+      "translation_api_calls": "none observed; BabelDOC log reported 0 prompt and 0 completion tokens",
+      "adapter_notes": [
+        "BabelDOC page_layout exposed a table box but no explicit rows/columns/cells fields.",
+        "The adapter reconstructs a rectangular grid from positioned BabelDOC paragraph text inside the predicted table box without consulting the reference JSON.",
+        "BabelDOC exposed three image forms on Sample02; the adapter maps non-full-page image forms to figures."
+      ]
+    }
+  },
+  "documents_expected": 1,
+  "documents_missing": 0,
+  "counts": {
+    "evaluated_pages": 6,
+    "missing_pages": 0,
+    "character_errors": 13000,
+    "reference_characters": 21822,
+    "word_errors": 2641,
+    "reference_words": 3796,
+    "text_pages": 6,
+    "tables_pages": 6,
+    "tables_tp": 3,
+    "tables_fn": 0,
+    "tables_fp": 0,
+    "tables_iou_sum": 2.834967821553844,
+    "cell_tp": 4,
+    "cell_fn": 255,
+    "cell_fp": 111,
+    "figures_pages": 6,
+    "figures_tp": 0,
+    "figures_fn": 5,
+    "figures_fp": 4,
+    "figures_iou_sum": 0,
+    "table_dimensions_correct": 0
+  },
+  "metrics": {
+    "text": {
+      "pages": 6,
+      "cer": 0.595729080744203,
+      "wer": 0.6957323498419389,
+      "character_errors": 13000,
+      "reference_characters": 21822,
+      "word_errors": 2641,
+      "reference_words": 3796
+    },
+    "table_cells": {
+      "tp": 4,
+      "fp": 111,
+      "fn": 255,
+      "precision": 0.034782608695652174,
+      "recall": 0.015444015444015444,
+      "f1": 0.0213903743315508
+    },
+    "table_dimensions_recall": 0.0,
+    "tables": {
+      "tp": 3,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 6,
+      "matched_mean_iou": 0.9449892738512813
+    },
+    "figures": {
+      "tp": 0,
+      "fp": 4,
+      "fn": 5,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1": 0.0,
+      "pages": 6,
+      "matched_mean_iou": null
+    }
+  },
+  "documents": [
+    {
+      "source_sha256": "37049049b5e06f67c6cd22b72f7b9352914b0eb3a03e99abf54594c1005a8468",
+      "source_name": "YOLOv3.pdf",
+      "missing_prediction": false,
+      "counts": {
+        "evaluated_pages": 6,
+        "missing_pages": 0,
+        "character_errors": 13000,
+        "reference_characters": 21822,
+        "word_errors": 2641,
+        "reference_words": 3796,
+        "text_pages": 6,
+        "tables_pages": 6,
+        "tables_tp": 3,
+        "tables_fn": 0,
+        "tables_fp": 0,
+        "tables_iou_sum": 2.834967821553844,
+        "cell_tp": 4,
+        "cell_fn": 255,
+        "cell_fp": 111,
+        "figures_pages": 6,
+        "figures_tp": 0,
+        "figures_fn": 5,
+        "figures_fp": 4,
+        "figures_iou_sum": 0,
+        "table_dimensions_correct": 0
+      },
+      "pages": [
+        {
+          "page": 1,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 2175,
+            "reference_characters": 3558,
+            "word_errors": 484,
+            "reference_words": 649,
+            "reference": "YOLOv3: An Incremental Improvement\nJoseph Redmon\nAli Farhadi\nUniversity of Washington\nAbstract\nWe present some updates to YOLO! We made a bunch\nof little design changes to make it better. We also trained\nthis new network that?셲 pretty swell. It?셲 a little bigger than\nlast time but more accurate.\nIt?셲 still fast though, don?셳\nworry. At 320 횞 320 YOLOv3 runs in 22 ms at 28.2 mAP,\nas accurate as SSD but three times faster. When we look\nat the old .5 IOU mAP detection metric YOLOv3 is quite\ngood. It achieves 57.9 AP50 in 51 ms on a Titan X, com-\npared to 57.5 AP50 in 198 ms by RetinaNet, similar perfor-\nmance but 3.8횞 faster. As always, all the code is online at\nhttps://pjreddie.com/yolo/.\n1. Introduction\nSometimes you just kinda phone it in for a year, you\nknow? I didn?셳 do a whole lot of research this year. Spent\na lot of time on Twitter. Played around with GANs a little.\nI had a little momentum left over from last year [12] [1]; I\nmanaged to make some improvements to YOLO. But, hon-\nestly, nothing like super interesting, just a bunch of small\nchanges that make it better. I also helped out with other\npeople?셲 research a little.\nActually, that?셲 what brings us here today.\nWe have\na camera-ready deadline [4] and we need to cite some of\nthe random updates I made to YOLO but we don?셳 have a\nsource. So get ready for a TECH REPORT!\nThe great thing about tech reports is that they don?셳 need\nintros, y?셙ll know why we?셱e here. So the end of this intro-\nduction will signpost for the rest of the paper. First we?셪l tell\nyou what the deal is with YOLOv3. Then we?셪l tell you how\nwe do. We?셪l also tell you about some things we tried that\ndidn?셳 work. Finally we?셪l contemplate what this all means.\n2. The Deal\nSo here?셲 the deal with YOLOv3: We mostly took good\nideas from other people. We also trained a new classifier\nnetwork that?셲 better than the other ones. We?셪l just take\nyou through the whole system from scratch so you can un-\nderstand it all.\n50\n100\n150\n200\n250\ninference time (ms)\n28\n30\n32\n34\n36\n38\nCOCO AP\nB\nC\nD\nE\nF\nG\nRetinaNet-50\nRetinaNet-101\nYOLOv3\nMethod\n[B] SSD321\n[C] DSSD321\n[D] R-FCN\n[E] SSD513\n[F] DSSD513\n[G] FPN FRCN\nRetinaNet-50-500\nRetinaNet-101-500\nRetinaNet-101-800\nYOLOv3-320\nYOLOv3-416\nYOLOv3-608\nmAP\n28.0\n28.0\n29.9\n31.2\n33.2\n36.2\n32.5\n34.4\n37.8\n28.2\n31.0\n33.0\ntime\n61\n85\n85\n125\n156\n172\n73\n90\n198\n22\n29\n51\nFigure 1. We adapt this figure from the Focal Loss paper [9].\nYOLOv3 runs significantly faster than other detection methods\nwith comparable performance. Times from either an M40 or Titan\nX, they are basically the same GPU.\n2.1. Bounding Box Prediction\nFollowing YOLO9000 our system predicts bounding\nboxes using dimension clusters as anchor boxes [15]. The\nnetwork predicts 4 coordinates for each bounding box, tx,\nty, tw, th. If the cell is offset from the top left corner of the\nimage by (cx, cy) and the bounding box prior has width and\nheight pw, ph, then the predictions correspond to:\nbx = ?(tx) + cx\nby = ?(ty) + cy\nbw = pwetw\nbh = pheth\nDuring training we use sum of squared error loss. If the\nground truth for some coordinate prediction is ?t* our gra-\ndient is the ground truth value (computed from the ground\ntruth box) minus our prediction: ?t* ?뭪*. This ground truth\nvalue can be easily computed by inverting the equations\nabove.\nYOLOv3 predicts an objectness score for each bounding\nbox using logistic regression. This should be 1 if the bound-\ning box prior overlaps a ground truth object by more than\nany other bounding box prior. If the bounding box prior\n1\narXiv:1804.02767v1 [cs.CV] 8 Apr 2018",
+            "prediction": "YOLOv3: An Incremental Improvement Joseph Redmon Ali Farhadi University of Washington Abstract 38 YOLOv3 r 2018 CV] 8 Ap 1 [cs. 02767v :1804. iv arX RetinaNet-50 RetinaNet-101 G We present some updates to YOLO! We made a bunch of little design changes to make it better. We also trained this new network that’s pretty swell. It’s a little bigger than last time but more accurate. It’s still fast though, don’t worry. At 320 × 320 YOLOv3 runs in 22 ms at 28.2 mAP, as accurate as SSD but three times faster. When we look at the old .5 IOU mAP detection metric YOLOv3 is quite good. It achieves 57.9 AP50 in 51 ms on a Titan X, com- pared to 57.5 AP50 in 198 ms by RetinaNet, similar perfor- mance but 3.8× faster. As always, all the code is online at https://pjreddie.com/yolo/. 36 time Method mAP [B] SSD321 61 28.0 28 85 0 [C] DSSD321 . COCO AP 34 29.9 85 [D] R-FCN F 31.2 125 [E] SSD513 156 33.2 [F] DSSD513 32 36.2 172 [G] FPN FRCN E RetinaNet-50-500 32.5 73 RetinaNet-101-500 34.4 90 D 30 RetinaNet-101-800 37.8 198 22 28.2 YOLOv3-320 YOLOv3-416 29 31.0 C B 28 YOLOv3-608 33.0 51 200 250 50 100 150 inference time (ms) Figure 1. We adapt this figure from the Focal Loss paper [9]. YOLOv3 runs significantly faster than other detection methods with comparableperformance. Times fromeither an M40 or Titan X, they are basically the same GPU. 1. Introduction 2.1. Bounding Box Prediction Sometimes you just kinda phone it in for a year, you know? I didn’t do a whole lot of research this year. Spent a lot of time on Twitter. Played around with GANs a little. I had a little momentum left over from last year [12] [1]; I managed to make some improvements to YOLO. But, hon- estly, nothing like super interesting, just a bunch of small changes that make it better. I also helped out with other people’s research a little. Following YOLO9000 our system predicts bounding boxes using dimension clusters as anchor boxes [15]. The network predicts 4 coordinates for each bounding box, tx, ty, tw, th. If the cell is offset from the top left corner of the image by (cx,cy) and the bounding box prior has width and height pw, ph, then the predictions correspond to: Actually, that’s what brings us here today. We have a camera-ready deadline [4] and we need to cite some of the random updates I made to YOLO but we don’t have a source. So get ready for aTECHREPORT! The great thing about tech reports is that they don’t need intros, y’all know why we’re here. So the end of this intro- duction will signpost for the rest of the paper. First we’ll tell you what the deal is with YOLOv3. Then we’ll tell you how we do. We’ll also tell you about some things we tried that didn’t work. Finally we’ll contemplate what this all means. During training we use sum of squared error loss. If the ground truth for some coordinate prediction is ˆt* our gra- dient is the ground truth value (computed from the ground ˆ truth box) minus our prediction: t* − t*. This ground truth value can be easily computed by inverting the equations above. 2. The Deal So here’s the deal with YOLOv3: We mostly took good ideas from other people. We also trained a new classifier network that’s better than the other ones. We’ll just take you through the whole system from scratch so you can un- derstandit all. YOLOv3 predicts an objectness score for each bounding box usinglogistic regression. This shouldbe 1 if the bound- ing box prior overlaps a ground truth object by more than any other bounding box prior. If the bounding box prior 1"
+          },
+          "tables": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [
+              {
+                "id": "p1_figure1",
+                "bbox": [
+                  309.0,
+                  200.0,
+                  545.0,
+                  345.5
+                ]
+              }
+            ],
+            "extra": []
+          }
+        },
+        {
+          "page": 2,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 2721,
+            "reference_characters": 3461,
+            "word_errors": 532,
+            "reference_words": 587,
+            "reference": "?(tx)\n?(ty)\npw\nph\nbh\nbw\nbw=pwe\nbh=phe\ncx\ncy\nbx=?(tx)+cx\nby=?(ty)+cy\ntw\nth\nFigure 2. Bounding boxes with dimension priors and location\nprediction. We predict the width and height of the box as offsets\nfrom cluster centroids. We predict the center coordinates of the\nbox relative to the location of filter application using a sigmoid\nfunction. This figure blatantly self-plagiarized from [15].\nis not the best but does overlap a ground truth object by\nmore than some threshold we ignore the prediction, follow-\ning [17]. We use the threshold of .5. Unlike [17] our system\nonly assigns one bounding box prior for each ground truth\nobject. If a bounding box prior is not assigned to a ground\ntruth object it incurs no loss for coordinate or class predic-\ntions, only objectness.\n2.2. Class Prediction\nEach box predicts the classes the bounding box may con-\ntain using multilabel classification. We do not use a softmax\nas we have found it is unnecessary for good performance,\ninstead we simply use independent logistic classifiers. Dur-\ning training we use binary cross-entropy loss for the class\npredictions.\nThis formulation helps when we move to more complex\ndomains like the Open Images Dataset [7]. In this dataset\nthere are many overlapping labels (i.e. Woman and Person).\nUsing a softmax imposes the assumption that each box has\nexactly one class which is often not the case. A multilabel\napproach better models the data.\n2.3. Predictions Across Scales\nYOLOv3 predicts boxes at 3 different scales. Our sys-\ntem extracts features from those scales using a similar con-\ncept to feature pyramid networks [8]. From our base fea-\nture extractor we add several convolutional layers. The last\nof these predicts a 3-d tensor encoding bounding box, ob-\njectness, and class predictions.\nIn our experiments with\nCOCO [10] we predict 3 boxes at each scale so the tensor is\nN 횞 N 횞 [3 ??4 + 1 + 80)] for the 4 bounding box offsets,\n1 objectness prediction, and 80 class predictions.\nNext we take the feature map from 2 layers previous and\nupsample it by 2횞. We also take a feature map from earlier\nin the network and merge it with our upsampled features\nusing concatenation. This method allows us to get more\nmeaningful semantic information from the upsampled fea-\ntures and finer-grained information from the earlier feature\nmap. We then add a few more convolutional layers to pro-\ncess this combined feature map, and eventually predict a\nsimilar tensor, although now twice the size.\nWe perform the same design one more time to predict\nboxes for the final scale. Thus our predictions for the 3rd\nscale benefit from all the prior computation as well as fine-\ngrained features from early on in the network.\nWe still use k-means clustering to determine our bound-\ning box priors.\nWe just sort of chose 9 clusters and 3\nscales arbitrarily and then divide up the clusters evenly\nacross scales. On the COCO dataset the 9 clusters were:\n(10횞13), (16횞30), (33횞23), (30횞61), (62횞45), (59횞\n119), (116 횞 90), (156 횞 198), (373 횞 326).\n2.4. Feature Extractor\nWe use a new network for performing feature extraction.\nOur new network is a hybrid approach between the network\nused in YOLOv2, Darknet-19, and that newfangled residual\nnetwork stuff. Our network uses successive 3 횞 3 and 1 횞 1\nconvolutional layers but now has some shortcut connections\nas well and is significantly larger. It has 53 convolutional\nlayers so we call it.... wait for it..... Darknet-53!\nTable 1. Darknet-53.",
+            "prediction": "Next we take the feature map from 2 layers previous and upsample it by 2×. We also take a feature map from earlier in the network and merge it with our upsampled features using concatenation. This method allows us to get more meaningful semantic information from the upsampled fea- tures and finer-grained information from the earlier feature map. We then add a few more convolutional layers to pro- cess this combined feature map, and eventually predict a similar tensor, although now twice the size. c x p w c y b w bx=σ(tx)+cx σ(t ) ph bh y =σ(t )+c b We perform the same design one more time to predict boxes for the final scale. Thus our predictions for the 3rd y y y σ(t ) bw=pwe tw x bh=phe th scale benefit from all the prior computation as well as fine- grainedfeaturesfromearly oninthenetwork. We still use k-means clustering to determine our bound- ing box priors. We just sort of chose 9 clusters and 3 scales arbitrarily and then divide up the clusters evenly across scales. On the COCO dataset the 9 clusters were: (10 × 13), (16 ×30), (33 × 23), (30 × 61), (62 ×45), (59 × 119), (116 × 90), (156 × 198), (373 × 326). Figure 2. Bounding boxes with dimension priors and location prediction. We predict the width and height of the box as offsets from cluster centroids. We predict the center coordinates of the box relative to the location of filter application using a sigmoid function. This figure blatantly self-plagiarized from [15]. 2.4. Feature Extractor is not the best but does overlap a ground truth object by more than some threshold we ignore the prediction, follow- ing [17]. We use the threshold of .5. Unlike [17] our system only assigns one bounding box prior for each ground truth object. If a bounding box prior is not assigned to a ground truth object it incurs no loss for coordinate or class predic- tions, only objectness. We use a new network for performing feature extraction. Our new network is a hybrid approach between the network used in YOLOv2, Darknet-19, and that newfangled residual network stuff. Our network uses successive 3 × 3 and 1 × 1 convolutional layers but now has some shortcut connections as well and is significantly larger. It has 53 convolutional layers so we call it.... wait for it..... Darknet-53! 2.2. Class Prediction Each box predicts the classes the bounding box may con- tain usingmultilabel classification. We do not use a softmax as we have found it is unnecessary for good performance, instead we simply use independent logistic classifiers. Dur- ing training we use binary cross-entropy loss for the class predictions. This formulation helps when we move to more complex domains like the Open Images Dataset [7]. In this dataset there are many overlapping labels (i.e. Woman and Person). Using a softmax imposes the assumption that each box has exactly one class which is often not the case. A multilabel approach better models the data. 2.3. Predictions Across Scales YOLOv3 predicts boxes at 3 different scales. Our sys- tem extracts features from those scales using a similar con- cept to feature pyramid networks [8]. From our base fea- ture extractor we add several convolutional layers. The last of these predicts a 3-d tensor encoding bounding box, ob- jectness, and class predictions. In our experiments with COCO [10] we predict 3 boxes at each scale so the tensor is N × N × [3 ∗ (4 + 1 + 80)] for the 4 bounding box offsets, 1 objectness prediction, and 80 class predictions. Table 1. Darknet-53."
+          },
+          "tables": {
+            "matches": [
+              {
+                "reference_id": "p2_table1",
+                "prediction_id": "p2_table1",
+                "iou": 0.9717099509487053
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [
+              {
+                "id": "p2_figure1",
+                "bbox": [
+                  50.0,
+                  60.0,
+                  286.5,
+                  246.0
+                ]
+              }
+            ],
+            "extra": []
+          }
+        },
+        {
+          "page": 3,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 2664,
+            "reference_characters": 3670,
+            "word_errors": 539,
+            "reference_words": 623,
+            "reference": "This new network is much more powerful than Darknet-\n19 but still more efficient than ResNet-101 or ResNet-152.\nHere are some ImageNet results:\nTable 2. Comparison of backbones. Accuracy, billions of oper-\nations, billion floating point operations per second, and FPS for\nvarious networks.\nEach network is trained with identical settings and tested\nat 256횞256, single crop accuracy. Run times are measured\non a Titan X at 256 횞 256. Thus Darknet-53 performs on\npar with state-of-the-art classifiers but with fewer floating\npoint operations and more speed. Darknet-53 is better than\nResNet-101 and 1.5횞 faster. Darknet-53 has similar perfor-\nmance to ResNet-152 and is 2횞 faster.\nDarknet-53 also achieves the highest measured floating\npoint operations per second. This means the network struc-\nture better utilizes the GPU, making it more efficient to eval-\nuate and thus faster. That?셲 mostly because ResNets have\njust way too many layers and aren?셳 very efficient.\n2.5. Training\nWe still train on full images with no hard negative mining\nor any of that stuff. We use multi-scale training, lots of data\naugmentation, batch normalization, all the standard stuff.\nWe use the Darknet neural network framework for training\nand testing [14].\n3. How We Do\nYOLOv3 is pretty good! See table 3. In terms of COCOs\nweird average mean AP metric it is on par with the SSD\nvariants but is 3횞 faster. It is still quite a bit behind other\nTable 3. I?셫 seriously just stealing all these tables from [9] they take soooo long to make from scratch. Ok, YOLOv3 is doing alright.\nKeep in mind that RetinaNet has like 3.8횞 longer to process an image. YOLOv3 is much better than SSD variants and comparable to\nstate-of-the-art models on the AP50 metric.\nmodels like RetinaNet in this metric though.\nHowever, when we look at the ?쐎ld??detection metric of\nmAP at IOU= .5 (or AP50 in the chart) YOLOv3 is very\nstrong. It is almost on par with RetinaNet and far above\nthe SSD variants. This indicates that YOLOv3 is a very\nstrong detector that excels at producing decent boxes for ob-\njects. However, performance drops significantly as the IOU\nthreshold increases indicating YOLOv3 struggles to get the\nboxes perfectly aligned with the object.\nIn the past YOLO struggled with small objects. How-\never, now we see a reversal in that trend. With the new\nmulti-scale predictions we see YOLOv3 has relatively high\nAPS performance. However, it has comparatively worse\nperformance on medium and larger size objects. More in-\nvestigation is needed to get to the bottom of this.\nWhen we plot accuracy vs speed on the AP50 metric (see\nfigure 5) we see YOLOv3 has significant benefits over other\ndetection systems. Namely, it?셲 faster and better.\n4. Things We Tried That Didn?셳 Work\nWe tried lots of stuff while we were working on\nYOLOv3. A lot of it didn?셳 work. Here?셲 the stuff we can\nremember.\nAnchor box x, y offset predictions. We tried using the\nnormal anchor box prediction mechanism where you pre-\ndict the x, y offset as a multiple of the box width or height\nusing a linear activation. We found this formulation de-\ncreased model stability and didn?셳 work very well.\nLinear x, y predictions instead of logistic. We tried\nusing a linear activation to directly predict the x, y offset\ninstead of the logistic activation. This led to a couple point\ndrop in mAP.\nFocal loss. We tried using focal loss. It dropped our\nmAP about 2 points. YOLOv3 may already be robust to\nthe problem focal loss is trying to solve because it has sep-\narate objectness predictions and conditional class predic-\ntions. Thus for most examples there is no loss from the\nclass predictions? Or something? We aren?셳 totally sure.",
+            "prediction": "This new network is much more powerful than Darknet- 19 but still more efficient than ResNet-101 or ResNet-152. Here are some ImageNetresults: models like RetinaNet in this metric though. However, when we look at the “old” detection metric of mAP at IOU= .5 (or AP50 in the chart) YOLOv3 is very strong. It is almost on par with RetinaNet and far above the SSD variants. This indicates that YOLOv3 is a very strong detector that excels at producing decent boxes for ob- jects. However, performance drops significantly as the IOU threshold increases indicating YOLOv3 struggles to get the boxes perfectly aligned with the object. In the past YOLO struggled with small objects. How- ever, now we see a reversal in that trend. With the new multi-scale predictions we see YOLOv3 has relatively high APS performance. However, it has comparatively worse performance on medium and larger size objects. More in- vestigation is needed to get to the bottom of this. Table 2. Comparison of backbones. Accuracy, billions of oper- ations, billion floating point operations per second, and FPS for various networks. Each network is trained with identical settings and tested at 256 ×256, single crop accuracy. Run times are measured on a Titan X at 256 × 256. Thus Darknet-53 performs on par with state-of-the-art classifiers but with fewer floating point operations and more speed. Darknet-53 is better than ResNet-101 and 1.5× faster. Darknet-53 has similar perfor- mance to ResNet-152 and is 2× faster. When we plot accuracy vs speed on the AP50 metric (see figure5) weseeYOLOv3 has significant benefits over other detection systems. Namely, it’s faster and better. 4. Things We Tried That Didn’t Work Darknet-53 also achieves the highest measured floating point operations per second. This means the network struc- ture better utilizes the GPU, makingitmore efficient to eval- uate and thus faster. That’s mostly because ResNets have just way too many layers and aren’t very efficient. We tried lots of stuff while we were working on YOLOv3. A lot of it didn’t work. Here’s the stuff we can remember. Anchor box x, y offset predictions. We tried using the normal anchor box prediction mechanism where you pre- dict the x, y offset as a multiple of the box width or height using a linear activation. We found this formulation de- creased model stability and didn’t work very well. 2.5. Training Westill trainonfullimages withnohardnegative mining or any of that stuff. We use multi-scale training, lots of data augmentation, batch normalization, all the standard stuff. We use the Darknet neural network framework for training and testing [14]. Linear x, y predictions instead of logistic. We tried using a linear activation to directly predict the x,y offset instead of the logistic activation. This led to a couple point drop in mAP. Focal loss. We tried using focal loss. It dropped our mAP about 2 points. YOLOv3 may already be robust to the problem focal loss is trying to solve because it has sep- arate objectness predictions and conditional class predic- tions. Thus for most examples there is no loss from the class predictions? Or something? Wearen’t totally sure. 3. How We Do YOLOv3 is pretty good! See table 3. In terms of COCOs weird average mean AP metric it is on par with the SSD variants but is 3× faster. It is still quite a bit behind other Table 3. I’m seriously just stealing all these tables from [9] they take soooo long to make from scratch. Ok, YOLOv3 is doing alright. Keep in mind that RetinaNet has like 3.8× longer to process an image. YOLOv3 is much better than SSD variants and comparable to state-of-the-art models on theAP50 metric."
+          },
+          "tables": {
+            "matches": [
+              {
+                "reference_id": "p3_table1",
+                "prediction_id": "p3_table2",
+                "iou": 0.8907931034482759
+              },
+              {
+                "reference_id": "p3_table2",
+                "prediction_id": "p3_table1",
+                "iou": 0.9724647671568627
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "page": 4,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 1819,
+            "reference_characters": 3183,
+            "word_errors": 387,
+            "reference_words": 583,
+            "reference": "50\n100\n150\n200\n250\ninference time (ms)\n48\n50\n52\n54\n56\n58\nCOCO mAP-50\nB\nC\nD\nE\nF\nG\nRetinaNet-50\nRetinaNet-101\nYOLOv3\nMethod\n[B] SSD321\n[C] DSSD321\n[D] R-FCN\n[E] SSD513\n[F] DSSD513\n[G] FPN FRCN\nRetinaNet-50-500\nRetinaNet-101-500\nRetinaNet-101-800\nYOLOv3-320\nYOLOv3-416\nYOLOv3-608\nmAP-50\n45.4\n46.1\n51.9\n50.4\n53.3\n59.1\n50.9\n53.1\n57.5\n51.5\n55.3\n57.9\ntime\n61\n85\n85\n125\n156\n172\n73\n90\n198\n22\n29\n51\nFigure 3. Again adapted from the [9], this time displaying speed/accuracy tradeoff on the mAP at .5 IOU metric. You can tell YOLOv3 is\ngood because it?셲 very high and far to the left. Can you cite your own paper? Guess who?셲 going to try, this guy ??16]. Oh, I forgot, we\nalso fix a data loading bug in YOLOv2, that helped by like 2 mAP. Just sneaking this in here to not throw off layout.\nDual IOU thresholds and truth assignment. Faster R-\nCNN uses two IOU thresholds during training. If a predic-\ntion overlaps the ground truth by .7 it is as a positive exam-\nple, by [.3??7] it is ignored, less than .3 for all ground truth\nobjects it is a negative example. We tried a similar strategy\nbut couldn?셳 get good results.\nWe quite like our current formulation, it seems to be at\na local optima at least. It is possible that some of these\ntechniques could eventually produce good results, perhaps\nthey just need some tuning to stabilize the training.\n5. What This All Means\nYOLOv3 is a good detector. It?셲 fast, it?셲 accurate. It?셲\nnot as great on the COCO average AP between .5 and .95\nIOU metric. But it?셲 very good on the old detection metric\nof .5 IOU.\nWhy did we switch metrics anyway?\nThe original\nCOCO paper just has this cryptic sentence: ?쏛 full discus-\nsion of evaluation metrics will be added once the evaluation\nserver is complete?? Russakovsky et al report that that hu-\nmans have a hard time distinguishing an IOU of .3 from .5!\n?쏷raining humans to visually inspect a bounding box with\nIOU of 0.3 and distinguish it from one with IOU 0.5 is sur-\nprisingly difficult.??[18] If humans have a hard time telling\nthe difference, how much does it matter?\nBut maybe a better question is: ?쏻hat are we going to\ndo with these detectors now that we have them???A lot of\nthe people doing this research are at Google and Facebook.\nI guess at least we know the technology is in good hands\nand definitely won?셳 be used to harvest your personal infor-\nmation and sell it to.... wait, you?셱e saying that?셲 exactly\nwhat it will be used for?? Oh.\nWell the other people heavily funding vision research are\nthe military and they?셶e never done anything horrible like\nkilling lots of people with new technology oh wait.....1\nI have a lot of hope that most of the people using com-\nputer vision are just doing happy, good stuff with it, like\ncounting the number of zebras in a national park [13], or\ntracking their cat as it wanders around their house [19]. But\ncomputer vision is already being put to questionable use and\nas researchers we have a responsibility to at least consider\nthe harm our work might be doing and think of ways to mit-\nigate it. We owe the world that much.\nIn closing, do not @ me. (Because I finally quit Twitter).\n1The author is funded by the Office of Naval Research and Google.",
+            "prediction": "G 58 YOLOv3 RetinaNet-50 RetinaNet-101 56 -50 AP m CO CO time Method mAP-50 [B] SSD321 61 45.4 46.1 85 [C] DSSD321 54 85 51.9 [D] R-FCN F 125 50.4 [E] SSD513 156 53.3 [F] DSSD513 52 D 59.1 172 [G] FPN FRCN RetinaNet-50-500 50.9 73 E RetinaNet-101-500 53.1 90 50 RetinaNet-101-800 198 57.5 YOLOv3-320 22 51.5 YOLOv3-416 29 55.3 48 YOLOv3-608 57.9 51 200 250 50 100 150 C B inference time (ms) Figure 3. Again adapted from the [9], this time displaying speed/accuracy tradeoff on the mAP at .5 IOU metric. You can tell YOLOv3 is good because it’s very high and far to the left. Can you cite your own paper? Guess who’s going to try, this guy → [16]. Oh, I forgot, we also fix a data loading bug in YOLOv2, that helped by like 2 mAP. Just sneaking this in here to not throw off layout. Dual IOU thresholds and truth assignment. Faster R- CNN uses two IOU thresholds during training. If a predic- tion overlaps the ground truth by .7 it is as a positive exam- ple, by [.3 − .7] it is ignored, less than .3 for all ground truth objects it is a negative example. We tried a similar strategy but couldn’t get good results. prisingly difficult.” [18] If humans have a hard time telling the difference, how much does it matter? But maybe a better question is: “What are we going to do with these detectors now that we have them?” A lot of the people doing this research are at Google and Facebook. I guess at least we know the technology is in good hands and definitely won’t be used to harvest your personal infor- mation and sell it to.... wait, you’re saying that’s exactly what it will be used for?? Oh. We quite like our current formulation, it seems to be at a local optima at least. It is possible that some of these techniques could eventually produce good results, perhaps theyjust needsome tuningto stabilizethetraining. Well the otherpeople heavily funding vision research are the military and they’ve never done anything horrible like killing lots of people with new technology oh wait.....1 5. What This All Means I have a lot of hope that most of the people using com- puter vision are just doing happy, good stuff with it, like counting the number of zebras in a national park [13], or tracking their cat as it wanders around their house [19]. But computer vision is alreadybeing put to questionable use and as researchers we have a responsibility to at least consider the harm our work might be doing and think of ways to mit- igate it. We owe the world that much. YOLOv3 is a good detector. It’s fast, it’s accurate. It’s not as great on the COCO average AP between .5 and .95 IOU metric. But it’s very good on the old detection metric of .5 IOU. Why did we switch metrics anyway? The original COCO paper just has this cryptic sentence: “A full discus- sion of evaluation metrics will be added once the evaluation server is complete”. Russakovsky et al report that that hu- mans have a hard time distinguishing an IOU of .3 from .5! “Training humans to visually inspect a bounding box with IOU of 0.3 and distinguish it from one with IOU 0.5 is sur- In closing, do not @ me. (Because I finally quit Twitter). 1The author is funded by the Office of Naval Research and Google."
+          },
+          "tables": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [
+              {
+                "id": "p4_figure1",
+                "bbox": [
+                  63.0,
+                  50.0,
+                  567.0,
+                  377.0
+                ]
+              }
+            ],
+            "extra": []
+          }
+        },
+        {
+          "page": 5,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 1241,
+            "reference_characters": 3556,
+            "word_errors": 194,
+            "reference_words": 559,
+            "reference": "References\n[1] Analogy. Wikipedia, Mar 2018. 1\n[2] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and\nA. Zisserman. The pascal visual object classes (voc) chal-\nlenge. International journal of computer vision, 88(2):303??n338, 2010. 6\n[3] C.-Y. Fu, W. Liu, A. Ranga, A. Tyagi, and A. C. Berg.\nDssd: Deconvolutional single shot detector. arXiv preprint\narXiv:1701.06659, 2017. 3\n[4] D. Gordon, A. Kembhavi, M. Rastegari, J. Redmon, D. Fox,\nand A. Farhadi. Iqa: Visual question answering in interactive\nenvironments. arXiv preprint arXiv:1712.03316, 2017. 1\n[5] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learn-\ning for image recognition. In Proceedings of the IEEE con-\nference on computer vision and pattern recognition, pages\n770??78, 2016. 3\n[6] J. Huang, V. Rathod, C. Sun, M. Zhu, A. Korattikara,\nA. Fathi, I. Fischer, Z. Wojna, Y. Song, S. Guadarrama, et al.\nSpeed/accuracy trade-offs for modern convolutional object\ndetectors. 3\n[7] I. Krasin, T. Duerig, N. Alldrin, V. Ferrari, S. Abu-El-Haija,\nA. Kuznetsova, H. Rom, J. Uijlings, S. Popov, A. Veit,\nS. Belongie, V. Gomes, A. Gupta, C. Sun, G. Chechik,\nD. Cai, Z. Feng, D. Narayanan, and K. Murphy.\nOpen-\nimages: A public dataset for large-scale multi-label and\nmulti-class image classification.\nDataset available from\nhttps://github.com/openimages, 2017. 2\n[8] T.-Y. Lin, P. Dollar, R. Girshick, K. He, B. Hariharan, and\nS. Belongie. Feature pyramid networks for object detection.\nIn Proceedings of the IEEE Conference on Computer Vision\nand Pattern Recognition, pages 2117??125, 2017. 2, 3\n[9] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Doll ?ar.\nFocal loss for dense object detection.\narXiv preprint\narXiv:1708.02002, 2017. 1, 3, 4\n[10] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra-\nmanan, P. Doll ?ar, and C. L. Zitnick. Microsoft coco: Com-\nmon objects in context. In European conference on computer\nvision, pages 740??55. Springer, 2014. 2\n[11] W. Liu, D. Anguelov, D. Erhan, C. Szegedy, S. Reed, C.-\nY. Fu, and A. C. Berg. Ssd: Single shot multibox detector.\nIn European conference on computer vision, pages 21??7.\nSpringer, 2016. 3\n[12] I. Newton. Philosophiae naturalis principia mathematica.\nWilliam Dawson & Sons Ltd., London, 1687. 1\n[13] J. Parham, J. Crall, C. Stewart, T. Berger-Wolf, and\nD. Rubenstein. Animal population censusing at scale with\ncitizen science and photographic identification. 2017. 4\n[14] J. Redmon.\nDarknet: Open source neural networks in c.\nhttp://pjreddie.com/darknet/, 2013??016. 3\n[15] J. Redmon and A. Farhadi. Yolo9000: Better, faster, stronger.\nIn Computer Vision and Pattern Recognition (CVPR), 2017\nIEEE Conference on, pages 6517??525. IEEE, 2017. 1, 2, 3\n[16] J. Redmon and A. Farhadi. Yolov3: An incremental improve-\nment. arXiv, 2018. 4\n[17] S. Ren, K. He, R. Girshick, and J. Sun. Faster r-cnn: To-\nwards real-time object detection with region proposal net-\nworks. arXiv preprint arXiv:1506.01497, 2015. 2\n[18] O. Russakovsky, L.-J. Li, and L. Fei-Fei.\nBest of both\nworlds: human-machine collaboration for object annotation.\nIn Proceedings of the IEEE Conference on Computer Vision\nand Pattern Recognition, pages 2121??131, 2015. 4\n[19] M. Scott. Smart camera gimbal bot scanlime:027, Dec 2017.\n4\n[20] A. Shrivastava, R. Sukthankar, J. Malik, and A. Gupta. Be-\nyond skip connections: Top-down modulation for object de-\ntection. arXiv preprint arXiv:1612.06851, 2016. 3\n[21] C. Szegedy, S. Ioffe, V. Vanhoucke, and A. A. Alemi.\nInception-v4, inception-resnet and the impact of residual\nconnections on learning. 2017. 3",
+            "prediction": "[18] O. Russakovsky, L.-J. Li, and L. Fei-Fei. Best of both worlds: human-machine collaboration for object annotation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pages 2121–2131, 2015. 4 [19] M. Scott. Smart camera gimbal bot scanlime:027, Dec 2017. 4 [20] A. Shrivastava, R. Sukthankar, J. Malik, and A. Gupta. Be- yond skip connections: Top-down modulation for object de- tection. arXiv preprint arXiv:1612.06851, 2016. 3 [21] C. Szegedy, S. Ioffe, V. Vanhoucke, and A. A. Alemi. Inception-v4, inception-resnet and the impact of residual connections on learning. 2017. 3 References [1] Analogy. Wikipedia, Mar 2018. 1 [2] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and A. Zisserman. The pascal visual object classes (voc) chal- lenge. International journal of computer vision, 88(2):303– 338, 2010. 6 [3] C.-Y. Fu, W. Liu, A. Ranga, A. Tyagi, and A. C. Berg. Dssd: Deconvolutional single shot detector. arXiv preprint arXiv:1701.06659, 2017. 3 [4] D. Gordon, A. Kembhavi, M. Rastegari, J. Redmon, D. Fox, and A. Farhadi. Iqa: Visual question answering in interactive environments. arXiv preprint arXiv:1712.03316, 2017. 1 [5] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learn- ing for image recognition. In Proceedings of the IEEE con- ference on computer vision and pattern recognition, pages 770–778, 2016. 3 [6] J. Huang, V. Rathod, C. Sun, M. Zhu, A. Korattikara, A. Fathi, I. Fischer, Z. Wojna, Y. Song, S. Guadarrama, et al. Speed/accuracy trade-offs for modern convolutional object detectors. 3 [7] I. Krasin, T. Duerig, N. Alldrin, V. Ferrari, S. Abu-El-Haija, A. Kuznetsova, H. Rom, J. Uijlings, S. Popov, A. Veit, S. Belongie, V. Gomes, A. Gupta, C. Sun, G. Chechik, D. Cai, Z. Feng, D. Narayanan, and K. Murphy. Open- images: A public dataset for large-scale multi-label and multi-class image classification. Dataset available from https://github.com/openimages, 2017. 2 [8] T.-Y. Lin, P. Dollar, R. Girshick, K. He, B. Hariharan, and S. Belongie. Feature pyramid networks for object detection. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pages 2117–2125, 2017. 2, 3 [9] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Doll ́ar. Focal loss for dense object detection. arXiv preprint arXiv:1708.02002, 2017. 1, 3, 4 [10] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra- manan, P. Doll ́ar, and C. L. Zitnick. Microsoft coco: Com- mon objects in context. In European conference on computer vision, pages 740–755. Springer, 2014. 2 [11] W. Liu, D. Anguelov, D. Erhan, C. Szegedy, S. Reed, C.- Y. Fu, and A. C. Berg. Ssd: Single shot multibox detector. In European conference on computer vision, pages 21–37. Springer, 2016. 3 [12] I. Newton. Philosophiae naturalis principia mathematica. William Dawson & Sons Ltd., London, 1687. 1 [13] J. Parham, J. Crall, C. Stewart, T. Berger-Wolf, and D. Rubenstein. Animal population censusing at scale with citizen science and photographic identification. 2017. 4 [14] J. Redmon. Darknet: Open source neural networks in c. http://pjreddie.com/darknet/, 2013–2016. 3 [15] J. Redmon and A. Farhadi. Yolo9000: Better, faster, stronger. In Computer Vision and Pattern Recognition (CVPR), 2017 IEEE Conference on, pages 6517–6525. IEEE, 2017. 1, 2, 3 [16] J. Redmon and A. Farhadi. Yolov3: An incremental improve- ment. arXiv, 2018. 4 [17] S. Ren, K. He, R. Girshick, and J. Sun. Faster r-cnn: To- wards real-time object detection with region proposal net- works. arXiv preprint arXiv:1506.01497, 2015. 2"
+          },
+          "tables": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "page": 6,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 2380,
+            "reference_characters": 4394,
+            "word_errors": 505,
+            "reference_words": 795,
+            "reference": "0\n25\n50\n75\n100\n0\n50\n100\n150\n200\nYOLOv3\nAll the other slow ones\nmAP 50\nExecution time (ms)\n0\n25\n50\n75\n100\n0\n12.5\n25\n37.5\n50\nYOLOv3\nAll the other slow ones\nFPS\nmAP 50\nFigure 4. Zero-axis charts are probably more intellectually honest... and we can still screw with the variables to make ourselves look good!\nRebuttal\nWe would like to thank the Reddit commenters, labmates,\nemailers, and passing shouts in the hallway for their lovely, heart-\nfelt words. If you, like me, are reviewing for ICCV then we know\nyou probably have 37 other papers you could be reading that you?셪l\ninvariably put off until the last week and then have some legend in\nthe field email you about how you really should finish those re-\nviews execept it won?셳 entirely be clear what they?셱e saying and\nmaybe they?셱e from the future? Anyway, this paper won?셳 have be-\ncome what it will in time be without all the work your past selves\nwill have done also in the past but only a little bit further forward,\nnot like all the way until now forward. And if you tweeted about\nit I wouldn?셳 know. Just sayin.\nReviewer #2 AKA Dan Grossman (lol blinding who does that)\ninsists that I point out here that our graphs have not one but two\nnon-zero origins. You?셱e absolutely right Dan, that?셲 because it\nlooks way better than admitting to ourselves that we?셱e all just\nhere battling over 2-3% mAP. But here are the requested graphs.\nI threw in one with FPS too because we look just like super good\nwhen we plot on FPS.\nReviewer #4 AKA JudasAdventus on Reddit writes ?쏣ntertain-\ning read but the arguments against the MSCOCO metrics seem a\nbit weak?? Well, I always knew you would be the one to turn on\nme Judas. You know how when you work on a project and it only\ncomes out alright so you have to figure out some way to justify\nhow what you did actually was pretty cool? I was basically trying\nto do that and I lashed out at the COCO metrics a little bit. But\nnow that I?셶e staked out this hill I may as well die on it.\nSee here?셲 the thing, mAP is already sort of broken so an up-\ndate to it should maybe address some of the issues with it or at least\njustify why the updated version is better in some way. And that?셲\nthe big thing I took issue with was the lack of justification. For\nPASCAL VOC, the IOU threshold was ?쓘et deliberately low to ac-\ncount for inaccuracies in bounding boxes in the ground truth data??n[2]. Does COCO have better labelling than VOC? This is defi-\nnitely possible since COCO has segmentation masks maybe the\nlabels are more trustworthy and thus we aren?셳 as worried about\ninaccuracy. But again, my problem was the lack of justification.\nThe COCO metric emphasizes better bounding boxes but that\nemphasis must mean it de-emphasizes something else, in this case\nclassification accuracy. Is there a good reason to think that more\nprecise bounding boxes are more important than better classifi-\ncation? A miss-classified example is much more obvious than a\nbounding box that is slightly shifted.\nmAP is already screwed up because all that matters is per-class\nrank ordering. For example, if your test set only has these two\nimages then according to mAP two detectors that produce these\nresults are JUST AS GOOD:\nPerson: 99%\nDog: 99%\nCamel: 99%\nBird: 99%\nPerson: 99%\nHorse: 99%\nDetector #1\nHorse: 52%\nPerson: 42%\nDog: 48%\nCamel: 10%\nBird: 90%\nPerson: 11%\nHorse: 70%\nDetector #2\nBird: 89%\nHorse: 60%\nBird: 75%\nDog: 45%\nFigure 5. These two hypothetical detectors are perfect according to\nmAP over these two images. They are both perfect. Totally equal.\nNow this is OBVIOUSLY an over-exaggeration of the prob-\nlems with mAP but I guess my newly retconned point is that there\nare such obvious discrepancies between what people in the ?쐒eal\nworld??would care about and our current metrics that I think if\nwe?셱e going to come up with new metrics we should focus on\nthese discrepancies. Also, like, it?셲 already mean average preci-\nsion, what do we even call the COCO metric, average mean aver-\nage precision?\nHere?셲 a proposal, what people actually care about is given an\nimage and a detector, how well will the detector find and classify\nobjects in the image. What about getting rid of the per-class AP\nand just doing a global average precision? Or doing an AP calcu-\nlation per-image and averaging over that?\nBoxes are stupid anyway though, I?셫 probably a true believer\nin masks except I can?셳 get YOLO to learn them.",
+            "prediction": "100 100 75 75 YOLOv3 All the other slow ones All the other slow ones YOLOv3 AP 50 m AP 50 m 50 50 25 25 0 0 12.5 25 200 37.5 0 50 0 50 100 150 FPS Execution time (ms) Figure 4. Zero-axis charts are probably more intellectually honest... and we can still screw with the variables to make ourselves look good! precise bounding boxes are more important than better classifi- cation? A miss-classified example is much more obvious than a bounding box that is slightly shifted. Rebuttal We would like to thank the Reddit commenters, labmates, emailers, and passing shouts in the hallway for their lovely, heart- felt words. If you, like me, are reviewing for ICCV then we know you probably have 37 other papers you could be reading that you’ll invariably put off until the last week and then have some legend in the field email you about how you really should finish those re- views execept it won’t entirely be clear what they’re saying and maybe they’re from the future? Anyway, this paper won’t have be- come what it will in time be without all the work your past selves will have done also in the past but only a little bit further forward, not like all the way until now forward. And if you tweeted about it I wouldn’t know. Just sayin. mAP is already screwed up because all that matters is per-class rank ordering. For example, if your test set only has these two images then according to mAP two detectors that produce these results are JUST AS GOOD: Detector #1 Bird: 99% Person: 99% Person: 99% Camel: 99% Dog: 99% Horse: 99% Reviewer #2 AKA DanGrossman (lol blinding who does that) insists that I point out here that our graphs have not one but two non-zero origins. You’re absolutely right Dan, that’s because it looks way better than admitting to ourselves that we’re all just here battling over 2-3% mAP. But here are the requested graphs. I threw in one with FPS too because we look just like super good when we plot on FPS. Detector #2 Bird: 90% Dog: 45% Horse: 52% Person: 11% Person: 42% Camel: 10% Horse: 60% Bird: 89% Dog: 48% Horse: 70% Bird: 75% Reviewer#4 AKA JudasAdventus on Reddit writes “Entertain- ing read but the arguments against the MSCOCO metrics seem a bit weak”. Well, I always knew you would be the one to turn on me Judas. You know how when you work on a project and it only comes out alright so you have to figure out some way to justify how what you did actually was pretty cool? I was basically trying to do that and I lashed out at the COCO metrics a little bit. But now that I’ve staked out this hill I may as well die on it. Figure 5. These two hypothetical detectors are perfect according to mAP over these two images. They are both perfect. Totally equal. Now this is OBVIOUSLY an over-exaggeration of the prob- lems with mAP butI guess my newly retconned point is that there are such obvious discrepancies between what people in the “real world” would care about and our current metrics that I think if we’re going to come up with new metrics we should focus on these discrepancies. Also, like, it’s already mean average preci- sion, what do we even call the COCO metric, average mean aver- age precision? See here’s the thing, mAP is already sort of broken so an up- date to it should maybe address some of the issues with it or at least justify why the updated version is better in some way. And that’s the big thing I took issue with was the lack of justification. For PASCAL VOC, the IOU threshold was ”set deliberately low to ac- count for inaccuracies in bounding boxes in the ground truth data“ [2]. Does COCO have better labelling than VOC? This is defi- nitely possible since COCO has segmentation masks maybe the labels are more trustworthy and thus we aren’t as worried about inaccuracy. But again, my problem was the lack of justification. Here’s a proposal, what people actually care about is given an image and a detector, how well will the detector find and classify objects in the image. What about getting rid of the per-class AP and just doing a global average precision? Or doing an AP calcu- lation per-image and averaging over that? Boxes are stupid anyway though, I’m probably a true believer in masks except I can’t get YOLO to learn them. The COCO metric emphasizes better bounding boxes but that emphasis must mean it de-emphasizes somethingelse, inthis case classification accuracy. Is there a good reason to think that more"
+          },
+          "tables": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [],
+            "missed": [
+              {
+                "id": "p6_figure1",
+                "bbox": [
+                  50.0,
+                  60.0,
+                  545.0,
+                  215.0
+                ]
+              },
+              {
+                "id": "p6_figure2",
+                "bbox": [
+                  309.0,
+                  335.0,
+                  545.0,
+                  498.0
+                ]
+              }
+            ],
+            "extra": [
+              {
+                "id": "p6_figure1",
+                "kind": "figure",
+                "bbox": [
+                  308.862,
+                  418.379789,
+                  426.663647,
+                  496.914212
+                ],
+                "metadata": {
+                  "babeldoc_form_type": "image",
+                  "babeldoc_render_order": 18584,
+                  "figure_mapping": "non-full-page BabelDOC image form"
+                }
+              },
+              {
+                "id": "p6_figure2",
+                "kind": "figure",
+                "bbox": [
+                  426.663647,
+                  418.379789,
+                  544.465294,
+                  496.914212
+                ],
+                "metadata": {
+                  "babeldoc_form_type": "image",
+                  "babeldoc_render_order": 18585,
+                  "figure_mapping": "non-full-page BabelDOC image form"
+                }
+              },
+              {
+                "id": "p6_figure3",
+                "kind": "figure",
+                "bbox": [
+                  308.862,
+                  335.275375,
+                  426.663647,
+                  413.809798
+                ],
+                "metadata": {
+                  "babeldoc_form_type": "image",
+                  "babeldoc_render_order": 18586,
+                  "figure_mapping": "non-full-page BabelDOC image form"
+                }
+              },
+              {
+                "id": "p6_figure4",
+                "kind": "figure",
+                "bbox": [
+                  426.663647,
+                  335.275375,
+                  544.465294,
+                  413.809798
+                ],
+                "metadata": {
+                  "babeldoc_form_type": "image",
+                  "babeldoc_render_order": 18587,
+                  "figure_mapping": "non-full-page BabelDOC image form"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "CER/WER include missing text and are order-sensitive; whitespace and NFKC normalized, case preserved.",
+    "Missing documents/pages count as empty predictions. No overall winner score is calculated.",
+    "Null means undefined or unannotated. Empty-reference text insertions remain in error counts; CER/WER can exceed 1.",
+    "Table scoring checks grid slots and dimensions, not full merged-cell topology/TEDS.",
+    "Figure detection evaluates region boxes, not image fidelity or caption association."
+  ]
+}

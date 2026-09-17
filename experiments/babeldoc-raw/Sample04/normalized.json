@@ -1,0 +1,397 @@
+{
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p1_text1",
+          "kind": "text",
+          "bbox": [
+            70.78,
+            53.34,
+            541.06,
+            73.34
+          ],
+          "text": "Asset & Access Report — Redaction Test Sample",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 1
+          }
+        },
+        {
+          "id": "p1_text2",
+          "kind": "text",
+          "bbox": [
+            49.848,
+            76.856,
+            139.544,
+            84.856
+          ],
+          "text": "Document ID: SEC-2024-",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 46
+          }
+        },
+        {
+          "id": "p1_text3",
+          "kind": "text",
+          "bbox": [
+            140.192,
+            76.856,
+            510.784,
+            84.96
+          ],
+          "text": "0093 | Classification: Internal | Purpose: verify text-in-image and image-in-table handling during redacti",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 68
+          }
+        },
+        {
+          "id": "p1_text4",
+          "kind": "text",
+          "bbox": [
+            511.6,
+            78.896,
+            519.696,
+            83.312
+          ],
+          "text": "on",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 178
+          }
+        },
+        {
+          "id": "p1_text5",
+          "kind": "text",
+          "bbox": [
+            49.34,
+            102.27,
+            557.6,
+            140.4
+          ],
+          "text": "This document mixes normal selectable text with images that contain their own baked-in text (not part of the PDF text layer). Use it to confirm a redaction pipeline correctly leaves image-embedded text alone (or flags it separately) while masking real text-layer PII.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 181
+          }
+        },
+        {
+          "id": "p1_text6",
+          "kind": "text",
+          "bbox": [
+            50.166,
+            159.098,
+            345.902,
+            173.238
+          ],
+          "text": "1. Images with baked-in text (non-selectable)",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 446
+          }
+        },
+        {
+          "id": "p1_text7",
+          "kind": "text",
+          "bbox": [
+            49.34,
+            186.27,
+            503.78,
+            210.34
+          ],
+          "text": "The three images below each contain text that is part of the pixel data, not the PDF text layer — a plain text-extraction pass will NOT find Kim Min-jun, EMP-2024-8831, or the API key inside them.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 491
+          }
+        },
+        {
+          "id": "p1_text8",
+          "kind": "text",
+          "bbox": [
+            109.26,
+            319.536,
+            178.612,
+            327.64
+          ],
+          "text": "Staff ID badge scan",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 23,
+            "babeldoc_render_order": 689
+          }
+        },
+        {
+          "id": "p1_text9",
+          "kind": "text",
+          "bbox": [
+            269.568,
+            319.536,
+            342.584,
+            327.64
+          ],
+          "text": "Facility warning label",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 24,
+            "babeldoc_render_order": 708
+          }
+        },
+        {
+          "id": "p1_text10",
+          "kind": "text",
+          "bbox": [
+            425.424,
+            319.536,
+            510.52,
+            327.536
+          ],
+          "text": "App console screenshot",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 25,
+            "babeldoc_render_order": 730
+          }
+        },
+        {
+          "id": "p1_text11",
+          "kind": "text",
+          "bbox": [
+            49.34,
+            341.95,
+            549.31,
+            379.13
+          ],
+          "text": "For comparison, here is the same kind of information as real selectable text (the redaction engine SHOULD catch this): employee Kim Min-jun, ID EMP-2024-8831, email minjun.kim@example-corp.com, API key sklive 4f9a-REDACT ME. _ _ _",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 752
+          }
+        },
+        {
+          "id": "p1_text12",
+          "kind": "text",
+          "bbox": [
+            49.564,
+            398.778,
+            310.118,
+            412.918
+          ],
+          "text": "2. Table with images embedded in cells",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 975
+          }
+        },
+        {
+          "id": "p1_text13",
+          "kind": "text",
+          "bbox": [
+            49.34,
+            425.95,
+            562.17,
+            464.02
+          ],
+          "text": "Each row below mixes a real text-layer SKU/price with a product photo that has its own price sticker baked into the image — useful for testing whether a redaction pass preserves embedded images inside table cells while still finding the text-layer values in adjacent cells.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 1013
+          }
+        },
+        {
+          "id": "p1_table1",
+          "kind": "table",
+          "bbox": [
+            72.0,
+            473.0,
+            538.0,
+            724.0
+          ],
+          "cells": [
+            [
+              "Photo",
+              "Item",
+              "SKU",
+              "Assigned To",
+              "List Price"
+            ],
+            [
+              "",
+              "LaserJet Pro X1",
+              "SKU-PR-0417",
+              "Kim Min-jun",
+              "KRW 1,200,000"
+            ],
+            [
+              "",
+              "EliteBook 840",
+              "SKU-LT-0982",
+              "Park Ji-hoon",
+              "KRW 2,400,000"
+            ],
+            [
+              "",
+              "Field Scanner T3",
+              "SKU-FS-2201",
+              "Lee Soo-jin",
+              "KRW 850,000"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 9,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.7413650751113892,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p1_figure1",
+          "kind": "figure",
+          "bbox": [
+            75.6,
+            224.2,
+            212.4,
+            309.88
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 686,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure2",
+          "kind": "figure",
+          "bbox": [
+            226.8,
+            236.08,
+            385.2,
+            298.0
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 687,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure3",
+          "kind": "figure",
+          "bbox": [
+            399.6,
+            224.56,
+            536.4,
+            309.52
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 688,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure4",
+          "kind": "figure",
+          "bbox": [
+            82.8,
+            505.88,
+            165.6,
+            567.8
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 1321,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure5",
+          "kind": "figure",
+          "bbox": [
+            82.8,
+            579.8,
+            165.6,
+            641.72
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 1372,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure6",
+          "kind": "figure",
+          "bbox": [
+            82.8,
+            653.72,
+            165.6,
+            715.64
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 1422,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p2_text1",
+          "kind": "text",
+          "bbox": [
+            49.808,
+            49.2,
+            561.744,
+            70.912
+          ],
+          "text": "Note: the price sticker visible on each photo (e.g. \"KRW 1.2M\") is baked into the image and will differ slightly in formatting from the text-layer \"List Price\" column — both should be checked independently by an OCR-aware redaction pass.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 1483
+          }
+        },
+        {
+          "id": "p2_text2",
+          "kind": "text",
+          "bbox": [
+            49.584,
+            89.7,
+            358.672,
+            99.46
+          ],
+          "text": "Generated as a synthetic test document. All names, IDs, keys, and figures are fictitious.",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 1720
+          }
+        }
+      ]
+    }
+  ]
+}

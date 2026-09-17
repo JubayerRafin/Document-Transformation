@@ -1,0 +1,499 @@
+{
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p1_text1",
+          "kind": "text",
+          "bbox": [
+            72.355957,
+            37.704785,
+            224.363004,
+            46.752
+          ],
+          "text": "CONFIDENTIAL — Internal Use Only",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 1
+          }
+        },
+        {
+          "id": "p1_text2",
+          "kind": "text",
+          "bbox": [
+            116.022352,
+            89.800781,
+            350.014645,
+            107.904
+          ],
+          "text": "Employee Onboarding Record",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 44
+          }
+        },
+        {
+          "id": "p1_text3",
+          "kind": "text",
+          "bbox": [
+            71.70142,
+            108.281414,
+            308.704086,
+            118.25472
+          ],
+          "text": "Document ID: HR-2024-00417 | Classification: Internal",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 71
+          }
+        },
+        {
+          "id": "p1_text4",
+          "kind": "text",
+          "bbox": [
+            73.870313,
+            131.238398,
+            218.861376,
+            147.21972
+          ],
+          "text": "1. Employee Summary",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 129
+          }
+        },
+        {
+          "id": "p1_text5",
+          "kind": "text",
+          "bbox": [
+            72.160255,
+            148.239551,
+            515.431144,
+            181.47432
+          ],
+          "text": "This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789. Resident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 149
+          }
+        },
+        {
+          "id": "p1_text6",
+          "kind": "text",
+          "bbox": [
+            100.312156,
+            204.408854,
+            519.0795,
+            214.38216
+          ],
+          "text": "Fields highlighted in this document contain sample PII and must be masked before external distribution.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 456
+          }
+        },
+        {
+          "id": "p1_text7",
+          "kind": "text",
+          "bbox": [
+            72.342891,
+            232.278398,
+            225.281872,
+            248.25972
+          ],
+          "text": "2. Personnel Data Table",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 560
+          }
+        },
+        {
+          "id": "p1_text8",
+          "kind": "text",
+          "bbox": [
+            72.646816,
+            367.638398,
+            194.646652,
+            383.61972
+          ],
+          "text": "3. ID Photo on File",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 1030
+          }
+        },
+        {
+          "id": "p1_text9",
+          "kind": "text",
+          "bbox": [
+            71.966797,
+            456.284414,
+            511.381532,
+            477.78144
+          ],
+          "text": "Placeholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 1053
+          }
+        },
+        {
+          "id": "p1_text10",
+          "kind": "text",
+          "bbox": [
+            72.249375,
+            495.69972,
+            124.695194,
+            511.65972
+          ],
+          "text": "4. Notes",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 1199
+          }
+        },
+        {
+          "id": "p1_text11",
+          "kind": "text",
+          "bbox": [
+            71.965957,
+            512.684414,
+            527.245743,
+            557.22888
+          ],
+          "text": "This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table — so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 1208
+          }
+        },
+        {
+          "id": "p1_text12",
+          "kind": "text",
+          "bbox": [
+            72.160255,
+            568.739294,
+            374.135565,
+            578.92176
+          ],
+          "text": "Reviewer: Park Ji-hoon Signature date: 2024-03-20 Internal ext.: 04512",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 1650
+          }
+        },
+        {
+          "id": "p1_text13",
+          "kind": "text",
+          "bbox": [
+            72.763711,
+            596.598398,
+            287.758302,
+            612.57972
+          ],
+          "text": "5. Quarterly Performance Review",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 1725
+          }
+        },
+        {
+          "id": "p1_text14",
+          "kind": "text",
+          "bbox": [
+            294.029414,
+            748.443,
+            317.081367,
+            757.443
+          ],
+          "text": "Page 1",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 34
+          }
+        },
+        {
+          "id": "p1_table1",
+          "kind": "table",
+          "bbox": [
+            70.0,
+            246.0,
+            523.0,
+            345.0
+          ],
+          "cells": [
+            [
+              "Field",
+              "Value",
+              "Field",
+              "Value"
+            ],
+            [
+              "Full Name",
+              "Kim Min-jun",
+              "Department",
+              "Enterprise Solutions"
+            ],
+            [
+              "Employee ID",
+              "EMP-2024-8831",
+              "Title",
+              "Software Engineer II"
+            ],
+            [
+              "Email",
+              "minjun.kim@example-\ncorp.com",
+              "Phone",
+              "010-2345-6789"
+            ],
+            [
+              "Bank Account",
+              "KB 123-456-789012",
+              "Annual Salary",
+              "KRW 68,000,000"
+            ],
+            [
+              "Home Address",
+              "12, Teheran-ro 4-gil,\nGangnam-gu, Seoul",
+              "Start Date",
+              "2024-03-18"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 1,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9810649156570435,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p1_table2",
+          "kind": "table",
+          "bbox": [
+            70.0,
+            610.0,
+            548.0,
+            679.0
+          ],
+          "cells": [
+            [
+              "",
+              "Q1 2024",
+              "Q2 2024",
+              ""
+            ],
+            [
+              "Employee",
+              "",
+              "",
+              "Overall"
+            ],
+            [
+              "",
+              "Rating\nBonus (KRW)",
+              "Rating\nBonus (KRW)",
+              ""
+            ],
+            [
+              "",
+              "Exceeds\n1,200,000",
+              "Meets\n800,000",
+              ""
+            ],
+            [
+              "Kim Min-jun",
+              "Self-review notes",
+              "",
+              "B+"
+            ],
+            [
+              "",
+              "Meets\n700,000",
+              "Exceeds\n1,300,000",
+              ""
+            ],
+            [
+              "Park Ji-hoon",
+              "Promoted to Team Lead effective 2024-07-01; contact 010-5566-7788",
+              "",
+              "A-"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 3,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9763079881668091,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p1_figure1",
+          "kind": "figure",
+          "bbox": [
+            72.0,
+            72.0,
+            101.999998,
+            101.999998
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 2141,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure2",
+          "kind": "figure",
+          "bbox": [
+            72.0,
+            190.288086,
+            92.999998,
+            211.288084
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 2142,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p1_figure3",
+          "kind": "figure",
+          "bbox": [
+            72.0,
+            382.239288,
+            139.499994,
+            463.239281
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 2143,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p2_text1",
+          "kind": "text",
+          "bbox": [
+            72.355957,
+            34.8,
+            224.363004,
+            45.742383
+          ],
+          "text": "CONFIDENTIAL — Internal Use Only",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 2144
+          }
+        },
+        {
+          "id": "p2_text2",
+          "kind": "text",
+          "bbox": [
+            72.685781,
+            70.92,
+            213.299104,
+            90.324492
+          ],
+          "text": "6. Approval Signature",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 2184
+          }
+        },
+        {
+          "id": "p2_text3",
+          "kind": "text",
+          "bbox": [
+            72.077812,
+            161.88,
+            532.759249,
+            173.98957
+          ],
+          "text": "Approved by: Park Ji-hoon (HR Manager, synthetic signature — not a real person's handwriting) Date: 2024-03-",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 2209
+          }
+        },
+        {
+          "id": "p2_text4",
+          "kind": "text",
+          "bbox": [
+            72.194064,
+            176.632939,
+            81.64482,
+            183.480439
+          ],
+          "text": "20",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 2319
+          }
+        },
+        {
+          "id": "p2_text5",
+          "kind": "text",
+          "bbox": [
+            294.029414,
+            745.68,
+            317.806465,
+            756.622383
+          ],
+          "text": "Page 2",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 2177
+          }
+        },
+        {
+          "id": "p2_figure1",
+          "kind": "figure",
+          "bbox": [
+            71.999992,
+            90.398498,
+            271.399821,
+            140.248497
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 2322,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        }
+      ]
+    }
+  ]
+}

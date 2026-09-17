@@ -1,0 +1,2 @@
+experiment,documents,missing_documents,missing_pages,CER_lower_better,WER_lower_better,character_errors,table_detection_F1,table_cell_exact_F1,table_dimensions_recall,figure_detection_F1,figure_matched_mean_IoU,comparison_key
+babeldoc-yolov3,1,0,0,0.595729080744203,0.6957323498419389,13000,1.0,0.0213903743315508,0.0,0.0,,2ad55ae2fcecd3aea098e7802d28e8bad03fd1c8ffa4f666c092876a99f39ec1

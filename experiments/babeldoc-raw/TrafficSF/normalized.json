@@ -1,0 +1,2039 @@
+{
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p1_text1",
+          "kind": "text",
+          "bbox": [
+            124.946,
+            38.8735,
+            430.9854,
+            100.9999
+          ],
+          "text": "TRAFFIC SAFETY FACTS Research Note",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 201
+          }
+        },
+        {
+          "id": "p1_text2",
+          "kind": "text",
+          "bbox": [
+            36.64,
+            124.24,
+            120.73,
+            134.3
+          ],
+          "text": "DOT HS 812 118",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 269
+          }
+        },
+        {
+          "id": "p1_text3",
+          "kind": "text",
+          "bbox": [
+            220.8769,
+            124.24,
+            390.8369,
+            134.3
+          ],
+          "text": "Office of Behavioral Safety Research",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 234
+          }
+        },
+        {
+          "id": "p1_text4",
+          "kind": "text",
+          "bbox": [
+            502.83,
+            124.24,
+            574.319,
+            134.3
+          ],
+          "text": "February 2015",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 285
+          }
+        },
+        {
+          "id": "p1_text5",
+          "kind": "text",
+          "bbox": [
+            36.48,
+            136.5396,
+            564.55654,
+            204.0396
+          ],
+          "text": "Results of the 2013–2014 National Roadside Survey of Alcohol and Drug Use by Drivers",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 2853
+          }
+        },
+        {
+          "id": "p1_text6",
+          "kind": "text",
+          "bbox": [
+            36.96,
+            209.3596,
+            306.39768,
+            221.9956
+          ],
+          "text": "By Amy Berning, Richard Compton, and Kathryn Wochinger",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 2937
+          }
+        },
+        {
+          "id": "p1_text7",
+          "kind": "text",
+          "bbox": [
+            36.126,
+            232.123,
+            297.036048,
+            375.5945
+          ],
+          "text": "Over the last four decades, the National Highway Traffic Safety Administration and/or the Insurance Institute for Highway Safety (IIHS) conducted four national surveys to estimate the prevalence of drinking and driving in the United States (Wolfe, 1974; Lund & Wolfe, 1991; Voas et al, 1998; Compton & Berning, 2009; Lacey et al, 2009). The first National Roadside Survey (NRS) was conducted in 1973, followed by national surveys of drivers in 1986, 1996, 2007, and now 2013–2014. These surveys used a stratified random sample of weekend nighttime drivers in the contiguous 48 States and collected data directly from drivers on the road.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 1202
+          }
+        },
+        {
+          "id": "p1_text8",
+          "kind": "text",
+          "bbox": [
+            315.336,
+            232.123,
+            575.925,
+            258.5945
+          ],
+          "text": "of drivers using alcohol or drugs and adjusted with an appropriate weighting scheme.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 298
+          }
+        },
+        {
+          "id": "p1_text9",
+          "kind": "text",
+          "bbox": [
+            315.686,
+            272.871,
+            425.97156,
+            287.123
+          ],
+          "text": "Summary of Results",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 382
+          }
+        },
+        {
+          "id": "p1_text10",
+          "kind": "text",
+          "bbox": [
+            316.118,
+            295.86,
+            494.59136,
+            309.367
+          ],
+          "text": "Prevalence of Alcohol Use by Drivers",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 400
+          }
+        },
+        {
+          "id": "p1_text11",
+          "kind": "text",
+          "bbox": [
+            315.063,
+            314.0,
+            576.127881,
+            480.5945
+          ],
+          "text": "The NRS surveys reveal a decreasing trend in alcohol use from the first survey in 1973 to the most recent one in 2013– 2014. Figure 1 shows the percentage of weekend nighttime drivers with BrACs across three categories: BrAC of .005 to .049 g/210 L; 2 BrACs of .050 to .079; and BrACs of .080 and higher. The surveys found a decline in each BrAC category. Further, there has been a large decrease in the percentage of drivers who were alcohol positive, from 35.9 percent in 1973 to 8.3 percent in 2013–2014. For BrACs of .08 and higher, there was a decrease from 7.5 percent in 1973 to 1.5 percent in 2013–2014, revealing an impressive 80 percent reduction in the percentage of alcohol-impaired drivers on the road on weekend nights. Also of importance is the decrease",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 436
+          }
+        },
+        {
+          "id": "p1_text12",
+          "kind": "text",
+          "bbox": [
+            35.8425,
+            386.979,
+            297.114546,
+            501.5945
+          ],
+          "text": "The 2007 NRS added procedures to the NRS for the first time to estimate the use by drivers of other potentially impairing drugs. Prior roadside surveys had only collected breath samples to determine breath alcohol concentration (BrAC). Due to developments in analytical toxicology, NHTSA determined it would be feasible in the 2007 and 2013–2014 surveys to determine driver use of a variety of potentially impairing drugs including illegal drugs as well as legal medications.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 1836
+          }
+        },
+        {
+          "id": "p1_text13",
+          "kind": "text",
+          "bbox": [
+            315.605,
+            496.0869,
+            538.664134,
+            529.8119
+          ],
+          "text": "Figure 1. Percentage of Weekend Nighttime Drivers by BrAC Category in the Five National Roadside Surveys3",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 3550
+          }
+        },
+        {
+          "id": "p1_text14",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            510.123,
+            297.10665,
+            640.5945
+          ],
+          "text": "In 2013–2014, the National Highway Traffic Safety Administration conducted the most recent National Roadside Survey of Alcohol and Drug Use by Drivers.1 This voluntary and anonymous study is the second to col- lect data on drug use, presenting our first opportunity to examine drug use trends on a national scale. The 2013– 2014 NRS was designed to produce national estimates of alcohol and drug use by weekday daytime and weekend nighttime drivers. Thus, the use rates presented below are national prevalence rates calculated from the percentage",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 2310
+          }
+        },
+        {
+          "id": "p1_text15",
+          "kind": "text",
+          "bbox": [
+            338.3817,
+            541.8521,
+            346.4997,
+            548.7371
+          ],
+          "text": "25",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 71,
+            "babeldoc_render_order": 3667
+          }
+        },
+        {
+          "id": "p1_text16",
+          "kind": "text",
+          "bbox": [
+            353.385136,
+            547.3612,
+            368.307886,
+            556.3612
+          ],
+          "text": "22.3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 72,
+            "babeldoc_render_order": 3755
+          }
+        },
+        {
+          "id": "p1_text17",
+          "kind": "text",
+          "bbox": [
+            500.779801,
+            549.4042,
+            556.151287,
+            558.5392
+          ],
+          "text": "BrAC .005–.049",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 73,
+            "babeldoc_render_order": 3701
+          }
+        },
+        {
+          "id": "p1_text18",
+          "kind": "text",
+          "bbox": [
+            322.161,
+            554.066599,
+            333.321,
+            635.0766
+          ],
+          "text": "Percentage of Drivers",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 84,
+            "babeldoc_render_order": 3800
+          }
+        },
+        {
+          "id": "p1_text19",
+          "kind": "text",
+          "bbox": [
+            501.448509,
+            560.0692,
+            556.819996,
+            569.2042
+          ],
+          "text": "BrAC .050–.079",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 75,
+            "babeldoc_render_order": 3715
+          }
+        },
+        {
+          "id": "p1_text20",
+          "kind": "text",
+          "bbox": [
+            338.3817,
+            561.5441,
+            346.5807,
+            568.4291
+          ],
+          "text": "20",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 76,
+            "babeldoc_render_order": 3665
+          }
+        },
+        {
+          "id": "p1_text21",
+          "kind": "text",
+          "bbox": [
+            395.223496,
+            565.3702,
+            409.975246,
+            574.3702
+          ],
+          "text": "17.6",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 77,
+            "babeldoc_render_order": 3765
+          }
+        },
+        {
+          "id": "p1_text22",
+          "kind": "text",
+          "bbox": [
+            501.638278,
+            571.0672,
+            536.668414,
+            580.2022
+          ],
+          "text": "BrAC .08+",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 79,
+            "babeldoc_render_order": 3729
+          }
+        },
+        {
+          "id": "p1_text23",
+          "kind": "text",
+          "bbox": [
+            338.6517,
+            581.2361,
+            346.4997,
+            588.1211
+          ],
+          "text": "15",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 82,
+            "babeldoc_render_order": 3663
+          }
+        },
+        {
+          "id": "p1_text24",
+          "kind": "text",
+          "bbox": [
+            441.437803,
+            599.0302,
+            451.851253,
+            608.0302
+          ],
+          "text": "9.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 86,
+            "babeldoc_render_order": 3773
+          }
+        },
+        {
+          "id": "p1_text25",
+          "kind": "text",
+          "bbox": [
+            338.6517,
+            600.9281,
+            346.5807,
+            607.8131
+          ],
+          "text": "10",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 87,
+            "babeldoc_render_order": 3661
+          }
+        },
+        {
+          "id": "p1_text26",
+          "kind": "text",
+          "bbox": [
+            485.247203,
+            604.0342,
+            495.750653,
+            613.0342
+          ],
+          "text": "7.9",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 88,
+            "babeldoc_render_order": 3782
+          }
+        },
+        {
+          "id": "p1_text27",
+          "kind": "text",
+          "bbox": [
+            378.54303,
+            605.3662,
+            388.93848,
+            614.3662
+          ],
+          "text": "7.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 90,
+            "babeldoc_render_order": 3762
+          }
+        },
+        {
+          "id": "p1_text28",
+          "kind": "text",
+          "bbox": [
+            366.632828,
+            610.8652,
+            375.876278,
+            619.8652
+          ],
+          "text": "6.1",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 91,
+            "babeldoc_render_order": 3759
+          }
+        },
+        {
+          "id": "p1_text29",
+          "kind": "text",
+          "bbox": [
+            421.105453,
+            613.3672,
+            431.554903,
+            622.3672
+          ],
+          "text": "5.4",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 92,
+            "babeldoc_render_order": 3770
+          }
+        },
+        {
+          "id": "p1_text30",
+          "kind": "text",
+          "bbox": [
+            528.279529,
+            614.1952,
+            538.692979,
+            623.1952
+          ],
+          "text": "5.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 93,
+            "babeldoc_render_order": 3791
+          }
+        },
+        {
+          "id": "p1_text31",
+          "kind": "text",
+          "bbox": [
+            453.393408,
+            618.0382,
+            475.75306,
+            630.8722
+          ],
+          "text": "3.44.3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 95,
+            "babeldoc_render_order": 3776
+          }
+        },
+        {
+          "id": "p1_text32",
+          "kind": "text",
+          "bbox": [
+            342.8637,
+            620.7551,
+            346.4907,
+            627.5051
+          ],
+          "text": "5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 96,
+            "babeldoc_render_order": 3660
+          }
+        },
+        {
+          "id": "p1_text33",
+          "kind": "text",
+          "bbox": [
+            412.547976,
+            622.8712,
+            416.228976,
+            629.7562
+          ],
+          "text": "3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 97,
+            "babeldoc_render_order": 3769
+          }
+        },
+        {
+          "id": "p1_text34",
+          "kind": "text",
+          "bbox": [
+            497.627345,
+            625.8682,
+            519.932997,
+            635.6962
+          ],
+          "text": "2.32.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 98,
+            "babeldoc_render_order": 3785
+          }
+        },
+        {
+          "id": "p1_text35",
+          "kind": "text",
+          "bbox": [
+            540.360328,
+            628.3702,
+            562.712298,
+            638.0362
+          ],
+          "text": "1.61.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 99,
+            "babeldoc_render_order": 3794
+          }
+        },
+        {
+          "id": "p1_text36",
+          "kind": "text",
+          "bbox": [
+            342.8907,
+            640.3121,
+            346.5717,
+            647.1971
+          ],
+          "text": "0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 101,
+            "babeldoc_render_order": 3659
+          }
+        },
+        {
+          "id": "p1_text37",
+          "kind": "text",
+          "bbox": [
+            363.188749,
+            648.1972,
+            380.100649,
+            655.0822
+          ],
+          "text": "1973",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 104,
+            "babeldoc_render_order": 3697
+          }
+        },
+        {
+          "id": "p1_text38",
+          "kind": "text",
+          "bbox": [
+            406.8536,
+            648.1972,
+            423.8645,
+            655.0822
+          ],
+          "text": "1986",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 105,
+            "babeldoc_render_order": 3693
+          }
+        },
+        {
+          "id": "p1_text39",
+          "kind": "text",
+          "bbox": [
+            450.247353,
+            648.1972,
+            467.258253,
+            655.0822
+          ],
+          "text": "1996",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 102,
+            "babeldoc_render_order": 3738
+          }
+        },
+        {
+          "id": "p1_text40",
+          "kind": "text",
+          "bbox": [
+            493.8139,
+            648.1972,
+            511.0768,
+            655.0822
+          ],
+          "text": "2007",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 103,
+            "babeldoc_render_order": 3742
+          }
+        },
+        {
+          "id": "p1_text41",
+          "kind": "text",
+          "bbox": [
+            526.183001,
+            648.1972,
+            565.992401,
+            655.0822
+          ],
+          "text": "2013–2014",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 106,
+            "babeldoc_render_order": 3746
+          }
+        },
+        {
+          "id": "p1_text42",
+          "kind": "text",
+          "bbox": [
+            36.378,
+            668.0,
+            296.8215,
+            734.547
+          ],
+          "text": "1 The Office of National Drug Control Policy provided funds to NHTSA for this study. The National Institute on Drug Abuse, and the Insurance Institute for Highway Safety provided additional funding through investigator initiated grants and contracts to the Pacific Institute for Research and Evaluation, NHTSA’s contractor for the 2013–2014 NRS.",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 2992
+          }
+        },
+        {
+          "id": "p1_text43",
+          "kind": "text",
+          "bbox": [
+            315.0945,
+            687.0,
+            575.7909,
+            734.547
+          ],
+          "text": "2 .08 g/210 L = grams per 210 liters of breath. The illegal limit in all States is .08. 3 From 1973 to 2004, the States had BrAC limits that ranged from .08 to .15. After 2004, all States had BrAC limits of .08.",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 3337
+          }
+        },
+        {
+          "id": "p1_text44",
+          "kind": "text",
+          "bbox": [
+            36.612,
+            748.9458,
+            234.1557,
+            757.9998
+          ],
+          "text": "NHTSA’s Office of Behavioral Safety Research",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 3
+          }
+        },
+        {
+          "id": "p1_text45",
+          "kind": "text",
+          "bbox": [
+            337.041,
+            748.9458,
+            575.766,
+            757.9998
+          ],
+          "text": "1200 New Jersey Avenue SE., Washington, DC 20590",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 47
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p2_text1",
+          "kind": "text",
+          "bbox": [
+            36.234,
+            21.2777,
+            40.563,
+            27.6047
+          ],
+          "text": "2",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 3823
+          }
+        },
+        {
+          "id": "p2_text2",
+          "kind": "text",
+          "bbox": [
+            36.2415,
+            45.0515,
+            300.595843,
+            71.523
+          ],
+          "text": "from 6.1 percent to 1.6 percent from 1973 to 2013–2014 for BrACs of .050 to .079 category.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 3918
+          }
+        },
+        {
+          "id": "p2_text3",
+          "kind": "text",
+          "bbox": [
+            315.189,
+            45.0515,
+            575.8495,
+            71.523
+          ],
+          "text": "understood, there is little evidence available to link concen- trations of other drugs to driver performance.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 6488
+          }
+        },
+        {
+          "id": "p2_text4",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            80.0515,
+            300.898557,
+            249.523
+          ],
+          "text": "The 2013–2014 survey found large differences by the day of week and the time of day in the likelihood of drivers being alcohol positive or having an illegal BrAC (Table 1). During weekday daytime hours (Friday), only 1.1 percent of drivers were alcohol positive, while at weekend nighttime hours (Friday and Saturday), 8.3 percent of drivers were alcohol positive. During weekday daytime hours there were very few drivers with illegal BrACs (BrAC ≥ .08), just 0.4 percent, while at weekend nighttime hours 1.5 percent drivers had illegal BrACs. Daytime compared to nighttime percentages are statistically significant. Compared with the NRS 2007, the 2013–2014 NRS BrAC prevalence shown in Figure 1 was significantly lower only for the .005 to .049 BrAC category.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 4008
+          }
+        },
+        {
+          "id": "p2_text5",
+          "kind": "text",
+          "bbox": [
+            315.126,
+            83.5515,
+            579.703594,
+            116.7495
+          ],
+          "text": "Table 2 Overall Drug Prevalence by Data Collection Period and Type of Test in the 2013–2014 NRS",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 6596
+          }
+        },
+        {
+          "id": "p2_text6",
+          "kind": "text",
+          "bbox": [
+            315.0631,
+            216.9369,
+            579.715495,
+            295.4084
+          ],
+          "text": "In contrast to alcohol use, overall drug prevalence (shown in Table 2), did not appear to differ between daytime and nighttime, regardless of whether oral fluid or blood tests were conducted. The much higher nighttime use of alco- hol appears to represent recreational use. For other drugs, a different pattern emerges.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 6890
+          }
+        },
+        {
+          "id": "p2_text7",
+          "kind": "text",
+          "bbox": [
+            36.099,
+            261.5515,
+            290.196328,
+            294.7495
+          ],
+          "text": "Table 1 Alcohol Prevalence by Data Collection Period and BrAC in the 2013–2014 NRS",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 4768
+          }
+        },
+        {
+          "id": "p2_text8",
+          "kind": "text",
+          "bbox": [
+            315.1576,
+            303.9369,
+            579.80296,
+            382.4084
+          ],
+          "text": "As shown in Table 3, the pattern of drug use among driv- ers varies by day and category of drug. The prevalence of illegal drug use increases from daytime to nighttime, but there is a countervailing pattern of a reduction in preva- lence of driver use of medicinal drugs in nighttime drivers compared to daytime drivers.4",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 7207
+          }
+        },
+        {
+          "id": "p2_text9",
+          "kind": "text",
+          "bbox": [
+            37.118,
+            368.9371,
+            202.581272,
+            384.4071
+          ],
+          "text": "Prevalence of Drug Use by Drivers",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 4988
+          }
+        },
+        {
+          "id": "p2_text10",
+          "kind": "text",
+          "bbox": [
+            35.8425,
+            387.4371,
+            301.059081,
+            530.8876
+          ],
+          "text": "The 2013–2014 study examined the use of drugs, focus- ing on drugs with the potential to impair driving skills, including over-the-counter, prescription, and illegal drugs. Participants were asked to provide an oral fluid and blood sample in addition to a breath sample. The oral fluid and blood samples were tested for the presence of a large num- ber of potentially impairing drugs including cannabinoids, stimulants, sedatives, antidepressants, and narcotic analge- sics. Not all drivers provided both an oral fluid and blood sample; some drivers provided just one sample but many provided both.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 5021
+          }
+        },
+        {
+          "id": "p2_text11",
+          "kind": "text",
+          "bbox": [
+            315.1261,
+            394.4369,
+            575.76576,
+            429.5709
+          ],
+          "text": "Table 3 Drug Prevalence by Data Collection Period, Drug Category, and Type of Drug Test in the 2013–2014 NRS",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 7526
+          }
+        },
+        {
+          "id": "p2_text12",
+          "kind": "text",
+          "bbox": [
+            35.58,
+            539.4371,
+            300.928398,
+            732.1471
+          ],
+          "text": "The reader is cautioned that drug presence does not neces- sarily imply impairment. For many drug substances, drug presence can be detected after impairment that might affect driving has passed. For example, traces of marijuana use can be detected in blood samples several weeks after heavy chronic users stop ingestion. In this study, for marijuana, we tested only for THC (delta 9 tetrahydrocannabinol), the psychoactive substance in marijuana, and 11-OH-THC, its active metabolite. When marijuana is smoked or ingested, THC is absorbed into the blood stream and is distributed into areas of the body, including the brain. There are over 100 marijuana metabolites detectable in blood that research has not associated with the psychoactive effects of mari- juana use. Whereas the impairment effects for various con- centration levels of alcohol in the blood or breath are well",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 5613
+          }
+        },
+        {
+          "id": "p2_text13",
+          "kind": "text",
+          "bbox": [
+            315.0126,
+            629.0,
+            579.6129,
+            734.547
+          ],
+          "text": "4 Despite recent changes in the legal status of marijuana in some States, for simplicity and to allow inter-survey comparisons, this drug remained included within the “illegal” category in the 2013– 2014 NRS. 5 “Any Illegal Drug” includes drivers who tested positive for one or more illegal drugs, whether or not they also tested positive for medications. 6 “Only Medications” includes drivers who tested positive for one or more medications, but did not test positive for illegal drugs.",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 8065
+          }
+        },
+        {
+          "id": "p2_text14",
+          "kind": "text",
+          "bbox": [
+            36.612,
+            748.9458,
+            234.1557,
+            757.9998
+          ],
+          "text": "NHTSA’s Office of Behavioral Safety Research",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 3826
+          }
+        },
+        {
+          "id": "p2_text15",
+          "kind": "text",
+          "bbox": [
+            337.041,
+            748.9458,
+            575.766,
+            757.9998
+          ],
+          "text": "1200 New Jersey Avenue SE., Washington, DC 20590",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 3870
+          }
+        },
+        {
+          "id": "p2_table1",
+          "kind": "table",
+          "bbox": [
+            313.0,
+            430.0,
+            577.0,
+            580.0
+          ],
+          "cells": [
+            [
+              "Drug Category",
+              "Oral Fluid\nOral Fluid and/or\nBlood Test\nBlood Test\nTest\nN\nN\nN\n%\n%\n%\nWeekday Daytime"
+            ],
+            [
+              "Any Illegal Drug5",
+              "189 10.6% 137 11.3%\n221\n12.1%"
+            ],
+            [
+              "Only Medications6\n( prescription and over-the-counter)",
+              "8.4% 128 10.3%\n197\n234\n10.3%"
+            ],
+            [
+              "Any Illegal Drug",
+              "Weekend Nighttime\n783 13.9% 423 14.3%\n852\n15.2%"
+            ],
+            [
+              "Only Medications\n( prescription and over-the-counter)",
+              "5.9% 216\n317\n391\n6.9%\n7.3%"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 6,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9747287034988403,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p2_table2",
+          "kind": "table",
+          "bbox": [
+            34.0,
+            297.0,
+            298.0,
+            356.0
+          ],
+          "cells": [
+            [
+              "Data Collection Time Period",
+              "% Alcohol Positive\n(%BrAC > .005)",
+              "% BrAC > .08"
+            ],
+            [
+              "Weekday Daytime",
+              "1.1%",
+              "0.4%"
+            ],
+            [
+              "Weekend Nighttime",
+              "8.3%",
+              "1.5%"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 7,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9728983640670776,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p2_table3",
+          "kind": "table",
+          "bbox": [
+            312.0,
+            119.0,
+            577.0,
+            200.0
+          ],
+          "cells": [
+            [
+              "",
+              "% Drug-Positive",
+              "% Drug-Positive",
+              "% Drug-Positive Oral"
+            ],
+            [
+              "Time of Day",
+              "Oral Fluid Test",
+              "Blood Test",
+              "Fluid and/or Blood Test"
+            ],
+            [
+              "Weekday\nDaytime",
+              "19.0%",
+              "21.6%",
+              "22.4%"
+            ],
+            [
+              "Weekend\nNighttime",
+              "19.8%",
+              "21.2%",
+              "22.5%"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 8,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9704989194869995,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p3_text1",
+          "kind": "text",
+          "bbox": [
+            571.302,
+            21.2777,
+            575.694,
+            27.7757
+          ],
+          "text": "3",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 8554
+          }
+        },
+        {
+          "id": "p3_text2",
+          "kind": "text",
+          "bbox": [
+            36.126,
+            45.3904,
+            573.82476,
+            68.5244
+          ],
+          "text": "Table 4 Weekend Nighttime Drug Prevalence by Drug Category and Test Type Comparing 2007 Data to 2013–2014 Comparable Data",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 12137
+          }
+        },
+        {
+          "id": "p3_text3",
+          "kind": "text",
+          "bbox": [
+            37.001,
+            179.2623,
+            282.706148,
+            208.4963
+          ],
+          "text": "Comparison of Drug Prevalence Between the 2007 NRS and 2013–2014 NRS",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 8649
+          }
+        },
+        {
+          "id": "p3_text4",
+          "kind": "text",
+          "bbox": [
+            315.063,
+            180.0515,
+            580.421289,
+            216.7615
+          ],
+          "text": "whereas in the 2013–2014 NRS, 12.6 percent of weekend nighttime drivers tested positive for THC, a 48 percent increase.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 10428
+          }
+        },
+        {
+          "id": "p3_text5",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            213.7623,
+            300.918108,
+            383.2338
+          ],
+          "text": "The specific drugs and detection thresholds changed somewhat between the 2007 NRS and 2013–2014 NRS. A few drugs that were either not detected or rarely detected in the 2007 NRS were not included on the 2013–2014 NRS, and a few new drugs were added in the 2013–2014 NRS. For example, we tested for selected synthetic cannabinoids in the new survey. Also, improvements in analytical tech- nology allowed the detection thresholds to be lowered significantly for a number of drugs in the 2013–2014 NRS. To compare the prevalence rates between the 2007 NRS and 2013–2014 NRS, we included only the drugs that were tested for in both surveys and based 2013–2014 NRS preva- lence rates using the cutoff levels from the 2007 NRS.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 8717
+          }
+        },
+        {
+          "id": "p3_text6",
+          "kind": "text",
+          "bbox": [
+            315.168,
+            229.0515,
+            582.67377,
+            307.523
+          ],
+          "text": "Changes in State policy on marijuana use, including medical and recreational use, may have contributed to an increase in marijuana use by drivers. However, the survey does not permit a state-by-state comparison. The change in use may reflect the emergence of a new trend in the coun- try that warrants monitoring.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 10547
+          }
+        },
+        {
+          "id": "p3_text7",
+          "kind": "text",
+          "bbox": [
+            315.686,
+            319.5515,
+            427.556892,
+            336.2675
+          ],
+          "text": "Survey Methodology",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 10858
+          }
+        },
+        {
+          "id": "p3_text8",
+          "kind": "text",
+          "bbox": [
+            315.168,
+            339.0515,
+            580.675452,
+            508.502
+          ],
+          "text": "This most recent NRS started in the summer of 2013, contin- ued through the spring of 2014, and involved 60 sites across the contiguous United States. The study used a multistage sampling procedure based on the National Automotive Sampling System—General Estimates System (NHTSA, 2008). The sites were large cities, counties, or groups of counties representing four regions within the United States and three levels of population density. As a whole, the 60 sites provide a representative sample of drivers across the country. The 2013–2014 NRS attempted to re-visit the same sites as 2007; however, because not all sites were avail- able, statistical sampling techniques were used to identify replacement sites with similar characteristics.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 10876
+          }
+        },
+        {
+          "id": "p3_text9",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            391.7623,
+            301.141107,
+            571.4723
+          ],
+          "text": "To account for these refinements in lab testing since 2007, Table 4 presents the 2013–2014 NRS data after applying the same set of drugs and drug cutoff levels as used for 2007 survey. The results from either oral fluid tests or blood tests, or both oral fluid and/or blood tests, show a small increase in drug-positive drivers using medications (from 3.9% in 2007 to 4.9% in 2013–2014), and a larger increase in the prevalence of illegal drugs (from 12.4% in 2007 to 15.1% in 2013–2014). In 2007, 16.3 percent of weekend nighttime drivers were drug-positive based on the combined results of either or both oral fluid and blood tests (Compton & Berning, 2009). In 2013–2014, 20.0 percent of weekend nighttime drivers tested positive for drugs using the 2007 cut-off criteria.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 9434
+          }
+        },
+        {
+          "id": "p3_text10",
+          "kind": "text",
+          "bbox": [
+            314.8425,
+            517.7514,
+            579.99837,
+            635.223
+          ],
+          "text": "Roadside survey data were collected in 5 different loca- tions at each site (for a total of 300 locations). Although there were practical considerations for selecting a site, such as traffic flow and safety, the 5 locations were randomly chosen within the boundaries of the cooperating local law enforcement agency’s area of jurisdiction. This approach provided, as much as possible, a representative sample of drivers for that site. Locations were not selected on the basis of assumptions of where there would be a high per-",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 11615
+          }
+        },
+        {
+          "id": "p3_text11",
+          "kind": "text",
+          "bbox": [
+            36.084,
+            582.7623,
+            300.811092,
+            634.5198
+          ],
+          "text": "The drug with the largest increase in weekend night- time prevalence was THC (Table 5). In the 2007 NRS, 8.6 percent of weekend nighttime drivers tested positive for THC (based on the combined oral fluid and/or blood tests),",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 10205
+          }
+        },
+        {
+          "id": "p3_text12",
+          "kind": "text",
+          "bbox": [
+            36.126,
+            648.8619,
+            426.86102,
+            671.9519
+          ],
+          "text": "Table 5 Weekend Nighttime Prevalence of THC in 2007 Compared to 2013–2014 Comparable Data",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 12699
+          }
+        },
+        {
+          "id": "p3_text13",
+          "kind": "text",
+          "bbox": [
+            36.612,
+            748.9458,
+            234.1557,
+            757.9998
+          ],
+          "text": "NHTSA’s Office of Behavioral Safety Research",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 8557
+          }
+        },
+        {
+          "id": "p3_text14",
+          "kind": "text",
+          "bbox": [
+            337.041,
+            748.9458,
+            575.766,
+            757.9998
+          ],
+          "text": "1200 New Jersey Avenue SE., Washington, DC 20590",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 8601
+          }
+        },
+        {
+          "id": "p3_table1",
+          "kind": "table",
+          "bbox": [
+            34.0,
+            69.0,
+            577.0,
+            166.0
+          ],
+          "cells": [
+            [
+              "Oral Fluid Test",
+              "2007 Data\n2013–2014 Comparable Data\nOral Fluid and/or\nOral Fluid and/or\nBlood Test\nBlood Test\nBlood Test\nBlood Test\nOral Fluid Test"
+            ],
+            [
+              "Drug Category\nN\n%",
+              "N\nN\nN\nN\nN\n%\n%\n%\n%\n%"
+            ],
+            [
+              "11.4%\nAny Illegal Drug\n635",
+              "9.8%\n12.4%\n13.8%\n14.3%\n15.1%\n422\n297\n699\n779\n849"
+            ],
+            [
+              "Only Medications\n3.0%\n201\n(prescription and over-the-counter)",
+              "4.0%\n3.9%\n3.9%\n4.9%\n4.9%\n277\n211\n169\n155\n266"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 6,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9788963794708252,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p3_table2",
+          "kind": "table",
+          "bbox": [
+            34.0,
+            673.0,
+            577.0,
+            735.0
+          ],
+          "cells": [],
+          "metadata": {
+            "babeldoc_layout_id": 8,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9749565124511719,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p4_text1",
+          "kind": "text",
+          "bbox": [
+            36.225,
+            21.2777,
+            40.707,
+            27.6047
+          ],
+          "text": "4",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 13078
+          }
+        },
+        {
+          "id": "p4_text2",
+          "kind": "text",
+          "bbox": [
+            315.126,
+            44.0518,
+            528.185288,
+            76.7118
+          ],
+          "text": "Challenges in Determining How Drugs Affect Driving",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 15502
+          }
+        },
+        {
+          "id": "p4_text3",
+          "kind": "text",
+          "bbox": [
+            36.084,
+            45.123,
+            300.808005,
+            97.5945
+          ],
+          "text": "centage of alcohol- or drug-positive drivers. The objective of this study was to estimate the alcohol and other drug prevalence of all drivers “on the road in the United States” during the given time periods.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 13173
+          }
+        },
+        {
+          "id": "p4_text4",
+          "kind": "text",
+          "bbox": [
+            315.063,
+            79.5518,
+            579.865629,
+            194.2618
+          ],
+          "text": "Most psychoactive drugs are chemically complex mol- ecules, whose absorption, action, and elimination from the body are difficult to predict, and considerable differ- ences exist between individuals with regard to the rates with which these processes occur. Alcohol, in comparison, is more predictable. A strong relationship between alco- hol concentration and impairment has been established, as has the correlation between alcohol concentration and crash risk.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 15552
+          }
+        },
+        {
+          "id": "p4_text5",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            106.123,
+            300.660858,
+            275.5945
+          ],
+          "text": "In the 2007 NRS, in an effort to learn more about the presence of alcohol and drug use during daytime driv- ing, we added data collection on Fridays during the day, from either 9:30 to 11:30 a.m., or 1:30 to 3:30 p.m. (the times were randomized across sites). This additional data collec- tion allowed us to examine drug use and alcohol trends among daytime drivers. This method was repeated for the 2013–2014 NRS, and data were collected on weekend nights, from 10:00 p.m. to midnight, and from 1 to 3 a.m. on Fridays (i.e., early Saturday mornings) and from 1 to 3 a.m. on Saturdays (i.e., early Sunday mornings). By using these same time frames for each NRS, we can compare data on BrACs and drug use over time.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 13381
+          }
+        },
+        {
+          "id": "p4_text6",
+          "kind": "text",
+          "bbox": [
+            315.084,
+            205.5518,
+            579.585553,
+            232.0233
+          ],
+          "text": "Factors that make similar prediction difficult for most other psychoactive drugs include:",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 16010
+          }
+        },
+        {
+          "id": "p4_text7",
+          "kind": "text",
+          "bbox": [
+            315.3675,
+            240.0118,
+            579.818097,
+            292.4833
+          ],
+          "text": "■■ The large number of different drugs that would need to be tested (extensive testing of alcohol has been under- taken over many decades, whereas relatively little simi- lar testing has occurred for most other drugs).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 16098
+          }
+        },
+        {
+          "id": "p4_text8",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            284.123,
+            300.846078,
+            492.5735
+          ],
+          "text": "Participation in the survey was entirely voluntary and anonymous. When a data collector was available, drivers were allowed to enter the data collection location. Where researchers described the project and offered incentives for participation. Drivers were informed that participation was voluntary and that they were free to leave at any time. Data collectors asked participants for a breath test, an oral fluid sample, and a blood sample. The vast majority of eli- gible drivers entering the research area participated in the study (see Table 6). The number of drivers who entered the site and were eligible to participate (e.g., non-commercial drivers 16 and older, English- or Spanish-speaking) was 11,100. Out of the 11,100 eligible drivers, 85.2 percent (9,455 drivers) provided breath samples; 71 percent (7,881 drivers) provided oral fluid samples; and 42.2 percent (4,686 drivers) provided blood samples.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 14093
+          }
+        },
+        {
+          "id": "p4_text9",
+          "kind": "text",
+          "bbox": [
+            315.3675,
+            300.4718,
+            580.709211,
+            404.2293
+          ],
+          "text": "■■ Poor correlation between the effects on psychomotor, behavioral, and/or executive functions and blood or plasma drug concentrations (peak psychomotor, behav- ioral, and executive function effects do not necessarily correspond to peak blood levels; detectable blood levels may persist beyond the impairing effects or the impair- ing effects may be measurable when the drug cannot be detected in the blood).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 16313
+          }
+        },
+        {
+          "id": "p4_text10",
+          "kind": "text",
+          "bbox": [
+            315.3675,
+            412.9318,
+            582.724824,
+            439.4033
+          ],
+          "text": "■■ Sensitivity and tolerance (accentuation and diminution of the impairing effects with repeated exposure).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 16718
+          }
+        },
+        {
+          "id": "p4_text11",
+          "kind": "text",
+          "bbox": [
+            315.3675,
+            447.3918,
+            582.763926,
+            525.8423
+          ],
+          "text": "■■ Individual differences in absorption, distribution, action, and metabolism (some individuals will show evidence of impairment at drug concentrations that are not asso- ciated with impairment in others; wide ranges of drug concentrations in different individuals have been associ- ated with equivalent levels of impairment).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 16824
+          }
+        },
+        {
+          "id": "p4_text12",
+          "kind": "text",
+          "bbox": [
+            36.063,
+            501.123,
+            301.685742,
+            553.5945
+          ],
+          "text": "National prevalence rates were derived from a complex weighting scheme based on the volume of serious crashes at each site and the probability of a survey driver being ran- domly selected from the total driving trips at that site.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 15004
+          }
+        },
+        {
+          "id": "p4_text13",
+          "kind": "text",
+          "bbox": [
+            315.3675,
+            533.8518,
+            582.134376,
+            598.6093
+          ],
+          "text": "■■ Accumulation (blood levels of some drugs or their metabolites may accumulate with repeated administra- tions if the time-course of elimination is insufficient to reduce or remove the drug or metabolite before the next dose is administered).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 17147
+          }
+        },
+        {
+          "id": "p4_text14",
+          "kind": "text",
+          "bbox": [
+            36.126,
+            565.623,
+            272.201274,
+            598.821
+          ],
+          "text": "Table 6 Number of Participants and Participation Rates in the 2013–2014 NRS",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 15233
+          }
+        },
+        {
+          "id": "p4_text15",
+          "kind": "text",
+          "bbox": [
+            315.3675,
+            607.3118,
+            580.104159,
+            659.7833
+          ],
+          "text": "■■ Acute versus chronic administration (it is not unusual to observe greater impairment during initial administra- tions of drugs than is observed when the drug is admin- istered over a long period of time).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 17387
+          }
+        },
+        {
+          "id": "p4_text16",
+          "kind": "text",
+          "bbox": [
+            315.063,
+            667.7718,
+            578.073505,
+            707.2223
+          ],
+          "text": "At the current time, specific drug concentration levels can- not be reliably equated with a specific degree of driver impairment.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 17591
+          }
+        },
+        {
+          "id": "p4_text17",
+          "kind": "text",
+          "bbox": [
+            36.612,
+            746.7498,
+            234.1557,
+            757.8468
+          ],
+          "text": "NHTSA’s Office of Behavioral Safety Research",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 13081
+          }
+        },
+        {
+          "id": "p4_text18",
+          "kind": "text",
+          "bbox": [
+            337.041,
+            746.7498,
+            575.766,
+            757.8468
+          ],
+          "text": "1200 New Jersey Avenue SE., Washington, DC 20590",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 13125
+          }
+        },
+        {
+          "id": "p4_table1",
+          "kind": "table",
+          "bbox": [
+            34.0,
+            601.0,
+            298.0,
+            707.0
+          ],
+          "cells": [
+            [
+              "",
+              "Drivers",
+              "Participants\nN",
+              "%"
+            ],
+            [
+              "Eligible and Entered Site",
+              "",
+              "11,100",
+              "100.0%"
+            ],
+            [
+              "Breath Test",
+              "",
+              "9,455",
+              "85.2%"
+            ],
+            [
+              "Oral Fluid Test",
+              "",
+              "7,881",
+              "71.0%"
+            ],
+            [
+              "Blood Test",
+              "",
+              "4,686",
+              "42.2%"
+            ],
+            [
+              "Oral Fluid and/or Blood",
+              "",
+              "7\n898\n,",
+              "71.2%"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 7,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9695872068405151,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p5_text1",
+          "kind": "text",
+          "bbox": [
+            571.284,
+            21.4127,
+            575.622,
+            27.7757
+          ],
+          "text": "5",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 17719
+          }
+        },
+        {
+          "id": "p5_text2",
+          "kind": "text",
+          "bbox": [
+            37.022,
+            44.0518,
+            152.431756,
+            58.2618
+          ],
+          "text": "For More Information",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 18076
+          }
+        },
+        {
+          "id": "p5_text3",
+          "kind": "text",
+          "bbox": [
+            315.231,
+            45.123,
+            580.938463,
+            149.5735
+          ],
+          "text": "Lacey, J. H., Kelley-Baker, T., Furr-Holden, D., Voas, R. B., Romano, E., Ramirez, A., ... & Berning, A. (2009, December). 2007 National Roadside Survey of Alcohol and Drug Use by Drivers: Drug Results (Report No. DOT HS 811 249). Washington, DC: National Highway Traffic Safety Administration. Available at www.nhtsa.gov/ DOT/NHTSA/Traffic%20Injury%20Control/Articles/ Associated%20Files/811249.pdf.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 19875
+          }
+        },
+        {
+          "id": "p5_text4",
+          "kind": "text",
+          "bbox": [
+            36.231,
+            63.5518,
+            303.606885,
+            90.0233
+          ],
+          "text": "For questions on this document, please contact Amy Berning at amy.berning@dot.gov.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 18096
+          }
+        },
+        {
+          "id": "p5_text5",
+          "kind": "text",
+          "bbox": [
+            35.8425,
+            98.5518,
+            301.210753,
+            343.2618
+          ],
+          "text": "Detailed information about the study and results will be available in upcoming publications. Three technical reports are under development: one provides a complete description of the methodology used (sampling, analy- sis, weighting, and imputation procedures) and subject participation rates (report entitled, 2013–2014 National Roadside Survey of Alcohol and Drug Use: Methodology). Detailed information on the use of alcohol by drivers and the relationship of alcohol to various factors like time of day and vehicle type will be available in a report entitled, 2013–2014 National Roadside Survey of Alcohol and Drug Use: Alcohol Prevalence Rates. Detailed information on the use of drugs by drivers and the combined use of drugs and alcohol, as well as more detailed trend analysis exam- ining changes in drug prevalence from 2007 to 2013–2014 will be provided in a third report titled 2013–2014 National Roadside Survey of Alcohol and Drug Use: Drug Prevalence Rates. These upcoming reports will be posted on NHTSA’s Web site.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 18178
+          }
+        },
+        {
+          "id": "p5_text6",
+          "kind": "text",
+          "bbox": [
+            315.231,
+            155.123,
+            580.200988,
+            246.5735
+          ],
+          "text": "Lacey, J. H., Kelley-Baker, T., Furr-Holden, D., Voas, R. B., Romano, E., Torres, P., ... & Berning, A. (2009, December). 2007 National Roadside Survey of Alcohol and Drug Use by Drivers: Alcohol Results (Report No. DOT HS 811 248). Washington, D.C: National Highway Traffic Safety Administration. Available at ntl.bts.gov/ lib/31000/31600/31643/811248.pdf.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 20270
+          }
+        },
+        {
+          "id": "p5_text7",
+          "kind": "text",
+          "bbox": [
+            315.231,
+            252.123,
+            579.769932,
+            291.521
+          ],
+          "text": "Lund, A. K., & Wolfe, A. C. (1991). Changes in the incidence of alcohol-impaired driving in the United States, 1973- 1986. Journal of Studies on Alcohol, 52(4), 293–301.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 20623
+          }
+        },
+        {
+          "id": "p5_text8",
+          "kind": "text",
+          "bbox": [
+            315.1785,
+            297.123,
+            580.479679,
+            362.5735
+          ],
+          "text": "NHTSA. (2008). National Automotive Sampling System Brochure (Report No. DOT HS 807 304). Washington, D.C: National Highway Traffic Safety Administration. Available at www.nhtsa.gov/DOT/NHTSA/NCSA/ Content/PDF/NASSbrochure.pdf.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 20791
+          }
+        },
+        {
+          "id": "p5_text9",
+          "kind": "text",
+          "bbox": [
+            36.924,
+            360.5518,
+            98.151684,
+            371.2618
+          ],
+          "text": "References",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 19206
+          }
+        },
+        {
+          "id": "p5_text10",
+          "kind": "text",
+          "bbox": [
+            315.084,
+            368.123,
+            579.857199,
+            419.8805
+          ],
+          "text": "Voas, R. B., Wells, J., Lestina, D., Williams, A., & Greene, M. (1998). Drinking and driving in the United States: The 1996 National Roadside Survey. Accident Analysis and Prevention, 30(2), 267–275.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 21015
+          }
+        },
+        {
+          "id": "p5_text11",
+          "kind": "text",
+          "bbox": [
+            36.231,
+            376.5518,
+            303.03765,
+            455.0023
+          ],
+          "text": "Compton, R., & Berning, A. (2009). Results of the 2007 National Roadside Survey of Alcohol and Drug Use by Drivers (Report No. DOT HS 811 175). Washington, DC: National Highway Traffic Safety Administration. Available at www.nhtsa.gov/DOT/NHTSA/Traffic%20Injury%20 Control/Articles/Associated%20Files/811175.pdf.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 19216
+          }
+        },
+        {
+          "id": "p5_text12",
+          "kind": "text",
+          "bbox": [
+            315.084,
+            426.123,
+            579.572884,
+            465.5945
+          ],
+          "text": "Wolfe, A. C. (1974). 1973 US National Roadside Breath Testing Survey: Procedures and Results. Ann Arbor, MI: University of Michigan Safety Research Institute.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 21214
+          }
+        },
+        {
+          "id": "p5_text13",
+          "kind": "text",
+          "bbox": [
+            36.231,
+            460.5518,
+            302.365911,
+            552.0023
+          ],
+          "text": "Lacey, J. H., Kelley-Baker, T., Furr-Holden, D., Voas, R. B., Moore, C., Brainard, K., ... & Berning, A. (2009, December). 2007 National Roadside Survey of Alcohol and Drug Use by Drivers: Methodology. (Report No. DOT HS 811 237). Washington, DC: National Highway Traffic Safety Administration. Available at www.nhtsa.gov/ staticfiles/nti/pdf/811237.pdf.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 19526
+          }
+        },
+        {
+          "id": "p5_text14",
+          "kind": "text",
+          "bbox": [
+            315.216,
+            559.534,
+            505.82259,
+            571.081
+          ],
+          "text": "Suggested APA format citation for this document:",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 21372
+          }
+        },
+        {
+          "id": "p5_text15",
+          "kind": "text",
+          "bbox": [
+            315.234,
+            579.534,
+            579.31374,
+            635.081
+          ],
+          "text": "Berning, A., Compton, R., & Wochinger, K. (2015, February). Results of the 2013–2014 National Roadside Survey of alcohol and drug use by drivers. (Traffic Safety Facts Research Note. Report No. DOT HS 812 118). Washington, DC: National Highway Traffic Safety Administration.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 21420
+          }
+        },
+        {
+          "id": "p5_text16",
+          "kind": "text",
+          "bbox": [
+            324.168,
+            674.523,
+            566.6718,
+            726.9945
+          ],
+          "text": "This and other behavioral-related research notes may be accessed by Internet users at: www.nhtsa. gov/Driving+Safety/Research+&+Evaluation/ Impaired+driving+(drug-related)+reports.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 17898
+          }
+        },
+        {
+          "id": "p5_text17",
+          "kind": "text",
+          "bbox": [
+            36.612,
+            748.9458,
+            261.0549,
+            757.9998
+          ],
+          "text": "NHTSA’s National Center for Statistics and Analysis",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 17722
+          }
+        },
+        {
+          "id": "p5_text18",
+          "kind": "text",
+          "bbox": [
+            337.041,
+            748.9458,
+            575.766,
+            757.9998
+          ],
+          "text": "1200 New Jersey Avenue SE., Washington, DC 20590",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 17774
+          }
+        },
+        {
+          "id": "p5_text19",
+          "kind": "text",
+          "bbox": [
+            541.5201,
+            769.5899,
+            575.7351,
+            774.6649
+          ],
+          "text": "11326-020515-v3",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 21692
+          }
+        }
+      ]
+    }
+  ]
+}
