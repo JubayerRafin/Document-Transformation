@@ -6,17 +6,11 @@ adapter only performs a mechanical format conversion so the evaluator can
 score what the tool actually produced.
 """
 import json
-import re
 from html.parser import HTMLParser
 from pathlib import Path
 
-import sys
-
-_variant = sys.argv[1] if len(sys.argv) > 1 else "paddleocr-raw"
-RAW_JSON = Path(f"experiments/{_variant}/page_1/Sample02_0_res.json")
-SOURCE_PDF = "samples/Sample02.pdf"
-OUT_NORMALIZED = Path(f"experiments/{_variant}/normalized.json")
-OUT_SETTINGS = Path(f"experiments/{_variant}/settings.json")
+import argparse
+import pymupdf
 
 # Kinds that are purely textual in PP-StructureV3's block_label taxonomy.
 TEXT_LABELS = {
@@ -43,6 +37,8 @@ class TableHTMLParser(HTMLParser):
         if tag == "tr":
             self._row = []
         elif tag in ("td", "th"):
+            if any(k in {"rowspan", "colspan"} and v != "1" for k, v in attrs):
+                raise ValueError("Merged cells are not supported by this Sample02 adapter.")
             self._in_cell = True
             self._cell_chunks = []
 
@@ -67,11 +63,27 @@ def html_table_to_cells(html: str):
 
 
 def main():
-    doc = json.loads(RAW_JSON.read_text(encoding="utf-8"))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("variant", nargs="?", choices=["paddleocr-raw-nowarp", "paddleocr-raw"], default="paddleocr-raw-nowarp")
+    parser.add_argument("--allow-unmapped-geometry", action="store_true",
+                        help="Reproduce historical dewarped scores; boxes are NOT valid original-page geometry")
+    args = parser.parse_args()
+    _variant = args.variant
+    root = Path("experiments") / _variant
+    OUT_NORMALIZED = root / "normalized.json"
+    OUT_SETTINGS = root / "settings.json"
+    doc = json.loads((root / "page_1/Sample02_0_res.json").read_text(encoding="utf-8"))
+    preprocessing = doc.get("doc_preprocessor_res", {})
+    transformed = preprocessing.get("model_settings", {}).get("use_doc_unwarping", False) or preprocessing.get("angle", -1) not in (-1, 0)
+    if transformed and not args.allow_unmapped_geometry:
+        raise ValueError("Dewarped/rotated boxes require inverse mapping. Use the nowarp run for valid geometry evaluation.")
+    with pymupdf.open("samples/Sample02.pdf") as pdf:
+        if len(pdf) != 1 or doc.get("page_count", 1) != 1:
+            raise ValueError("This Sample02 adapter supports one-page PDFs only.")
+        pdf_w, pdf_h = pdf[0].rect.width, pdf[0].rect.height
+        rotation = pdf[0].rotation
 
     img_w, img_h = doc["width"], doc["height"]
-    # Reference page dimensions (PDF points, from references/Sample02.json)
-    pdf_w, pdf_h = 612.0, 792.0
     sx, sy = pdf_w / img_w, pdf_h / img_h
 
     def to_pdf_bbox(bbox):
@@ -120,7 +132,7 @@ def main():
                 "number": 1,
                 "width": pdf_w,
                 "height": pdf_h,
-                "rotation": 0,
+                "rotation": rotation,
                 "regions": regions,
             }
         ],
@@ -145,6 +157,13 @@ def main():
         ) + "; enable_mkldnn=False (required to work around a PaddlePaddle 3.3.1 CPU oneDNN/PIR NotImplementedError on this machine, see https://github.com/PaddlePaddle/Paddle/issues/77340)",
         "hardware": "CPU only (no GPU used)",
     }
+    # Keep the recorded environment for historical raw output. Never label
+    # a new machine's run with the original author's package versions.
+    manifest_path = root / "run_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    settings["ocr_version"] = manifest["paddleocr_version"]
+    settings["paddlepaddle_version"] = manifest.get("paddlepaddle_version", "unrecorded; historical submission reported 3.3.1")
+    settings["geometry_status"] = "unmapped transformed coordinates; geometry scores invalid" if transformed else "untransformed image scaled to PDF points"
     OUT_SETTINGS.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"Wrote {OUT_NORMALIZED} with {len(regions)} regions "

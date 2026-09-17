@@ -1,0 +1,2 @@
+experiment,documents,missing_documents,missing_pages,CER_lower_better,WER_lower_better,character_errors,table_detection_F1,table_cell_exact_F1,table_dimensions_recall,figure_detection_F1,figure_matched_mean_IoU,comparison_key
+paddleocr-pp-structurev3-nowarp,1,0,0,0.0031746031746031746,0.046242774566473986,4,1.0,0.9583333333333334,1.0,1.0,0.8720841559159043,9c97266ac248d9046245180751ad545238f6201ca091e4bf571b70958ab792f8

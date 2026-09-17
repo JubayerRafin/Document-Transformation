@@ -127,3 +127,7 @@ Streamlit discovers completed visual-review runs recursively under both `runs/` 
 4. Reconstruct PDFs and evaluate layout, translation quality and actual redaction removal.
 
 Official references: [Docling](https://docling-project.github.io/docling/), [Docling offline options](https://docling-project.github.io/docling/usage/advanced_options/), [PyMuPDF coordinates and page operations](https://pymupdf.readthedocs.io/en/latest/page.html).
+
+## PaddleOCR experiment
+
+See [PaddleOCR reproduction and limitations](docs/PADDLEOCR.md) for the submitted Sample02 experiment, adapter commands, and coordinate caveats.

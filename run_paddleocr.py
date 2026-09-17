@@ -12,24 +12,29 @@ os.environ.setdefault("FLAGS_use_mkldnn", "false")
 os.environ.setdefault("FLAGS_enable_pir_api", "0")
 
 import json
-import sys
+import argparse
 import time
 from pathlib import Path
 
 from paddleocr import PPStructureV3
 
 SAMPLE_PDF = Path("samples/Sample02.pdf")
-OUT_DIR = Path("experiments/paddleocr-raw-nowarp")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def main():
-    print(f"Loading PP-StructureV3 pipeline...", flush=True)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--variant", choices=["nowarp", "default"], default="nowarp")
+    args = parser.parse_args()
+    out_dir = Path("experiments/paddleocr-raw" + ("-nowarp" if args.variant == "nowarp" else ""))
+    if out_dir.exists():
+        raise SystemExit(f"Output already exists: {out_dir}. Preserve or move the previous run first.")
+    out_dir.mkdir(parents=True)
+    print("Loading PP-StructureV3 pipeline...", flush=True)
     t0 = time.time()
     pipeline = PPStructureV3(
         enable_mkldnn=False,
-        use_doc_unwarping=False,
-        use_doc_orientation_classify=False,
+        use_doc_unwarping=args.variant == "default",
+        use_doc_orientation_classify=args.variant == "default",
     )
     print(f"Pipeline loaded in {time.time() - t0:.1f}s", flush=True)
 
@@ -39,7 +44,7 @@ def main():
 
     results = []
     for i, res in enumerate(output):
-        page_out_dir = OUT_DIR / f"page_{i+1}"
+        page_out_dir = out_dir / f"page_{i+1}"
         page_out_dir.mkdir(parents=True, exist_ok=True)
         # Save PaddleOCR's native JSON + visualization for inspection
         res.save_to_json(save_path=str(page_out_dir))
@@ -53,10 +58,12 @@ def main():
         "tool": "PaddleOCR PP-StructureV3",
         "paddleocr_version": __import__("paddleocr").__version__,
         "source_pdf": str(SAMPLE_PDF),
+        "variant": args.variant,
+        "paddlepaddle_version": __import__("paddle").__version__,
         "pages_processed": len(results),
         "elapsed_seconds": elapsed,
     }
-    with open(OUT_DIR / "run_manifest.json", "w", encoding="utf-8") as f:
+    with open(out_dir / "run_manifest.json", "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     print(json.dumps(manifest, ensure_ascii=False, indent=2))
 

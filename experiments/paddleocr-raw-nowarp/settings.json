@@ -1,7 +1,7 @@
 {
   "ocr_engine": "PaddleOCR PP-StructureV3",
   "ocr_version": "3.7.0",
-  "paddlepaddle_version": "3.3.1",
+  "paddlepaddle_version": "unrecorded; historical submission reported 3.3.1",
   "ocr_weights_sha256": "unavailable: PaddleX official model hub does not publish per-file checksums for the auto-downloaded PP-OCRv5_server_det/rec weights used here",
   "ocr_mode": "automatic (PP-OCRv5_server_det + PP-OCRv5_server_rec, default PPStructureV3 model set)",
   "languages": [
@@ -10,5 +10,6 @@
   "layout_model": "PP-DocLayout_plus-L",
   "table_model": "SLANet_plus / SLANeXt_wired (wired-table classification via PP-LCNet_x1_0_table_cls)",
   "preprocessing": "use_doc_unwarping=False, use_doc_orientation_classify=False (disabled after the default run showed bbox drift vs reference on this born-digital, non-scanned PDF); enable_mkldnn=False (required to work around a PaddlePaddle 3.3.1 CPU oneDNN/PIR NotImplementedError on this machine, see https://github.com/PaddlePaddle/Paddle/issues/77340)",
-  "hardware": "CPU only (no GPU used)"
+  "hardware": "CPU only (no GPU used)",
+  "geometry_status": "untransformed image scaled to PDF points"
 }

@@ -1,8 +1,8 @@
 {
   "report_version": "1.0",
-  "evaluator_version": "1.0.0",
+  "evaluator_version": "1.0.1",
   "experiment": "paddleocr-pp-structurev3-nowarp",
-  "created_at": "2026-09-15T11:54:06.124689+00:00",
+  "created_at": "2026-09-17T05:28:30.166370+00:00",
   "dataset_sha256": "2830bd7828b5da8d8dcad0ee0d75881cf104fee6ae1ed0a26c181a8586a7867b",
   "protocol": {
     "protocol": "extraction-eval-v1",
@@ -12,15 +12,15 @@
     "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
     "table_scoring": "exact-normalized-grid-slots-and-dimensions"
   },
-  "evaluator_sha256": "8457f6614da457d05cac4ceca81a4993d5229b80d9905e55f302343acbeb8f51",
-  "comparison_key": "80014a63d68631b3bd0761cf2a6651d326dc229a56e0689dcf340c7cd4cf9a48",
+  "evaluator_sha256": "5b74a29d57bc039453c5f349af9ad86aebef0eb88bbe9bd90ed69226432c2793",
+  "comparison_key": "9c97266ac248d9046245180751ad545238f6201ca091e4bf571b70958ab792f8",
   "configuration": {
     "backend": "paddleocr-pp-structurev3-nowarp",
     "backend_version": "3.7.0",
     "settings": {
       "ocr_engine": "PaddleOCR PP-StructureV3",
       "ocr_version": "3.7.0",
-      "paddlepaddle_version": "3.3.1",
+      "paddlepaddle_version": "unrecorded; historical submission reported 3.3.1",
       "ocr_weights_sha256": "unavailable: PaddleX official model hub does not publish per-file checksums for the auto-downloaded PP-OCRv5_server_det/rec weights used here",
       "ocr_mode": "automatic (PP-OCRv5_server_det + PP-OCRv5_server_rec, default PPStructureV3 model set)",
       "languages": [
@@ -29,7 +29,8 @@
       "layout_model": "PP-DocLayout_plus-L",
       "table_model": "SLANet_plus / SLANeXt_wired (wired-table classification via PP-LCNet_x1_0_table_cls)",
       "preprocessing": "use_doc_unwarping=False, use_doc_orientation_classify=False (disabled after the default run showed bbox drift vs reference on this born-digital, non-scanned PDF); enable_mkldnn=False (required to work around a PaddlePaddle 3.3.1 CPU oneDNN/PIR NotImplementedError on this machine, see https://github.com/PaddlePaddle/Paddle/issues/77340)",
-      "hardware": "CPU only (no GPU used)"
+      "hardware": "CPU only (no GPU used)",
+      "geometry_status": "untransformed image scaled to PDF points"
     }
   },
   "documents_expected": 1,
@@ -184,5 +185,9 @@
     "Null means undefined or unannotated. Empty-reference text insertions remain in error counts; CER/WER can exceed 1.",
     "Table scoring checks grid slots and dimensions, not full merged-cell topology/TEDS.",
     "Figure detection evaluates region boxes, not image fidelity or caption association."
+  ],
+  "review_notes": [
+    "Single Sample02 development document; not evidence of general superiority.",
+    "No inference rerun during review; raw conversion and scoring verified."
   ]
 }
