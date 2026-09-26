@@ -33,6 +33,8 @@ The same adapter logic was used across the evaluated set.
 - **Source-page coordinate convention required by project:** displayed-page PDF points, top-left origin
 - **BabelDOC geometry observed:** bottom-left-origin coordinates
 - **Adapter action:** convert BabelDOC coordinates to the project top-left convention
+- **Geometry limitation:** the BabelDOC adapter currently supports only zero-origin, uncropped, unrotated source pages. It explicitly rejects non-zero MediaBox origins, CropBox/MediaBox differences, non-zero page rotation, and source/intermediate page-count mismatches instead of silently producing incorrect coordinates.
+- **Geometry tests:** automated tests cover supported zero-origin pages and rejection of cropped, non-zero-origin, and rotated inputs.
 - **Credentials:** no real credentials committed
 - **Translation usage:** the Sample02 no-translation run reported zero translation tokens
 
@@ -202,38 +204,26 @@ Structural counts are diagnostic only. Region granularity can differ between too
 
 ---
 
-## 8. Five-document pooled evaluation
+## 8. Provisional five-document evaluation
 
-The evaluator pools underlying counts across documents rather than averaging the five percentages.
+A five-document exploratory evaluation was also run using `Sample02`, `Sample03`, `Sample04`, `YOLOv3`, and `TrafficSF`.
 
-- Experiment: `babeldoc-five-documents`
-- Documents: `5`
-- Missing documents: `0`
-- Missing pages: `0`
-- CER: `0.5156035370879121`
-- WER: `0.6025353228575201`
-- Character errors: `24023`
-- Table detection F1: `1.0`
-- Table cell exact F1: `0.19248826291079812`
-- Table dimensions recall: `0.3076923076923077`
-- Figure detection F1: `0.7222222222222222`
-- Figure matched mean IoU: `0.9999996535976633`
-- Comparison key: `1861dad6130294cf047dcbe8385e97fc92cb5af749bb66dfe966ab70c2cf1293`
+Only `Sample02` currently has an approved shared reference. The references for `Sample03`, `Sample04`, `YOLOv3`, and `TrafficSF` are stored under `provisional-references/babeldoc/` with `reviewed: false`. Therefore, the results in this section are provisional and must not be treated as approved benchmark scores.
 
-Summary table:
+After correcting reference-text encoding issues and regenerating the affected reports, the pooled provisional results were:
 
-| Document | CER ↓ | WER ↓ | Table detection F1 ↑ | Cell exact F1 ↑ | Dimensions recall ↑ | Figure F1 ↑ | Figure IoU ↑ |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Sample02 | 0.0000 | 0.0000 | 1.0000 | 0.9583 | 1.0000 | 1.0000 | ~1.0000 |
-| Sample03 | 0.0075 | 0.0606 | 1.0000 | 0.4464 | 0.5000 | 1.0000 | ~1.0000 |
-| Sample04 | 0.2348 | 0.2467 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 |
-| YOLOv3 | 0.5957 | 0.6957 | 1.0000 | 0.0214 | 0.0000 | 0.0000 | null |
-| TrafficSF | 0.5272 | 0.5916 | 1.0000 | 0.0719 | 0.1667 | 0.0000 | null |
-| **All five pooled** | **0.5156** | **0.6025** | **1.0000** | **0.1925** | **0.3077** | **0.7222** | **~1.0000*** |
+| Metric | Result |
+|---|---:|
+| CER | 0.5114316996 |
+| WER | 0.5831689678 |
+| Character errors | 23823 |
+| Table dimensions recall | 0.3076923077 |
 
-`*` Figure mean IoU is calculated only over matched figures. It must always be interpreted together with figure detection F1. A near-perfect matched IoU does not mean missed figures were recovered.
+The complete provisional reports are stored under:
 
----
+`evaluation-results/provisional/babeldoc/`
+
+These results are useful for identifying BabelDOC failure modes, but the four additional references require independent review before they can be used for official cross-tool comparison.
 
 ## 9. Per-document observations
 
@@ -443,24 +433,22 @@ Until those reports exist, only implementation/capability differences should be 
 
 ## 16. Reference creation and review limitation
 
-`Sample02.json` was the existing reviewed project reference.
+`Sample02.json` is the approved shared project reference.
 
-Additional references were created for:
+Additional annotations were prepared for:
 
 - `Sample03`
 - `Sample04`
 - `YOLOv3`
 - `TrafficSF`
 
-For this individual BabelDOC investigation, those four references were annotated and self-reviewed because an independent second-team-member review was not available before submission.
+These four files are stored under `provisional-references/babeldoc/` and have `reviewed: false`.
 
-This differs from the project's preferred reference protocol.
+They are not approved benchmark references and require independent review by another team member before they can be promoted into the shared `references/` directory.
 
-Therefore, the four new references and their resulting scores should be treated as **provisional** until independently reviewed by the team.
+The provisional evaluation reports are therefore stored separately under `evaluation-results/provisional/babeldoc/`.
 
-If any reference is corrected later, every tool must be re-evaluated against the corrected shared reference set.
-
----
+If any provisional reference is corrected during review, the affected evaluations must be regenerated before comparison with other extraction tools.
 
 ## 17. Dataset provenance
 
@@ -498,11 +486,14 @@ Document-Transformation/
 ├── babeldoc_adapter.py
 ├── BABELDOC_REPORT.md
 ├── references/
-│   ├── Sample02.json
-│   ├── Sample03.json
-│   ├── Sample04.json
-│   ├── YOLOv3.json
-│   └── TrafficSF.json
+└── Sample02.json
+
+provisional-references/
+└── babeldoc/
+    ├── Sample03.json
+    ├── Sample04.json
+    ├── YOLOv3.json
+    └── TrafficSF.json
 ├── experiments/
 │   ├── babeldoc/
 │   │   ├── Sample02.json
@@ -567,7 +558,7 @@ Raw evidence needed for reproducibility should be preserved through the curated 
 7. One TrafficSF detected table could not be reconstructed and became `0x0`.
 8. Translation was disabled, so this report does not evaluate BabelDOC translation quality.
 9. Redaction and document reconstruction are outside this milestone.
-10. The four added references are self-reviewed/provisional until independent team review.
+10. The four added references are provisional and unreviewed until independent team review.
 11. Five documents are insufficient to claim general superiority over another extraction backend.
 12. Full cross-tool comparison requires all tools to be evaluated on the exact same reviewed references and evaluator fingerprint.
 

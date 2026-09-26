@@ -22,6 +22,7 @@ Important:
 import argparse
 import json
 from pathlib import Path
+import fitz
 
 
 def bbox_to_top_left(box, page_height):
@@ -31,7 +32,50 @@ def bbox_to_top_left(box, page_height):
         float(box["x2"]),
         float(page_height - box["y"]),
     ]
+GEOMETRY_TOLERANCE = 1e-6
 
+
+def validate_page_geometry(page):
+    """Reject page geometry this adapter cannot safely normalize."""
+    media = page.get("mediabox", {}).get("box")
+    crop = page.get("cropbox", {}).get("box")
+
+    if not media or not crop:
+        raise ValueError("BabelDOC page is missing MediaBox/CropBox geometry.")
+
+    # Current coordinate conversion assumes the page starts at (0, 0).
+    if (
+        abs(float(media["x"])) > GEOMETRY_TOLERANCE
+        or abs(float(media["y"])) > GEOMETRY_TOLERANCE
+    ):
+        raise ValueError(
+            "Unsupported BabelDOC geometry: MediaBox origin must be (0, 0)."
+        )
+
+    # Current adapter does not transform coordinates for a separate CropBox.
+    for key in ("x", "y", "x2", "y2"):
+        if abs(float(media[key]) - float(crop[key])) > GEOMETRY_TOLERANCE:
+            raise ValueError(
+                "Unsupported BabelDOC geometry: CropBox differs from MediaBox."
+            )
+
+
+def validate_source_pdf_rotation(source_pdf, expected_pages):
+    """Reject rotated PDFs because this adapter assumes page rotation 0."""
+    with fitz.open(source_pdf) as doc:
+        if len(doc) != expected_pages:
+            raise ValueError(
+                "Source PDF page count does not match BabelDOC intermediate."
+            )
+
+        for page_number, page in enumerate(doc, start=1):
+            rotation = int(page.rotation) % 360
+
+            if rotation != 0:
+                raise ValueError(
+                    f"Unsupported source PDF geometry: page {page_number} "
+                    f"has rotation {rotation}. Only rotation 0 is supported."
+                )
 
 def center(box):
     return ((box["x"] + box["x2"]) / 2.0, (box["y"] + box["y2"]) / 2.0)
@@ -149,6 +193,8 @@ def reconstruct_table_grid(page, table_box):
 
 
 def adapt_page(page):
+    validate_page_geometry(page)
+
     media = page["mediabox"]["box"]
     width = float(media["x2"] - media["x"])
     height = float(media["y2"] - media["y"])
@@ -264,14 +310,32 @@ def adapt_page(page):
     }
 
 
+
 def main():
-    parser = argparse.ArgumentParser()
+    parser= argparse.ArgumentParser()
     parser.add_argument("input_json", help="BabelDOC intermediate JSON")
-    parser.add_argument("output_json", help="TransformX normalized prediction JSON")
+    parser.add_argument(
+        "output_json",
+        help="TransformX normalized prediction JSON",
+    )
+    parser.add_argument(
+        "--source-pdf",
+        required=True,
+        help="Original PDF, used to reject unsupported page rotation",
+    )
     args = parser.parse_args()
 
-    source = json.loads(Path(args.input_json).read_text(encoding="utf-8"))
-    pages = [adapt_page(page) for page in source.get("page", [])]
+    source = json.loads(
+        Path(args.input_json).read_text(encoding="utf-8")
+    )
+    source_pages = source.get("page", [])
+
+    validate_source_pdf_rotation(
+        args.source_pdf,
+        len(source_pages),
+    )
+
+    pages = [adapt_page(page) for page in source_pages]
 
     out = {
         "coordinate_system": (
@@ -287,30 +351,41 @@ def main():
     )
 
     text_count = sum(
-        r["kind"] == "text" for p in pages for r in p["regions"]
+        r["kind"] == "text"
+        for p in pages
+        for r in p["regions"]
     )
+
     table_count = sum(
-        r["kind"] == "table" for p in pages for r in p["regions"]
+        r["kind"] == "table"
+        for p in pages
+        for r in p["regions"]
     )
+
     figure_count = sum(
-        r["kind"] == "figure" for p in pages for r in p["regions"]
+        r["kind"] == "figure"
+        for p in pages
+        for r in p["regions"]
     )
+
     print(f"Saved: {args.output_json}")
+
     print(
         f"Pages={len(pages)} Text={text_count} "
         f"Tables={table_count} Figures={figure_count}"
     )
+
     for page in pages:
         for region in page["regions"]:
             if region["kind"] == "table":
                 cells = region.get("cells", [])
                 rows = len(cells)
                 cols = len(cells[0]) if cells else 0
+
                 print(
                     f"{region['id']}: {rows}x{cols}, "
                     f"bbox={region['bbox']}"
                 )
-
 
 if __name__ == "__main__":
     main()

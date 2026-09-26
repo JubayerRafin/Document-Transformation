@@ -1,0 +1,133 @@
+{
+  "reference_version": "1.0",
+  "source_name": "Sample04.pdf",
+  "source_sha256": "2ba9ac9c9a42981800f85318d68959cef042b2921445777a963b09734ca14f0d",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Asset & Access Report — Redaction Test Sample\nDocument ID: SEC-2024-0093 | Classification: Internal | Purpose: verify text-in-image and image-in-table handling during redaction\nThis document mixes normal selectable text with images that contain their own baked-in text (not part of the PDF text layer). Use it to confirm a redaction pipeline correctly leaves image-embedded text alone (or flags it separately) while masking real text-layer PII.\n1. Images with baked-in text (non-selectable)\nThe three images below each contain text that is part of the pixel data, not the PDF text layer — a plain text-extraction pass will NOT find Kim Min-jun, EMP-2024-8831, or the API key inside them.\nHP ENTERPRISE — STAFF ID\nKim Min-jun\nID: EMP-2024-8831\nTitle: Software Engineer II\nDept: Enterprise Solutions\nIssued: 2024-03-18\nStaff ID badge scan\nCAUTION\nRestricted access area.\nBadge EMP-2024-8831\nauthorized only.\nsecurity@example-corp.com\nFacility warning label\nApp Center — Device Console\nDevice: WPX-0042 Owner: minjun.kim@example-corp.com\nAPI Key: sk_live_4f9a...REDACT_ME\nLast login IP: 172.16.5.114\nScreenshot captured 2024-03-20 09:41 KST\nApp console screenshot\nFor comparison, here is the same kind of information as real selectable text (the redaction engine SHOULD catch this): employee Kim Min-jun, ID EMP-2024-8831, email minjun.kim@example-corp.com, API key sk_live_4f9a-REDACT_ME.\n2. Table with images embedded in cells\nEach row below mixes a real text-layer SKU/price with a product photo that has its own price sticker baked into the image — useful for testing whether a redaction pass preserves embedded images inside table cells while still finding the text-layer values in adjacent cells.\n₩1.2M\nLaserJet Pro X1\n₩2.4M\nEliteBook 840\n₩850K\nField Scanner T3",
+      "tables": [
+        {
+          "id": "p1_table1",
+          "bbox": [
+            75.6,
+            473.88,
+            536.4,
+            721.64
+          ],
+          "cells": [
+            [
+              "Photo",
+              "Item",
+              "SKU",
+              "Assigned To",
+              "List Price"
+            ],
+            [
+              "",
+              "LaserJet Pro X1",
+              "SKU-PR-0417",
+              "Kim Min-jun",
+              "KRW 1,200,000"
+            ],
+            [
+              "",
+              "EliteBook 840",
+              "SKU-LT-0982",
+              "Park Ji-hoon",
+              "KRW 2,400,000"
+            ],
+            [
+              "",
+              "Field Scanner T3",
+              "SKU-FS-2201",
+              "Lee Soo-jin",
+              "KRW 850,000"
+            ]
+          ]
+        }
+      ],
+      "figures": [
+        {
+          "id": "p1_figure1",
+          "bbox": [
+            75.6,
+            224.2,
+            212.4,
+            309.88
+          ]
+        },
+        {
+          "id": "p1_figure2",
+          "bbox": [
+            226.8,
+            236.08,
+            385.2,
+            298.0
+          ]
+        },
+        {
+          "id": "p1_figure3",
+          "bbox": [
+            399.6,
+            224.56,
+            536.4,
+            309.52
+          ]
+        },
+        {
+          "id": "p1_figure4",
+          "bbox": [
+            82.8,
+            505.88,
+            165.6,
+            567.8
+          ]
+        },
+        {
+          "id": "p1_figure5",
+          "bbox": [
+            82.8,
+            579.8,
+            165.6,
+            641.72
+          ]
+        },
+        {
+          "id": "p1_figure6",
+          "bbox": [
+            82.8,
+            653.72,
+            165.6,
+            715.64
+          ]
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Note: the price sticker visible on each photo (e.g. \"KRW 1.2M\") is baked into the image and will differ slightly in formatting from the text-layer \"List Price\" column — both should be checked independently by an OCR-aware redaction pass.\nGenerated as a synthetic test document. All names, IDs, keys, and figures are fictitious.",
+      "tables": [],
+      "figures": []
+    }
+  ]
+}

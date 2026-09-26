@@ -1,29 +1,5 @@
 {
-  "schema_version": "0.1.0",
-  "source_name": "Sample04.pdf",
-  "source_sha256": "2ba9ac9c9a42981800f85318d68959cef042b2921445777a963b09734ca14f0d",
   "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
-  "backend": "babeldoc",
-  "backend_version": "0.6.4",
-  "settings": {
-    "ocr_engine": "BabelDOC internal parsing/OCR pipeline; no separate OCR engine explicitly configured in this run",
-    "ocr_version": "not explicitly exposed by the CLI run; record installed BabelDOC dependency versions if required",
-    "ocr_weights_sha256": "unavailable: BabelDOC installation did not expose/publish a single OCR-weights checksum for this experiment",
-    "ocr_mode": "BabelDOC default parsing behavior; translation skipped",
-    "languages": [
-      "en"
-    ],
-    "layout_model": "BabelDOC 0.6.4 default layout pipeline",
-    "table_model": "No structured table-cell model output exposed in inspected intermediate table object",
-    "preprocessing": "BabelDOC 0.6.4 default preprocessing; --skip-translation; --no-auto-extract-glossary; --debug. Adapter converts bottom-left PDF coordinates to TransformX top-left coordinates, uses geometric reading order, reconstructs the Sample02 table grid from BabelDOC-positioned table text, and maps non-full-page BabelDOC image forms to figure predictions.",
-    "translation": "skipped",
-    "translation_api_calls": "none observed; BabelDOC log reported 0 prompt and 0 completion tokens",
-    "adapter_notes": [
-      "BabelDOC page_layout exposed a table box but no explicit rows/columns/cells fields.",
-      "The adapter reconstructs a rectangular grid from positioned BabelDOC paragraph text inside the predicted table box without consulting the reference JSON.",
-      "BabelDOC exposed three image forms on Sample02; the adapter maps non-full-page image forms to figures."
-    ]
-  },
   "pages": [
     {
       "number": 1,
