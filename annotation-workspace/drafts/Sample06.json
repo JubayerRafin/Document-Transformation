@@ -1,0 +1,61 @@
+{
+  "reference_version": "1.0",
+  "source_name": "Sample06.pdf",
+  "source_sha256": "5715ddb864febb70db3ae1de7023ce6d82a9746c143ec665f3e9231cfdf87012",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 960.0,
+      "height": 540.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Sample #2\n01\nHP\nThe fact they had to travel by train because they could not risk flying and running the gauntlet of Russian drones - weapons launched on the orders of the man at whose table they sat in the Kremlin only hours ago.\n02\nHP\nBoth sides held talks for several hours; they were later joined by some European national security advisers, including the UK's National Security Adviser Jonathan Powell.\n03\nHP\nWitkoff insisted progress had been made and the ingredients for a settlement were there.\n04\nHP\nBut he admitted both sides would have to make compromises to narrow the differences between them. And right now, it is hard to see either side doing that.",
+      "tables": [],
+      "figures": [
+        {
+          "id": "p1_figure1",
+          "bbox": [
+            85,
+            133,
+            194,
+            242
+          ]
+        },
+        {
+          "id": "p1_figure2",
+          "bbox": [
+            313,
+            133,
+            423,
+            242
+          ]
+        },
+        {
+          "id": "p1_figure3",
+          "bbox": [
+            541,
+            133,
+            651,
+            242
+          ]
+        },
+        {
+          "id": "p1_figure4",
+          "bbox": [
+            769,
+            133,
+            879,
+            242
+          ]
+        }
+      ]
+    }
+  ]
+}

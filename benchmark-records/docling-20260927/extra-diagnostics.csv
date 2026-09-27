@@ -1,0 +1,2 @@
+file,backend,status,seconds,pages,text,tables,figures,raster_pages,warnings,run_dir,error
+samples\extra\YOLOv3.pdf,docling,completed,145.193,6,315,3,5,0,2,experiments\docling-extra-20260927\docling-37049049b5-6b0de213,

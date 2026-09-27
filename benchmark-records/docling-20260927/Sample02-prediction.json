@@ -1,0 +1,1979 @@
+{
+  "source_name": "Sample02.pdf",
+  "source_sha256": "684082b44c8c554ac095b31ab6c70d326a4f73fc02bb62fd1adbe68c92dcb772",
+  "backend": "docling",
+  "backend_version": "2.107.0",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "preview": "assets/page-1.png",
+      "regions": [
+        {
+          "id": "p1_r1",
+          "kind": "text",
+          "bbox": [
+            72.0,
+            37.841999999999985,
+            224.44650000000001,
+            45.65059090909085
+          ],
+          "text": "CONFIDENTIAL - Internal Use Only",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/0",
+            "source_label": "page_header",
+            "content_layer": "furniture",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/0",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "furniture",
+              "meta": null,
+              "label": "page_header",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.0,
+                    "t": 754.158,
+                    "r": 224.44650000000001,
+                    "b": 746.3494090909091,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    32
+                  ]
+                }
+              ],
+              "orig": "CONFIDENTIAL - Internal Use Only",
+              "text": "CONFIDENTIAL - Internal Use Only",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r2",
+          "kind": "figure",
+          "bbox": [
+            72.95310974121094,
+            73.33554077148438,
+            100.33100128173828,
+            100.45997619628906
+          ],
+          "text": "",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/pictures/0",
+            "source_label": "picture",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/pictures/0",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "picture",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.95310974121094,
+                    "t": 718.6644592285156,
+                    "r": 100.33100128173828,
+                    "b": 691.5400238037109,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "captions": [],
+              "references": [],
+              "footnotes": [],
+              "image": {
+                "mimetype": "image/png",
+                "dpi": 108,
+                "size": {
+                  "width": 41.0,
+                  "height": 41.0
+                },
+                "uri": "data:image/png;base64,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"
+              },
+              "annotations": []
+            }
+          },
+          "asset": "assets/p1_r2.png",
+          "warnings": []
+        },
+        {
+          "id": "p1_r3",
+          "kind": "text",
+          "bbox": [
+            102.0,
+            90.08399999999995,
+            350.4162,
+            105.7011818181818
+          ],
+          "text": "Employee Onboarding Record",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/1",
+            "source_label": "section_header",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/1",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "section_header",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 102.0,
+                    "t": 701.916,
+                    "r": 350.4162,
+                    "b": 686.2988181818182,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    26
+                  ]
+                }
+              ],
+              "orig": "Employee Onboarding Record",
+              "text": "Employee Onboarding Record",
+              "formatting": null,
+              "hyperlink": null,
+              "level": 1
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r4",
+          "kind": "text",
+          "bbox": [
+            71.99807999999996,
+            108.60347999999999,
+            308.51122800000013,
+            117.17570052785925
+          ],
+          "text": "Document ID: HR-2024-00417   |   Classification: Internal",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/2",
+            "source_label": "text",
+            "content_layer": "body",
+            "hierarchy_level": 2,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/2",
+              "parent": {
+                "cref": "#/groups/0"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "text",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 71.99807999999996,
+                    "t": 683.39652,
+                    "r": 308.51122800000013,
+                    "b": 674.8242994721408,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    57
+                  ]
+                }
+              ],
+              "orig": "Document ID: HR-2024-00417   |   Classification: Internal",
+              "text": "Document ID: HR-2024-00417   |   Classification: Internal",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r5",
+          "kind": "text",
+          "bbox": [
+            72.0,
+            131.75448000000006,
+            223.10928,
+            145.43886023076925
+          ],
+          "text": "1. Employee Summary",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/3",
+            "source_label": "section_header",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/3",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "section_header",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.0,
+                    "t": 660.2455199999999,
+                    "r": 223.10928,
+                    "b": 646.5611397692307,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    19
+                  ]
+                }
+              ],
+              "orig": "1. Employee Summary",
+              "text": "1. Employee Summary",
+              "formatting": null,
+              "hyperlink": null,
+              "level": 1
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r6",
+          "kind": "text",
+          "bbox": [
+            71.99003999999991,
+            148.56647999999996,
+            518.5964399999999,
+            180.25542727272727
+          ],
+          "text": "This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831 ), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com , mobile 010-2345-6789 . Resident registration number on file: 901231-1****** . Emergency contact: Lee Soo-jin , 010-9876-5432.",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/4",
+            "source_label": "text",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/4",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "text",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 71.99003999999991,
+                    "t": 643.43352,
+                    "r": 518.5964399999999,
+                    "b": 611.7445727272727,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    308
+                  ]
+                }
+              ],
+              "orig": "This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831 ), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com , mobile 010-2345-6789 . Resident registration number on file: 901231-1****** . Emergency contact: Lee Soo-jin , 010-9876-5432.",
+              "text": "This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831 ), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com , mobile 010-2345-6789 . Resident registration number on file: 901231-1****** . Emergency contact: Lee Soo-jin , 010-9876-5432.",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r7",
+          "kind": "figure",
+          "bbox": [
+            72.79169464111328,
+            191.12725830078125,
+            91.53123474121094,
+            208.9327850341797
+          ],
+          "text": "",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/pictures/1",
+            "source_label": "picture",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/pictures/1",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "picture",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.79169464111328,
+                    "t": 600.8727416992188,
+                    "r": 91.53123474121094,
+                    "b": 583.0672149658203,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "captions": [],
+              "references": [],
+              "footnotes": [],
+              "image": {
+                "mimetype": "image/png",
+                "dpi": 108,
+                "size": {
+                  "width": 28.0,
+                  "height": 26.0
+                },
+                "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABwAAAAaCAIAAAArNqveAAADTUlEQVRIDa3BD0xUBRwH8O/v3h1nF1ZaCTGyObUsksUCzeZ0rUxZY0xq5lD+1Ai6CFR2qHCr1m5NFNS4djcFS3FA2Y3KVgkrV1k0hYyWgW3aoK1RocNkBry79963xSS4uIOD9fkISfzfhCQi09nZdfbsd9nZmzEVIYnI5OZm9XZ/X3fs5B2x8zApIYkIfNXa1rg/NS66/9blB16wF2BSQhJTMYiy7S+umedJWqJsO7LUfbj1lptsCE9IYipt3/7gdj5UV64ps6TysF/udjtKihCekMSkhobUbUVZOUm+FUlWGOi7HNh66C5nZUvCvYsRhpDEpN774JN2X8YuuwGaQGAWGo+rXVLucr0mgpCEJMIbVrX87HWOx08mJljhxz9MuHZNL3DP2VVzbn58DEIRkgjv+IcnTjWk7S1WYAiI6yx4t1lt+6u0qmoPQhGSCGNYDTyXm+FM/WjJQit0jBEMDmr5nvidFZ/ef99iTCAkEUbd0fqez595JU9gmEAEseD9z9RvrjxfUeVVTIJgQhKh/DkwWJTz8O6sc3GxFmiAAMQYgQ6jcL/12fLWZcmJCCYkEcrefW7jwpbSnCj4RdPxez/jYwQGxljwxWm15nT60YYms1nBOEISE/Rd6i8pWLMnsyMuNgrEkIq2LmP1gyboGCPQNM1Rc3NGYfOqlSkYR0hiAo+3VjufvyUzCgEBoBu4fJUxcwVEkCh8eUZ958dMz8EGkwn/EpII1vvbpdKCFZW5PXExZui4TgDivwQBnVur/evymtOeWItRQhLBHI7tybbKjalWBDA1BRe71TLfqrfqP549OxojhCTG6Tx/sWLHYwcLf7XZzCAiQcV46YApMf3YhqfSMUJIYhQJl+vlhaprU5oVfkTKjJ8uqLtbHvG82WK7wQJASGLUzz29O/IeOFJ6JfpGBQamwULH64HkJ5s2blgPQEhihKbpZTtLVs5xpz9qhR/To6D7F7/Tl1Jde+L22+YKSYw49XV70xtr99kHFMUMYtqi4H1b1RZ5i4vsQhKAprPYvvnphMbVy63wYybM+KMvUOi901PfISQBnGnvqH015ZBTgUlAzIQAFtQ0+ofnVwvJQCCQnbXpHotv2VJQAwQzJLg6gOrmBX8DYkt84CtlS30AAAAASUVORK5CYII="
+              },
+              "annotations": []
+            }
+          },
+          "asset": "assets/p1_r7.png",
+          "warnings": []
+        },
+        {
+          "id": "p1_r8",
+          "kind": "text",
+          "bbox": [
+            92.99567999999988,
+            204.73091999999997,
+            519.0794999999999,
+            213.30314052785923
+          ],
+          "text": "Fields highlighted in this document contain sample PII and must be masked before external distribution.",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/5",
+            "source_label": "text",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/5",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "text",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 92.99567999999988,
+                    "t": 587.26908,
+                    "r": 519.0794999999999,
+                    "b": 578.6968594721408,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    103
+                  ]
+                }
+              ],
+              "orig": "Fields highlighted in this document contain sample PII and must be masked before external distribution.",
+              "text": "Fields highlighted in this document contain sample PII and must be masked before external distribution.",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r9",
+          "kind": "text",
+          "bbox": [
+            72.0,
+            232.79448000000002,
+            229.82844,
+            246.47886023076921
+          ],
+          "text": "2. Personnel Data Table",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/6",
+            "source_label": "section_header",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/6",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "section_header",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.0,
+                    "t": 559.20552,
+                    "r": 229.82844,
+                    "b": 545.5211397692308,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    23
+                  ]
+                }
+              ],
+              "orig": "2. Personnel Data Table",
+              "text": "2. Personnel Data Table",
+              "formatting": null,
+              "hyperlink": null,
+              "level": 1
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r10",
+          "kind": "table",
+          "bbox": [
+            71.06172943115234,
+            246.34423828125,
+            522.9609375,
+            342.6863098144531
+          ],
+          "text": "",
+          "cells": [
+            [
+              "Field",
+              "Value",
+              "Field",
+              "Value"
+            ],
+            [
+              "Full Name",
+              "Kim Min-jun",
+              "Department",
+              "Enterprise Solutions"
+            ],
+            [
+              "Employee ID",
+              "EMP-2024-8831",
+              "Title",
+              "Software Engineer II"
+            ],
+            [
+              "Email",
+              "minjun.kim@example- corp.com",
+              "Phone",
+              "010-2345-6789"
+            ],
+            [
+              "Bank Account",
+              "KB 123-456-789012",
+              "Annual Salary",
+              "KRW68,000,000"
+            ],
+            [
+              "Home Address",
+              "12, Teheran-ro 4-gil, Gangnam-gu, Seoul",
+              "Start Date",
+              "2024-03-18"
+            ]
+          ],
+          "metadata": {
+            "source_ref": "#/tables/0",
+            "source_label": "table",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/tables/0",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "table",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 71.06172943115234,
+                    "t": 545.65576171875,
+                    "r": 522.9609375,
+                    "b": 449.3136901855469,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "captions": [],
+              "references": [],
+              "footnotes": [],
+              "image": null,
+              "data": {
+                "table_cells": [
+                  {
+                    "bbox": {
+                      "l": 72.72,
+                      "t": 250.08647999999994,
+                      "r": 94.33618799999998,
+                      "b": 258.7279872727272,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 0,
+                    "end_row_offset_idx": 1,
+                    "start_col_offset_idx": 0,
+                    "end_col_offset_idx": 1,
+                    "text": "Field",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 183.36,
+                      "t": 250.08647999999994,
+                      "r": 208.29983999999993,
+                      "b": 258.7279872727272,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 0,
+                    "end_row_offset_idx": 1,
+                    "start_col_offset_idx": 1,
+                    "end_col_offset_idx": 2,
+                    "text": "Value",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 300.12,
+                      "t": 250.08647999999994,
+                      "r": 321.73618800000014,
+                      "b": 258.7279872727272,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 0,
+                    "end_row_offset_idx": 1,
+                    "start_col_offset_idx": 2,
+                    "end_col_offset_idx": 3,
+                    "text": "Field",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 411.84,
+                      "t": 250.08647999999994,
+                      "r": 436.77984,
+                      "b": 258.7279872727272,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 0,
+                    "end_row_offset_idx": 1,
+                    "start_col_offset_idx": 3,
+                    "end_col_offset_idx": 4,
+                    "text": "Value",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 72.72,
+                      "t": 262.08647999999994,
+                      "r": 117.46131599999995,
+                      "b": 270.7279872727272,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 1,
+                    "end_row_offset_idx": 2,
+                    "start_col_offset_idx": 0,
+                    "end_col_offset_idx": 1,
+                    "text": "Full Name",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 183.36,
+                      "t": 262.08647999999994,
+                      "r": 236.45867999999996,
+                      "b": 270.6263563846153,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 1,
+                    "end_row_offset_idx": 2,
+                    "start_col_offset_idx": 1,
+                    "end_col_offset_idx": 2,
+                    "text": "Kim Min-jun",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 300.12,
+                      "t": 262.08647999999994,
+                      "r": 351.80244000000016,
+                      "b": 270.7279872727272,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 1,
+                    "end_row_offset_idx": 2,
+                    "start_col_offset_idx": 2,
+                    "end_col_offset_idx": 3,
+                    "text": "Department",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 411.84,
+                      "t": 262.08647999999994,
+                      "r": 493.35264,
+                      "b": 270.6263563846153,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 1,
+                    "end_row_offset_idx": 2,
+                    "start_col_offset_idx": 3,
+                    "end_col_offset_idx": 4,
+                    "text": "Enterprise Solutions",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 72.72,
+                      "t": 274.08648000000005,
+                      "r": 128.50894800000003,
+                      "b": 282.72798727272726,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 2,
+                    "end_row_offset_idx": 3,
+                    "start_col_offset_idx": 0,
+                    "end_col_offset_idx": 1,
+                    "text": "Employee ID",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 183.36,
+                      "t": 274.08648000000005,
+                      "r": 250.61876399999997,
+                      "b": 282.6263563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 2,
+                    "end_row_offset_idx": 3,
+                    "start_col_offset_idx": 1,
+                    "end_col_offset_idx": 2,
+                    "text": "EMP-2024-8831",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 300.12,
+                      "t": 274.08648000000005,
+                      "r": 320.0200800000002,
+                      "b": 282.72798727272726,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 2,
+                    "end_row_offset_idx": 3,
+                    "start_col_offset_idx": 2,
+                    "end_col_offset_idx": 3,
+                    "text": "Title",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 411.84,
+                      "t": 274.08648000000005,
+                      "r": 495.78288000000066,
+                      "b": 282.6263563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 2,
+                    "end_row_offset_idx": 3,
+                    "start_col_offset_idx": 3,
+                    "end_col_offset_idx": 4,
+                    "text": "Software Engineer II",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 72.72,
+                      "t": 291.84648,
+                      "r": 98.2923,
+                      "b": 300.48798727272725,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 3,
+                    "end_row_offset_idx": 4,
+                    "start_col_offset_idx": 0,
+                    "end_col_offset_idx": 1,
+                    "text": "Email",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 183.36,
+                      "t": 286.08648,
+                      "r": 276.19668,
+                      "b": 306.1463563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 3,
+                    "end_row_offset_idx": 4,
+                    "start_col_offset_idx": 1,
+                    "end_col_offset_idx": 2,
+                    "text": "minjun.kim@example- corp.com",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 300.12,
+                      "t": 291.84648,
+                      "r": 326.7380999999999,
+                      "b": 300.48798727272725,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 3,
+                    "end_row_offset_idx": 4,
+                    "start_col_offset_idx": 2,
+                    "end_col_offset_idx": 3,
+                    "text": "Phone",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 411.84,
+                      "t": 291.84648,
+                      "r": 473.57280000000003,
+                      "b": 300.3863563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 3,
+                    "end_row_offset_idx": 4,
+                    "start_col_offset_idx": 3,
+                    "end_col_offset_idx": 4,
+                    "text": "010-2345-6789",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 72.72,
+                      "t": 309.60648,
+                      "r": 133.509864,
+                      "b": 318.24798727272724,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 4,
+                    "end_row_offset_idx": 5,
+                    "start_col_offset_idx": 0,
+                    "end_col_offset_idx": 1,
+                    "text": "Bank Account",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 183.36,
+                      "t": 309.60648,
+                      "r": 266.45976,
+                      "b": 318.1463563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 4,
+                    "end_row_offset_idx": 5,
+                    "start_col_offset_idx": 1,
+                    "end_col_offset_idx": 2,
+                    "text": "KB 123-456-789012",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 300.12,
+                      "t": 309.60648,
+                      "r": 361.97159999999997,
+                      "b": 318.24798727272724,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 4,
+                    "end_row_offset_idx": 5,
+                    "start_col_offset_idx": 2,
+                    "end_col_offset_idx": 3,
+                    "text": "Annual Salary",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 411.84,
+                      "t": 309.60648,
+                      "r": 482.698428,
+                      "b": 318.1463563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 4,
+                    "end_row_offset_idx": 5,
+                    "start_col_offset_idx": 3,
+                    "end_col_offset_idx": 4,
+                    "text": "KRW68,000,000",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 72.72,
+                      "t": 327.36647999999997,
+                      "r": 135.760824,
+                      "b": 336.00798727272723,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 5,
+                    "end_row_offset_idx": 6,
+                    "start_col_offset_idx": 0,
+                    "end_col_offset_idx": 1,
+                    "text": "Home Address",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 183.36,
+                      "t": 321.60648,
+                      "r": 266.72760000000017,
+                      "b": 341.6663563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 5,
+                    "end_row_offset_idx": 6,
+                    "start_col_offset_idx": 1,
+                    "end_col_offset_idx": 2,
+                    "text": "12, Teheran-ro 4-gil, Gangnam-gu, Seoul",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 300.12,
+                      "t": 327.36647999999997,
+                      "r": 344.3712840000003,
+                      "b": 336.00798727272723,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 5,
+                    "end_row_offset_idx": 6,
+                    "start_col_offset_idx": 2,
+                    "end_col_offset_idx": 3,
+                    "text": "Start Date",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  },
+                  {
+                    "bbox": {
+                      "l": 411.84,
+                      "t": 327.36647999999997,
+                      "r": 458.57280000000003,
+                      "b": 335.9063563846154,
+                      "coord_origin": "TOPLEFT"
+                    },
+                    "row_span": 1,
+                    "col_span": 1,
+                    "start_row_offset_idx": 5,
+                    "end_row_offset_idx": 6,
+                    "start_col_offset_idx": 3,
+                    "end_col_offset_idx": 4,
+                    "text": "2024-03-18",
+                    "column_header": false,
+                    "row_header": false,
+                    "row_section": false,
+                    "fillable": false
+                  }
+                ],
+                "num_rows": 6,
+                "num_cols": 4,
+                "orientation": "rot_0",
+                "grid": [
+                  [
+                    {
+                      "bbox": {
+                        "l": 72.72,
+                        "t": 250.08647999999994,
+                        "r": 94.33618799999998,
+                        "b": 258.7279872727272,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 0,
+                      "end_row_offset_idx": 1,
+                      "start_col_offset_idx": 0,
+                      "end_col_offset_idx": 1,
+                      "text": "Field",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 183.36,
+                        "t": 250.08647999999994,
+                        "r": 208.29983999999993,
+                        "b": 258.7279872727272,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 0,
+                      "end_row_offset_idx": 1,
+                      "start_col_offset_idx": 1,
+                      "end_col_offset_idx": 2,
+                      "text": "Value",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 300.12,
+                        "t": 250.08647999999994,
+                        "r": 321.73618800000014,
+                        "b": 258.7279872727272,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 0,
+                      "end_row_offset_idx": 1,
+                      "start_col_offset_idx": 2,
+                      "end_col_offset_idx": 3,
+                      "text": "Field",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 411.84,
+                        "t": 250.08647999999994,
+                        "r": 436.77984,
+                        "b": 258.7279872727272,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 0,
+                      "end_row_offset_idx": 1,
+                      "start_col_offset_idx": 3,
+                      "end_col_offset_idx": 4,
+                      "text": "Value",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    }
+                  ],
+                  [
+                    {
+                      "bbox": {
+                        "l": 72.72,
+                        "t": 262.08647999999994,
+                        "r": 117.46131599999995,
+                        "b": 270.7279872727272,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 1,
+                      "end_row_offset_idx": 2,
+                      "start_col_offset_idx": 0,
+                      "end_col_offset_idx": 1,
+                      "text": "Full Name",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 183.36,
+                        "t": 262.08647999999994,
+                        "r": 236.45867999999996,
+                        "b": 270.6263563846153,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 1,
+                      "end_row_offset_idx": 2,
+                      "start_col_offset_idx": 1,
+                      "end_col_offset_idx": 2,
+                      "text": "Kim Min-jun",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 300.12,
+                        "t": 262.08647999999994,
+                        "r": 351.80244000000016,
+                        "b": 270.7279872727272,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 1,
+                      "end_row_offset_idx": 2,
+                      "start_col_offset_idx": 2,
+                      "end_col_offset_idx": 3,
+                      "text": "Department",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 411.84,
+                        "t": 262.08647999999994,
+                        "r": 493.35264,
+                        "b": 270.6263563846153,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 1,
+                      "end_row_offset_idx": 2,
+                      "start_col_offset_idx": 3,
+                      "end_col_offset_idx": 4,
+                      "text": "Enterprise Solutions",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    }
+                  ],
+                  [
+                    {
+                      "bbox": {
+                        "l": 72.72,
+                        "t": 274.08648000000005,
+                        "r": 128.50894800000003,
+                        "b": 282.72798727272726,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 2,
+                      "end_row_offset_idx": 3,
+                      "start_col_offset_idx": 0,
+                      "end_col_offset_idx": 1,
+                      "text": "Employee ID",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 183.36,
+                        "t": 274.08648000000005,
+                        "r": 250.61876399999997,
+                        "b": 282.6263563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 2,
+                      "end_row_offset_idx": 3,
+                      "start_col_offset_idx": 1,
+                      "end_col_offset_idx": 2,
+                      "text": "EMP-2024-8831",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 300.12,
+                        "t": 274.08648000000005,
+                        "r": 320.0200800000002,
+                        "b": 282.72798727272726,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 2,
+                      "end_row_offset_idx": 3,
+                      "start_col_offset_idx": 2,
+                      "end_col_offset_idx": 3,
+                      "text": "Title",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 411.84,
+                        "t": 274.08648000000005,
+                        "r": 495.78288000000066,
+                        "b": 282.6263563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 2,
+                      "end_row_offset_idx": 3,
+                      "start_col_offset_idx": 3,
+                      "end_col_offset_idx": 4,
+                      "text": "Software Engineer II",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    }
+                  ],
+                  [
+                    {
+                      "bbox": {
+                        "l": 72.72,
+                        "t": 291.84648,
+                        "r": 98.2923,
+                        "b": 300.48798727272725,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 3,
+                      "end_row_offset_idx": 4,
+                      "start_col_offset_idx": 0,
+                      "end_col_offset_idx": 1,
+                      "text": "Email",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 183.36,
+                        "t": 286.08648,
+                        "r": 276.19668,
+                        "b": 306.1463563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 3,
+                      "end_row_offset_idx": 4,
+                      "start_col_offset_idx": 1,
+                      "end_col_offset_idx": 2,
+                      "text": "minjun.kim@example- corp.com",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 300.12,
+                        "t": 291.84648,
+                        "r": 326.7380999999999,
+                        "b": 300.48798727272725,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 3,
+                      "end_row_offset_idx": 4,
+                      "start_col_offset_idx": 2,
+                      "end_col_offset_idx": 3,
+                      "text": "Phone",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 411.84,
+                        "t": 291.84648,
+                        "r": 473.57280000000003,
+                        "b": 300.3863563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 3,
+                      "end_row_offset_idx": 4,
+                      "start_col_offset_idx": 3,
+                      "end_col_offset_idx": 4,
+                      "text": "010-2345-6789",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    }
+                  ],
+                  [
+                    {
+                      "bbox": {
+                        "l": 72.72,
+                        "t": 309.60648,
+                        "r": 133.509864,
+                        "b": 318.24798727272724,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 4,
+                      "end_row_offset_idx": 5,
+                      "start_col_offset_idx": 0,
+                      "end_col_offset_idx": 1,
+                      "text": "Bank Account",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 183.36,
+                        "t": 309.60648,
+                        "r": 266.45976,
+                        "b": 318.1463563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 4,
+                      "end_row_offset_idx": 5,
+                      "start_col_offset_idx": 1,
+                      "end_col_offset_idx": 2,
+                      "text": "KB 123-456-789012",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 300.12,
+                        "t": 309.60648,
+                        "r": 361.97159999999997,
+                        "b": 318.24798727272724,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 4,
+                      "end_row_offset_idx": 5,
+                      "start_col_offset_idx": 2,
+                      "end_col_offset_idx": 3,
+                      "text": "Annual Salary",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 411.84,
+                        "t": 309.60648,
+                        "r": 482.698428,
+                        "b": 318.1463563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 4,
+                      "end_row_offset_idx": 5,
+                      "start_col_offset_idx": 3,
+                      "end_col_offset_idx": 4,
+                      "text": "KRW68,000,000",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    }
+                  ],
+                  [
+                    {
+                      "bbox": {
+                        "l": 72.72,
+                        "t": 327.36647999999997,
+                        "r": 135.760824,
+                        "b": 336.00798727272723,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 5,
+                      "end_row_offset_idx": 6,
+                      "start_col_offset_idx": 0,
+                      "end_col_offset_idx": 1,
+                      "text": "Home Address",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 183.36,
+                        "t": 321.60648,
+                        "r": 266.72760000000017,
+                        "b": 341.6663563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 5,
+                      "end_row_offset_idx": 6,
+                      "start_col_offset_idx": 1,
+                      "end_col_offset_idx": 2,
+                      "text": "12, Teheran-ro 4-gil, Gangnam-gu, Seoul",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 300.12,
+                        "t": 327.36647999999997,
+                        "r": 344.3712840000003,
+                        "b": 336.00798727272723,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 5,
+                      "end_row_offset_idx": 6,
+                      "start_col_offset_idx": 2,
+                      "end_col_offset_idx": 3,
+                      "text": "Start Date",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    },
+                    {
+                      "bbox": {
+                        "l": 411.84,
+                        "t": 327.36647999999997,
+                        "r": 458.57280000000003,
+                        "b": 335.9063563846154,
+                        "coord_origin": "TOPLEFT"
+                      },
+                      "row_span": 1,
+                      "col_span": 1,
+                      "start_row_offset_idx": 5,
+                      "end_row_offset_idx": 6,
+                      "start_col_offset_idx": 3,
+                      "end_col_offset_idx": 4,
+                      "text": "2024-03-18",
+                      "column_header": false,
+                      "row_header": false,
+                      "row_section": false,
+                      "fillable": false
+                    }
+                  ]
+                ]
+              },
+              "annotations": []
+            }
+          },
+          "asset": "assets/p1_r10.png",
+          "warnings": []
+        },
+        {
+          "id": "p1_r11",
+          "kind": "text",
+          "bbox": [
+            72.0,
+            368.15448000000004,
+            199.09107599999996,
+            381.8388602307693
+          ],
+          "text": "3. ID Photo on File",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/7",
+            "source_label": "section_header",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/7",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "section_header",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.0,
+                    "t": 423.84551999999996,
+                    "r": 199.09107599999996,
+                    "b": 410.1611397692307,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    19
+                  ]
+                }
+              ],
+              "orig": "3. ID Photo on File",
+              "text": "3. ID Photo on File",
+              "formatting": null,
+              "hyperlink": null,
+              "level": 1
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r12",
+          "kind": "figure",
+          "bbox": [
+            71.09351348876953,
+            382.8580322265625,
+            140.56448364257812,
+            464.1051330566406
+          ],
+          "text": "",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/pictures/2",
+            "source_label": "picture",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/pictures/2",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "picture",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 71.09351348876953,
+                    "t": 409.1419677734375,
+                    "r": 140.56448364257812,
+                    "b": 327.8948669433594,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    0
+                  ]
+                }
+              ],
+              "captions": [],
+              "references": [],
+              "footnotes": [],
+              "image": {
+                "mimetype": "image/png",
+                "dpi": 108,
+                "size": {
+                  "width": 104.0,
+                  "height": 122.0
+                },
+                "uri": "data:image/png;base64,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"
+              },
+              "annotations": []
+            }
+          },
+          "asset": "assets/p1_r12.png",
+          "warnings": []
+        },
+        {
+          "id": "p1_r13",
+          "kind": "text",
+          "bbox": [
+            72.00084000000004,
+            456.60648,
+            514.1730479999998,
+            476.6700763846154
+          ],
+          "text": "Placeholder ID photo (synthetic, non-personal) - used to verify that embedded images are preserved and left untouched during text-only redaction.",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/8",
+            "source_label": "text",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/8",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "text",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.00084000000004,
+                    "t": 335.39352,
+                    "r": 514.1730479999998,
+                    "b": 315.3299236153846,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    145
+                  ]
+                }
+              ],
+              "orig": "Placeholder ID photo (synthetic, non-personal) - used to verify that embedded images are preserved and left untouched during text-only redaction.",
+              "text": "Placeholder ID photo (synthetic, non-personal) - used to verify that embedded images are preserved and left untouched during text-only redaction.",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r14",
+          "kind": "text",
+          "bbox": [
+            72.0,
+            496.19448,
+            129.26448000000002,
+            509.87886023076925
+          ],
+          "text": "4. Notes",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/9",
+            "source_label": "section_header",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/9",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "section_header",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 72.0,
+                    "t": 295.80552,
+                    "r": 129.26448000000002,
+                    "b": 282.12113976923075,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    8
+                  ]
+                }
+              ],
+              "orig": "4. Notes",
+              "text": "4. Notes",
+              "formatting": null,
+              "hyperlink": null,
+              "level": 1
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r15",
+          "kind": "text",
+          "bbox": [
+            71.99003999999996,
+            513.00648,
+            530.0494440000015,
+            556.1175163846154
+          ],
+          "text": "This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table - so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/10",
+            "source_label": "text",
+            "content_layer": "body",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/10",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "text",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 71.99003999999996,
+                    "t": 278.99352,
+                    "r": 530.0494440000015,
+                    "b": 235.88248361538456,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    441
+                  ]
+                }
+              ],
+              "orig": "This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table - so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.",
+              "text": "This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table - so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r16",
+          "kind": "text",
+          "bbox": [
+            71.99003999999996,
+            569.06136,
+            376.98515999999995,
+            577.7028672727273
+          ],
+          "text": "Reviewer: Park Ji-hoon Signature date: 2024-03-20   Internal ext.: 04512",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/11",
+            "source_label": "text",
+            "content_layer": "body",
+            "hierarchy_level": 2,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/11",
+              "parent": {
+                "cref": "#/groups/1"
+              },
+              "children": [],
+              "content_layer": "body",
+              "meta": null,
+              "label": "text",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 71.99003999999996,
+                    "t": 222.93863999999996,
+                    "r": 376.98515999999995,
+                    "b": 214.2971327272727,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    72
+                  ]
+                }
+              ],
+              "orig": "Reviewer: Park Ji-hoon Signature date: 2024-03-20   Internal ext.: 04512",
+              "text": "Reviewer: Park Ji-hoon Signature date: 2024-03-20   Internal ext.: 04512",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        },
+        {
+          "id": "p1_r17",
+          "kind": "text",
+          "bbox": [
+            293.88,
+            748.08648,
+            320.61,
+            756.6263563846154
+          ],
+          "text": "Page 1",
+          "cells": [],
+          "metadata": {
+            "source_ref": "#/texts/12",
+            "source_label": "page_footer",
+            "content_layer": "furniture",
+            "hierarchy_level": 1,
+            "occurrence": 0,
+            "source_item": {
+              "self_ref": "#/texts/12",
+              "parent": {
+                "cref": "#/body"
+              },
+              "children": [],
+              "content_layer": "furniture",
+              "meta": null,
+              "label": "page_footer",
+              "prov": [
+                {
+                  "page_no": 1,
+                  "bbox": {
+                    "l": 293.88,
+                    "t": 43.91351999999995,
+                    "r": 320.61,
+                    "b": 35.373643615384594,
+                    "coord_origin": "BOTTOMLEFT"
+                  },
+                  "charspan": [
+                    0,
+                    6
+                  ]
+                }
+              ],
+              "orig": "Page 1",
+              "text": "Page 1",
+              "formatting": null,
+              "hyperlink": null
+            }
+          },
+          "asset": null,
+          "warnings": []
+        }
+      ],
+      "warnings": []
+    }
+  ],
+  "schema_version": "0.1.0",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "settings": {
+    "ocr": true,
+    "artifacts_path": null,
+    "ocr_model_dir": null,
+    "adapter_version": "1.1.0",
+    "included_content_layers": [
+      "body",
+      "furniture"
+    ],
+    "ocr_models": {
+      "det_model_path": "PP-OCRv6_det_small.onnx",
+      "rec_model_path": "PP-OCRv6_rec_small.onnx",
+      "cls_model_path": "ch_ppocr_mobile_v2.0_cls_mobile.onnx"
+    },
+    "ocr_configuration": {
+      "profile": "rapidocr-ppocrv6-small-v1",
+      "engine": "rapidocr",
+      "runtime": "onnxruntime",
+      "config_sha256": "b9c9d9edc4612f2d27a48ce260e795f7b9d46e8b4cd84dc2ede4378e38479a5f",
+      "models": {
+        "det_model_path": {
+          "filename": "PP-OCRv6_det_small.onnx",
+          "sha256": "090f04abcd9d9a7498bc4ebf677e4cb9bdce1fe4197ddb7e529f1ef44e1ff94f"
+        },
+        "rec_model_path": {
+          "filename": "PP-OCRv6_rec_small.onnx",
+          "sha256": "6f327246b50388f3c176ae304bd95767ea6dc0c9ae92153ef8cbe210b3c14884"
+        },
+        "cls_model_path": {
+          "filename": "ch_ppocr_mobile_v2.0_cls_mobile.onnx",
+          "sha256": "e47acedf663230f8863ff1ab0e64dd2d82b838fceb5957146dab185a89d6215c"
+        }
+      },
+      "engine_version": "3.9.0",
+      "runtime_version": "1.25.1"
+    }
+  },
+  "warnings": [
+    "OCR was enabled, but figure-contained text may still be omitted or misrecognized. Inspect image regions before using this output for redaction.",
+    "Preserved source items in metadata; IR 0.1 does not guarantee exact font reconstruction."
+  ]
+}

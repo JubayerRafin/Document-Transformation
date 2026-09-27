@@ -1,0 +1,23 @@
+{
+  "python": "3.14.3",
+  "packages": {
+    "docling": "2.107.0",
+    "docling-core": "2.85.0",
+    "rapidocr": "3.9.0",
+    "onnxruntime": "1.25.1",
+    "torch": "2.11.0",
+    "transformers": "5.4.0",
+    "pymupdf": "1.27.2.2"
+  },
+  "ocr": true,
+  "ocr_mode": "automatic; not forced full-page",
+  "device": "cpu",
+  "threads": 4,
+  "adapter_version": "1.1.0",
+  "included_content_layers": [
+    "body",
+    "furniture"
+  ],
+  "source_manifest": "config/docling-provided-dataset.json",
+  "note": "Extraction diagnostics only; full accuracy evaluation requires approved references for each document."
+}

@@ -1,0 +1,7 @@
+file,backend,status,seconds,pages,text,tables,figures,raster_pages,warnings,run_dir,error
+samples\provided\Sample01.pdf,docling,completed,226.722,1,35,1,6,0,8,experiments\docling-provided-20260927-retry\docling-2feaccc1b4-90828282,
+samples\provided\Sample02.pdf,docling,completed,11.611,1,13,1,3,0,2,experiments\docling-provided-20260927-retry\docling-684082b44c-4123781d,
+samples\provided\Sample03.pdf,docling,completed,23.056,2,18,2,4,0,2,experiments\docling-provided-20260927-retry\docling-fd5acaf08f-af69f6cc,
+samples\provided\Sample04.pdf,docling,completed,24.133,2,29,1,1,0,2,experiments\docling-provided-20260927-retry\docling-2ba9ac9c9a-5e579248,
+samples\provided\Sample05.pdf,docling,completed,6.9,1,9,0,3,0,2,experiments\docling-provided-20260927-retry\docling-8aa208293a-5ce15661,
+samples\provided\Sample06.pdf,docling,completed,8.245,1,13,0,1,0,2,experiments\docling-provided-20260927-retry\docling-5715ddb864-b401af81,
