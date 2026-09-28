@@ -1,9 +1,12 @@
 from pathlib import Path
 import importlib.util
+import json
 import tempfile
 import unittest
 
 import fitz
+
+from evaluation.contracts import validate_document
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -77,6 +80,60 @@ class BabelDocGeometryTests(unittest.TestCase):
                     1,
                 )
 
+
+class SavedBabelDocPredictionTests(unittest.TestCase):
+    def test_saved_predictions_have_shared_metadata(self):
+        prediction_dir = ROOT / "experiments" / "babeldoc"
+
+        names = [
+            "Sample02",
+            "Sample03",
+            "Sample04",
+            "YOLOv3",
+            "TrafficSF",
+        ]
+
+        required_keys = {
+            "schema_version",
+            "source_name",
+            "source_sha256",
+            "backend",
+            "backend_version",
+            "settings",
+            "coordinate_system",
+            "pages",
+        }
+
+        for name in names:
+            path = prediction_dir / f"{name}.json"
+            self.assertTrue(path.exists(), f"Missing prediction: {path}")
+
+            data = json.loads(path.read_text(encoding="utf-8"))
+
+            validate_document(data, reference=False)
+
+            self.assertTrue(
+                required_keys.issubset(data),
+                f"{name} missing shared prediction metadata: "
+                f"{sorted(required_keys - set(data))}",
+            )
+
+            sha256 = data["source_sha256"]
+            self.assertEqual(len(sha256), 64, f"{name} has invalid SHA-256 length")
+            self.assertEqual(
+                sha256,
+                sha256.lower(),
+                f"{name} source SHA-256 must be lowercase",
+            )
+            self.assertTrue(
+                all(ch in "0123456789abcdef" for ch in sha256),
+                f"{name} source SHA-256 is not hexadecimal",
+            )
+
+            self.assertEqual(data["backend"], "babeldoc")
+            self.assertEqual(data["backend_version"], "0.6.4")
+            self.assertIsInstance(data["settings"], dict)
+            self.assertTrue(data["pages"], f"{name} has no pages")
 
 if __name__ == "__main__":
     unittest.main()
