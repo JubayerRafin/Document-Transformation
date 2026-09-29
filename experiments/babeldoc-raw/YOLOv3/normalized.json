@@ -1,0 +1,4778 @@
+{
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "pages": [
+    {
+      "number": 1,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p1_text1",
+          "kind": "text",
+          "bbox": [
+            173.533193,
+            102.5868,
+            421.894607,
+            119.873971
+          ],
+          "text": "YOLOv3: An Incremental Improvement",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 1
+          }
+        },
+        {
+          "id": "p1_text2",
+          "kind": "text",
+          "bbox": [
+            224.931552,
+            142.8358,
+            370.115501,
+            170.909847
+          ],
+          "text": "Joseph Redmon Ali Farhadi University of Washington",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 32
+          }
+        },
+        {
+          "id": "p1_text3",
+          "kind": "text",
+          "bbox": [
+            146.102597,
+            201.535912,
+            190.468344,
+            209.952373
+          ],
+          "text": "Abstract",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 76
+          }
+        },
+        {
+          "id": "p1_text4",
+          "kind": "text",
+          "bbox": [
+            318.867024,
+            203.608065,
+            326.608138,
+            208.95166
+          ],
+          "text": "38",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 25,
+            "babeldoc_render_order": 1659
+          }
+        },
+        {
+          "id": "p1_text5",
+          "kind": "text",
+          "bbox": [
+            496.427691,
+            205.1493,
+            521.575677,
+            210.202737
+          ],
+          "text": "YOLOv3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 27,
+            "babeldoc_render_order": 1736
+          }
+        },
+        {
+          "id": "p1_text6",
+          "kind": "text",
+          "bbox": [
+            12.1,
+            211.52,
+            36.34,
+            555.2
+          ],
+          "text": "r 2018 CV] 8 Ap 1 [cs. 02767v :1804. iv arX",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 20,
+            "babeldoc_render_order": 2943
+          }
+        },
+        {
+          "id": "p1_text7",
+          "kind": "text",
+          "bbox": [
+            496.730822,
+            213.21842,
+            535.146322,
+            221.209128
+          ],
+          "text": "RetinaNet-50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 28,
+            "babeldoc_render_order": 1699
+          }
+        },
+        {
+          "id": "p1_text8",
+          "kind": "text",
+          "bbox": [
+            496.730822,
+            221.21678,
+            537.789243,
+            227.97543
+          ],
+          "text": "RetinaNet-101",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 29,
+            "babeldoc_render_order": 1713
+          }
+        },
+        {
+          "id": "p1_text9",
+          "kind": "text",
+          "bbox": [
+            440.948218,
+            222.508273,
+            445.904701,
+            228.11959
+          ],
+          "text": "G",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 30,
+            "babeldoc_render_order": 1679
+          }
+        },
+        {
+          "id": "p1_text10",
+          "kind": "text",
+          "bbox": [
+            49.364805,
+            224.5564,
+            286.634087,
+            355.923044
+          ],
+          "text": "We present some updates to YOLO! We made a bunch of little design changes to make it better. We also trained this new network that’s pretty swell. It’s a little bigger than last time but more accurate. It’s still fast though, don’t worry. At 320 × 320 YOLOv3 runs in 22 ms at 28.2 mAP, as accurate as SSD but three times faster. When we look at the old .5 IOU mAP detection metric YOLOv3 is quite good. It achieves 57.9 AP50 in 51 ms on a Titan X, com- pared to 57.5 AP50 in 198 ms by RetinaNet, similar perfor- mance but 3.8× faster. As always, all the code is online at https://pjreddie.com/yolo/.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 84
+          }
+        },
+        {
+          "id": "p1_text11",
+          "kind": "text",
+          "bbox": [
+            318.867024,
+            224.902493,
+            326.640699,
+            230.246088
+          ],
+          "text": "36",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 31,
+            "babeldoc_render_order": 1657
+          }
+        },
+        {
+          "id": "p1_text12",
+          "kind": "text",
+          "bbox": [
+            529.766442,
+            228.717161,
+            541.796709,
+            233.140782
+          ],
+          "text": "time",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 33,
+            "babeldoc_render_order": 1942
+          }
+        },
+        {
+          "id": "p1_text13",
+          "kind": "text",
+          "bbox": [
+            453.225125,
+            228.743371,
+            473.620117,
+            233.146606
+          ],
+          "text": "Method",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 32,
+            "babeldoc_render_order": 1742
+          }
+        },
+        {
+          "id": "p1_text14",
+          "kind": "text",
+          "bbox": [
+            509.054347,
+            229.97543,
+            522.049505,
+            233.035943
+          ],
+          "text": "mAP",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 33,
+            "babeldoc_render_order": 1891
+          }
+        },
+        {
+          "id": "p1_text15",
+          "kind": "text",
+          "bbox": [
+            453.158145,
+            235.798448,
+            482.743434,
+            242.008583
+          ],
+          "text": "[B] SSD321",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 36,
+            "babeldoc_render_order": 1748
+          }
+        },
+        {
+          "id": "p1_text16",
+          "kind": "text",
+          "bbox": [
+            532.744613,
+            236.005214,
+            537.947792,
+            240.300698
+          ],
+          "text": "61",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 35,
+            "babeldoc_render_order": 1946
+          }
+        },
+        {
+          "id": "p1_text17",
+          "kind": "text",
+          "bbox": [
+            509.804341,
+            236.008126,
+            520.971784,
+            243.061713
+          ],
+          "text": "28.0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 37,
+            "babeldoc_render_order": 1894
+          }
+        },
+        {
+          "id": "p1_text18",
+          "kind": "text",
+          "bbox": [
+            509.804341,
+            243.16513,
+            515.991842,
+            247.469351
+          ],
+          "text": "28",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 1898
+          }
+        },
+        {
+          "id": "p1_text19",
+          "kind": "text",
+          "bbox": [
+            532.712579,
+            243.168043,
+            538.900079,
+            247.469351
+          ],
+          "text": "85",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 41,
+            "babeldoc_render_order": 1948
+          }
+        },
+        {
+          "id": "p1_text20",
+          "kind": "text",
+          "bbox": [
+            518.094538,
+            243.179691,
+            520.971784,
+            247.463526
+          ],
+          "text": "0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 1901
+          }
+        },
+        {
+          "id": "p1_text21",
+          "kind": "text",
+          "bbox": [
+            453.158145,
+            244.008583,
+            487.377594,
+            249.165587
+          ],
+          "text": "[C] DSSD321",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 42,
+            "babeldoc_render_order": 1758
+          }
+        },
+        {
+          "id": "p1_text22",
+          "kind": "text",
+          "bbox": [
+            516.250118,
+            244.254547,
+            517.908157,
+            250.218717
+          ],
+          "text": ".",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 43,
+            "babeldoc_render_order": 1900
+          }
+        },
+        {
+          "id": "p1_text23",
+          "kind": "text",
+          "bbox": [
+            307.417925,
+            245.592196,
+            319.369174,
+            283.742585
+          ],
+          "text": "COCO AP",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 55,
+            "babeldoc_render_order": 1661
+          }
+        },
+        {
+          "id": "p1_text24",
+          "kind": "text",
+          "bbox": [
+            318.867024,
+            246.21175,
+            326.684113,
+            251.548109
+          ],
+          "text": "34",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 44,
+            "babeldoc_render_order": 1655
+          }
+        },
+        {
+          "id": "p1_text25",
+          "kind": "text",
+          "bbox": [
+            509.804341,
+            250.322134,
+            520.93975,
+            257.375721
+          ],
+          "text": "29.9",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 46,
+            "babeldoc_render_order": 1902
+          }
+        },
+        {
+          "id": "p1_text26",
+          "kind": "text",
+          "bbox": [
+            532.712579,
+            250.325047,
+            538.900079,
+            254.626355
+          ],
+          "text": "85",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 45,
+            "babeldoc_render_order": 1950
+          }
+        },
+        {
+          "id": "p1_text27",
+          "kind": "text",
+          "bbox": [
+            453.158145,
+            251.165587,
+            480.157989,
+            256.322591
+          ],
+          "text": "[D] R-FCN",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 47,
+            "babeldoc_render_order": 1769
+          }
+        },
+        {
+          "id": "p1_text28",
+          "kind": "text",
+          "bbox": [
+            426.919766,
+            254.602315,
+            430.700441,
+            259.92782
+          ],
+          "text": "F",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 49,
+            "babeldoc_render_order": 1678
+          }
+        },
+        {
+          "id": "p1_text29",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            257.479139,
+            520.977608,
+            264.532725
+          ],
+          "text": "31.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 54,
+            "babeldoc_render_order": 1906
+          }
+        },
+        {
+          "id": "p1_text30",
+          "kind": "text",
+          "bbox": [
+            531.433125,
+            257.479139,
+            540.558118,
+            261.768798
+          ],
+          "text": "125",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 52,
+            "babeldoc_render_order": 1952
+          }
+        },
+        {
+          "id": "p1_text31",
+          "kind": "text",
+          "bbox": [
+            453.158145,
+            258.322591,
+            483.689896,
+            263.479595
+          ],
+          "text": "[E] SSD513",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 53,
+            "babeldoc_render_order": 1778
+          }
+        },
+        {
+          "id": "p1_text32",
+          "kind": "text",
+          "bbox": [
+            531.433125,
+            264.633231,
+            540.578504,
+            268.928714
+          ],
+          "text": "156",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 56,
+            "babeldoc_render_order": 1955
+          }
+        },
+        {
+          "id": "p1_text33",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            264.636143,
+            520.977608,
+            271.689729
+          ],
+          "text": "33.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 59,
+            "babeldoc_render_order": 1910
+          }
+        },
+        {
+          "id": "p1_text34",
+          "kind": "text",
+          "bbox": [
+            453.158145,
+            265.479595,
+            487.662034,
+            270.636599
+          ],
+          "text": "[F] DSSD513",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 57,
+            "babeldoc_render_order": 1788
+          }
+        },
+        {
+          "id": "p1_text35",
+          "kind": "text",
+          "bbox": [
+            318.867024,
+            267.510153,
+            326.622609,
+            272.85013
+          ],
+          "text": "32",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 62,
+            "babeldoc_render_order": 1653
+          }
+        },
+        {
+          "id": "p1_text36",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            271.790235,
+            520.977608,
+            278.846733
+          ],
+          "text": "36.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 65,
+            "babeldoc_render_order": 1914
+          }
+        },
+        {
+          "id": "p1_text37",
+          "kind": "text",
+          "bbox": [
+            531.433125,
+            271.793147,
+            540.563943,
+            275.977967
+          ],
+          "text": "172",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 63,
+            "babeldoc_render_order": 1958
+          }
+        },
+        {
+          "id": "p1_text38",
+          "kind": "text",
+          "bbox": [
+            453.158145,
+            272.636599,
+            492.092294,
+            278.846733
+          ],
+          "text": "[G] FPN FRCN",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 64,
+            "babeldoc_render_order": 1799
+          }
+        },
+        {
+          "id": "p1_text39",
+          "kind": "text",
+          "bbox": [
+            397.700022,
+            275.8971,
+            401.741183,
+            281.229841
+          ],
+          "text": "E",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 66,
+            "babeldoc_render_order": 1677
+          }
+        },
+        {
+          "id": "p1_text40",
+          "kind": "text",
+          "bbox": [
+            453.309579,
+            278.856961,
+            499.602162,
+            286.003737
+          ],
+          "text": "RetinaNet-50-500",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 69,
+            "babeldoc_render_order": 1811
+          }
+        },
+        {
+          "id": "p1_text41",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            278.950151,
+            520.971784,
+            286.003737
+          ],
+          "text": "32.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 70,
+            "babeldoc_render_order": 1918
+          }
+        },
+        {
+          "id": "p1_text42",
+          "kind": "text",
+          "bbox": [
+            532.738789,
+            278.958888,
+            538.894255,
+            283.248547
+          ],
+          "text": "73",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 68,
+            "babeldoc_render_order": 1961
+          }
+        },
+        {
+          "id": "p1_text43",
+          "kind": "text",
+          "bbox": [
+            453.309579,
+            286.013965,
+            502.918241,
+            293.160741
+          ],
+          "text": "RetinaNet-101-500",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 72,
+            "babeldoc_render_order": 1827
+          }
+        },
+        {
+          "id": "p1_text44",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            286.110067,
+            521.027115,
+            293.160741
+          ],
+          "text": "34.4",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 72,
+            "babeldoc_render_order": 1922
+          }
+        },
+        {
+          "id": "p1_text45",
+          "kind": "text",
+          "bbox": [
+            532.732964,
+            286.115892,
+            538.900079,
+            290.408463
+          ],
+          "text": "90",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 71,
+            "babeldoc_render_order": 1963
+          }
+        },
+        {
+          "id": "p1_text46",
+          "kind": "text",
+          "bbox": [
+            359.983259,
+            288.678313,
+            364.494744,
+            294.011054
+          ],
+          "text": "D",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 73,
+            "babeldoc_render_order": 1676
+          }
+        },
+        {
+          "id": "p1_text47",
+          "kind": "text",
+          "bbox": [
+            318.867024,
+            288.823028,
+            326.615373,
+            294.152151
+          ],
+          "text": "30",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 74,
+            "babeldoc_render_order": 1651
+          }
+        },
+        {
+          "id": "p1_text48",
+          "kind": "text",
+          "bbox": [
+            453.309579,
+            293.170969,
+            502.918241,
+            299.250055
+          ],
+          "text": "RetinaNet-101-800",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 78,
+            "babeldoc_render_order": 1844
+          }
+        },
+        {
+          "id": "p1_text49",
+          "kind": "text",
+          "bbox": [
+            509.775219,
+            293.205915,
+            520.997994,
+            300.317746
+          ],
+          "text": "37.8",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 79,
+            "babeldoc_render_order": 1926
+          }
+        },
+        {
+          "id": "p1_text50",
+          "kind": "text",
+          "bbox": [
+            531.433125,
+            293.267071,
+            540.552294,
+            297.56838
+          ],
+          "text": "198",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 77,
+            "babeldoc_render_order": 1965
+          }
+        },
+        {
+          "id": "p1_text51",
+          "kind": "text",
+          "bbox": [
+            532.706754,
+            300.362919,
+            538.91464,
+            304.605984
+          ],
+          "text": "22",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 80,
+            "babeldoc_render_order": 1968
+          }
+        },
+        {
+          "id": "p1_text52",
+          "kind": "text",
+          "bbox": [
+            509.804341,
+            300.421163,
+            520.977608,
+            307.47475
+          ],
+          "text": "28.2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 82,
+            "babeldoc_render_order": 1930
+          }
+        },
+        {
+          "id": "p1_text53",
+          "kind": "text",
+          "bbox": [
+            452.887311,
+            301.250055,
+            488.036798,
+            304.725384
+          ],
+          "text": "YOLOv3-320",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 81,
+            "babeldoc_render_order": 1861
+          }
+        },
+        {
+          "id": "p1_text54",
+          "kind": "text",
+          "bbox": [
+            452.887311,
+            307.339368,
+            488.042622,
+            311.882388
+          ],
+          "text": "YOLOv3-416",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 86,
+            "babeldoc_render_order": 1871
+          }
+        },
+        {
+          "id": "p1_text55",
+          "kind": "text",
+          "bbox": [
+            532.706754,
+            307.578167,
+            538.868045,
+            311.879476
+          ],
+          "text": "29",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 85,
+            "babeldoc_render_order": 1970
+          }
+        },
+        {
+          "id": "p1_text56",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            307.586904,
+            520.971784,
+            314.631754
+          ],
+          "text": "31.0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 87,
+            "babeldoc_render_order": 1934
+          }
+        },
+        {
+          "id": "p1_text57",
+          "kind": "text",
+          "bbox": [
+            359.751716,
+            309.81753,
+            364.494744,
+            315.461408
+          ],
+          "text": "C",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 88,
+            "babeldoc_render_order": 1675
+          }
+        },
+        {
+          "id": "p1_text58",
+          "kind": "text",
+          "bbox": [
+            337.536052,
+            309.980334,
+            341.935382,
+            315.313075
+          ],
+          "text": "B",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 89,
+            "babeldoc_render_order": 1674
+          }
+        },
+        {
+          "id": "p1_text59",
+          "kind": "text",
+          "bbox": [
+            318.921292,
+            310.114195,
+            326.608138,
+            315.461408
+          ],
+          "text": "28",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 90,
+            "babeldoc_render_order": 1649
+          }
+        },
+        {
+          "id": "p1_text60",
+          "kind": "text",
+          "bbox": [
+            452.887311,
+            314.496372,
+            488.028061,
+            319.039392
+          ],
+          "text": "YOLOv3-608",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 93,
+            "babeldoc_render_order": 1881
+          }
+        },
+        {
+          "id": "p1_text61",
+          "kind": "text",
+          "bbox": [
+            509.760658,
+            314.743908,
+            520.971784,
+            321.788758
+          ],
+          "text": "33.0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 94,
+            "babeldoc_render_order": 1938
+          }
+        },
+        {
+          "id": "p1_text62",
+          "kind": "text",
+          "bbox": [
+            532.712579,
+            314.767206,
+            537.947792,
+            319.024831
+          ],
+          "text": "51",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 92,
+            "babeldoc_render_order": 1972
+          }
+        },
+        {
+          "id": "p1_text63",
+          "kind": "text",
+          "bbox": [
+            463.830703,
+            327.803888,
+            475.64441,
+            333.143865
+          ],
+          "text": "200",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 96,
+            "babeldoc_render_order": 1617
+          }
+        },
+        {
+          "id": "p1_text64",
+          "kind": "text",
+          "bbox": [
+            510.635874,
+            327.803888,
+            522.449581,
+            333.143865
+          ],
+          "text": "250",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 98,
+            "babeldoc_render_order": 1620
+          }
+        },
+        {
+          "id": "p1_text65",
+          "kind": "text",
+          "bbox": [
+            325.504466,
+            327.821978,
+            333.191312,
+            333.143865
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 100,
+            "babeldoc_render_order": 1609
+          }
+        },
+        {
+          "id": "p1_text66",
+          "kind": "text",
+          "bbox": [
+            370.697919,
+            327.821978,
+            382.034068,
+            333.143865
+          ],
+          "text": "100",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 97,
+            "babeldoc_render_order": 1611
+          }
+        },
+        {
+          "id": "p1_text67",
+          "kind": "text",
+          "bbox": [
+            417.50309,
+            327.821978,
+            428.839239,
+            333.143865
+          ],
+          "text": "150",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 99,
+            "babeldoc_render_order": 1614
+          }
+        },
+        {
+          "id": "p1_text68",
+          "kind": "text",
+          "bbox": [
+            402.199881,
+            337.620071,
+            470.831994,
+            347.482002
+          ],
+          "text": "inference time (ms)",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 102,
+            "babeldoc_render_order": 1623
+          }
+        },
+        {
+          "id": "p1_text69",
+          "kind": "text",
+          "bbox": [
+            308.951664,
+            347.4066,
+            545.108707,
+            391.204675
+          ],
+          "text": "Figure 1. We adapt this figure from the Focal Loss paper [9]. YOLOv3 runs significantly faster than other detection methods with comparableperformance. Times fromeither an M40 or Titan X, they are basically the same GPU.",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 1978
+          }
+        },
+        {
+          "id": "p1_text70",
+          "kind": "text",
+          "bbox": [
+            50.889088,
+            380.4518,
+            126.744832,
+            392.574373
+          ],
+          "text": "1. Introduction",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 570
+          }
+        },
+        {
+          "id": "p1_text71",
+          "kind": "text",
+          "bbox": [
+            309.048301,
+            398.3031,
+            445.793455,
+            411.519533
+          ],
+          "text": "2.1. Bounding Box Prediction",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 2162
+          }
+        },
+        {
+          "id": "p1_text72",
+          "kind": "text",
+          "bbox": [
+            50.161813,
+            402.1974,
+            286.385022,
+            498.007884
+          ],
+          "text": "Sometimes you just kinda phone it in for a year, you know? I didn’t do a whole lot of research this year. Spent a lot of time on Twitter. Played around with GANs a little. I had a little momentum left over from last year [12] [1]; I managed to make some improvements to YOLO. But, hon- estly, nothing like super interesting, just a bunch of small changes that make it better. I also helped out with other people’s research a little.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 584
+          }
+        },
+        {
+          "id": "p1_text73",
+          "kind": "text",
+          "bbox": [
+            308.891888,
+            417.2324,
+            545.018451,
+            489.142847
+          ],
+          "text": "Following YOLO9000 our system predicts bounding boxes using dimension clusters as anchor boxes [15]. The network predicts 4 coordinates for each bounding box, tx, ty, tw, th. If the cell is offset from the top left corner of the image by (cx,cy) and the bounding box prior has width and height pw, ph, then the predictions correspond to:",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 2187
+          }
+        },
+        {
+          "id": "p1_text74",
+          "kind": "text",
+          "bbox": [
+            50.241514,
+            498.6624,
+            286.863226,
+            546.661847
+          ],
+          "text": "Actually, that’s what brings us here today. We have a camera-ready deadline [4] and we need to cite some of the random updates I made to YOLO but we don’t have a source. So get ready for aTECHREPORT!",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 935
+          }
+        },
+        {
+          "id": "p1_text75",
+          "kind": "text",
+          "bbox": [
+            50.251476,
+            547.3064,
+            286.375059,
+            619.216847
+          ],
+          "text": "The great thing about tech reports is that they don’t need intros, y’all know why we’re here. So the end of this intro- duction will signpost for the rest of the paper. First we’ll tell you what the deal is with YOLOv3. Then we’ll tell you how we do. We’ll also tell you about some things we tried that didn’t work. Finally we’ll contemplate what this all means.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 1097
+          }
+        },
+        {
+          "id": "p1_text76",
+          "kind": "text",
+          "bbox": [
+            308.991514,
+            593.4414,
+            545.025433,
+            663.318476
+          ],
+          "text": "During training we use sum of squared error loss. If the ground truth for some coordinate prediction is ˆt* our gra- dient is the ground truth value (computed from the ground ˆ truth box) minus our prediction: t* − t*. This ground truth value can be easily computed by inverting the equations above.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 2505
+          }
+        },
+        {
+          "id": "p1_text77",
+          "kind": "text",
+          "bbox": [
+            50.315238,
+            631.4718,
+            107.951258,
+            643.594373
+          ],
+          "text": "2. The Deal",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 1392
+          }
+        },
+        {
+          "id": "p1_text78",
+          "kind": "text",
+          "bbox": [
+            50.251476,
+            653.2164,
+            286.385022,
+            711.109589
+          ],
+          "text": "So here’s the deal with YOLOv3: We mostly took good ideas from other people. We also trained a new classifier network that’s better than the other ones. We’ll just take you through the whole system from scratch so you can un- derstandit all.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 1401
+          }
+        },
+        {
+          "id": "p1_text79",
+          "kind": "text",
+          "bbox": [
+            308.891888,
+            665.1724,
+            545.135022,
+            713.171847
+          ],
+          "text": "YOLOv3 predicts an objectness score for each bounding box usinglogistic regression. This shouldbe 1 if the bound- ing box prior overlaps a ground truth object by more than any other bounding box prior. If the bounding box prior",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 2752
+          }
+        },
+        {
+          "id": "p1_text80",
+          "kind": "text",
+          "bbox": [
+            296.226849,
+            734.153282,
+            299.046264,
+            740.888
+          ],
+          "text": "1",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 2942
+          }
+        }
+      ]
+    },
+    {
+      "number": 2,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p2_text1",
+          "kind": "text",
+          "bbox": [
+            308.951663,
+            72.0004,
+            545.131118,
+            179.775847
+          ],
+          "text": "Next we take the feature map from 2 layers previous and upsample it by 2×. We also take a feature map from earlier in the network and merge it with our upsampled features using concatenation. This method allows us to get more meaningful semantic information from the upsampled fea- tures and finer-grained information from the earlier feature map. We then add a few more convolutional layers to pro- cess this combined feature map, and eventually predict a similar tensor, although now twice the size.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 4648
+          }
+        },
+        {
+          "id": "p2_text2",
+          "kind": "text",
+          "bbox": [
+            97.986775,
+            74.857648,
+            103.141824,
+            81.3859
+          ],
+          "text": "c",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 3043
+          }
+        },
+        {
+          "id": "p2_text3",
+          "kind": "text",
+          "bbox": [
+            104.064575,
+            81.38462,
+            107.696227,
+            84.990446
+          ],
+          "text": "x",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 3044
+          }
+        },
+        {
+          "id": "p2_text4",
+          "kind": "text",
+          "bbox": [
+            153.2252,
+            104.716979,
+            158.618344,
+            113.476686
+          ],
+          "text": "p",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 22,
+            "babeldoc_render_order": 3016
+          }
+        },
+        {
+          "id": "p2_text5",
+          "kind": "text",
+          "bbox": [
+            159.31414,
+            111.24395,
+            163.149164,
+            114.849777
+          ],
+          "text": "w",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 23,
+            "babeldoc_render_order": 3017
+          }
+        },
+        {
+          "id": "p2_text6",
+          "kind": "text",
+          "bbox": [
+            52.473803,
+            115.138273,
+            57.628852,
+            121.666525
+          ],
+          "text": "c",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 26,
+            "babeldoc_render_order": 3045
+          }
+        },
+        {
+          "id": "p2_text7",
+          "kind": "text",
+          "bbox": [
+            58.474128,
+            121.665245,
+            62.234905,
+            126.775382
+          ],
+          "text": "y",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 27,
+            "babeldoc_render_order": 3046
+          }
+        },
+        {
+          "id": "p2_text8",
+          "kind": "text",
+          "bbox": [
+            153.2252,
+            129.686105,
+            158.618344,
+            138.711594
+          ],
+          "text": "b",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 29,
+            "babeldoc_render_order": 3023
+          }
+        },
+        {
+          "id": "p2_text9",
+          "kind": "text",
+          "bbox": [
+            159.31414,
+            138.79337,
+            163.149164,
+            142.399196
+          ],
+          "text": "w",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 31,
+            "babeldoc_render_order": 3024
+          }
+        },
+        {
+          "id": "p2_text10",
+          "kind": "text",
+          "bbox": [
+            215.795232,
+            157.64505,
+            281.396251,
+            170.529791
+          ],
+          "text": "bx=σ(tx)+cx",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 34,
+            "babeldoc_render_order": 3047
+          }
+        },
+        {
+          "id": "p2_text11",
+          "kind": "text",
+          "bbox": [
+            161.992428,
+            161.11698,
+            181.446597,
+            172.285329
+          ],
+          "text": "σ(t",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 35,
+            "babeldoc_render_order": 3008
+          }
+        },
+        {
+          "id": "p2_text12",
+          "kind": "text",
+          "bbox": [
+            187.064681,
+            161.119342,
+            191.959486,
+            172.287692
+          ],
+          "text": ")",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 35,
+            "babeldoc_render_order": 3012
+          }
+        },
+        {
+          "id": "p2_text13",
+          "kind": "text",
+          "bbox": [
+            93.837738,
+            168.793318,
+            103.36787,
+            178.926116
+          ],
+          "text": "ph",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 37,
+            "babeldoc_render_order": 3018
+          }
+        },
+        {
+          "id": "p2_text14",
+          "kind": "text",
+          "bbox": [
+            119.454609,
+            168.885272,
+            128.984741,
+            181.598363
+          ],
+          "text": "bh",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 39,
+            "babeldoc_render_order": 3021
+          }
+        },
+        {
+          "id": "p2_text15",
+          "kind": "text",
+          "bbox": [
+            182.331309,
+            170.398257,
+            186.092086,
+            175.508394
+          ],
+          "text": "y",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 36,
+            "babeldoc_render_order": 3011
+          }
+        },
+        {
+          "id": "p2_text16",
+          "kind": "text",
+          "bbox": [
+            226.180091,
+            172.618315,
+            252.421649,
+            183.786664
+          ],
+          "text": "=σ(t",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 3060
+          }
+        },
+        {
+          "id": "p2_text17",
+          "kind": "text",
+          "bbox": [
+            258.037843,
+            172.618315,
+            276.839651,
+            183.786664
+          ],
+          "text": ")+c",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 3065
+          }
+        },
+        {
+          "id": "p2_text18",
+          "kind": "text",
+          "bbox": [
+            215.795232,
+            172.789965,
+            221.188377,
+            181.815453
+          ],
+          "text": "b",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 3058
+          }
+        },
+        {
+          "id": "p2_text19",
+          "kind": "text",
+          "bbox": [
+            308.891888,
+            180.2054,
+            545.124939,
+            203.200142
+          ],
+          "text": "We perform the same design one more time to predict boxes for the final scale. Thus our predictions for the 3rd",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 5065
+          }
+        },
+        {
+          "id": "p2_text20",
+          "kind": "text",
+          "bbox": [
+            221.922911,
+            181.89723,
+            225.683688,
+            187.007367
+          ],
+          "text": "y",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 41,
+            "babeldoc_render_order": 3059
+          }
+        },
+        {
+          "id": "p2_text21",
+          "kind": "text",
+          "bbox": [
+            253.304471,
+            181.89723,
+            257.065248,
+            187.007367
+          ],
+          "text": "y",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 41,
+            "babeldoc_render_order": 3064
+          }
+        },
+        {
+          "id": "p2_text22",
+          "kind": "text",
+          "bbox": [
+            277.687124,
+            181.89723,
+            281.447901,
+            187.007367
+          ],
+          "text": "y",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 42,
+            "babeldoc_render_order": 3068
+          }
+        },
+        {
+          "id": "p2_text23",
+          "kind": "text",
+          "bbox": [
+            140.024155,
+            186.9495,
+            159.478324,
+            198.117849
+          ],
+          "text": "σ(t",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 44,
+            "babeldoc_render_order": 3003
+          }
+        },
+        {
+          "id": "p2_text24",
+          "kind": "text",
+          "bbox": [
+            165.093431,
+            186.9495,
+            169.988236,
+            198.117849
+          ],
+          "text": ")",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 44,
+            "babeldoc_render_order": 3007
+          }
+        },
+        {
+          "id": "p2_text25",
+          "kind": "text",
+          "bbox": [
+            215.795232,
+            187.763467,
+            249.45532,
+            200.476558
+          ],
+          "text": "bw=pwe",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 45,
+            "babeldoc_render_order": 3025
+          }
+        },
+        {
+          "id": "p2_text26",
+          "kind": "text",
+          "bbox": [
+            250.623423,
+            188.603947,
+            255.709979,
+            194.572954
+          ],
+          "text": "tw",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 45,
+            "babeldoc_render_order": 3069
+          }
+        },
+        {
+          "id": "p2_text27",
+          "kind": "text",
+          "bbox": [
+            160.437534,
+            196.228414,
+            164.069186,
+            199.834241
+          ],
+          "text": "x",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 46,
+            "babeldoc_render_order": 3006
+          }
+        },
+        {
+          "id": "p2_text28",
+          "kind": "text",
+          "bbox": [
+            215.795232,
+            202.732267,
+            249.455438,
+            215.449704
+          ],
+          "text": "bh=phe",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 48,
+            "babeldoc_render_order": 3031
+          }
+        },
+        {
+          "id": "p2_text29",
+          "kind": "text",
+          "bbox": [
+            250.623423,
+            203.330354,
+            255.513062,
+            209.299361
+          ],
+          "text": "th",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 48,
+            "babeldoc_render_order": 3071
+          }
+        },
+        {
+          "id": "p2_text30",
+          "kind": "text",
+          "bbox": [
+            309.140953,
+            205.200142,
+            544.636892,
+            228.204847
+          ],
+          "text": "scale benefit from all the prior computation as well as fine- grainedfeaturesfromearly oninthenetwork.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 5155
+          }
+        },
+        {
+          "id": "p2_text31",
+          "kind": "text",
+          "bbox": [
+            309.021402,
+            228.6344,
+            544.866031,
+            300.86365
+          ],
+          "text": "We still use k-means clustering to determine our bound- ing box priors. We just sort of chose 9 clusters and 3 scales arbitrarily and then divide up the clusters evenly across scales. On the COCO dataset the 9 clusters were: (10 × 13), (16 ×30), (33 × 23), (30 × 61), (62 ×45), (59 × 119), (116 × 90), (156 × 198), (373 × 326).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 5243
+          }
+        },
+        {
+          "id": "p2_text32",
+          "kind": "text",
+          "bbox": [
+            50.138899,
+            251.1806,
+            288.850837,
+            305.937675
+          ],
+          "text": "Figure 2. Bounding boxes with dimension priors and location prediction. We predict the width and height of the box as offsets from cluster centroids. We predict the center coordinates of the box relative to the location of filter application using a sigmoid function. This figure blatantly self-plagiarized from [15].",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 3073
+          }
+        },
+        {
+          "id": "p2_text33",
+          "kind": "text",
+          "bbox": [
+            309.048301,
+            309.1641,
+            412.357852,
+            320.276425
+          ],
+          "text": "2.4. Feature Extractor",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 5506
+          }
+        },
+        {
+          "id": "p2_text34",
+          "kind": "text",
+          "bbox": [
+            50.241514,
+            325.9574,
+            286.335295,
+            409.822847
+          ],
+          "text": "is not the best but does overlap a ground truth object by more than some threshold we ignore the prediction, follow- ing [17]. We use the threshold of .5. Unlike [17] our system only assigns one bounding box prior for each ground truth object. If a bounding box prior is not assigned to a ground truth object it incurs no loss for coordinate or class predic- tions, only objectness.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 3340
+          }
+        },
+        {
+          "id": "p2_text35",
+          "kind": "text",
+          "bbox": [
+            308.951663,
+            328.7014,
+            545.164909,
+            412.566847
+          ],
+          "text": "We use a new network for performing feature extraction. Our new network is a hybrid approach between the network used in YOLOv2, Darknet-19, and that newfangled residual network stuff. Our network uses successive 3 × 3 and 1 × 1 convolutional layers but now has some shortcut connections as well and is significantly larger. It has 53 convolutional layers so we call it.... wait for it..... Darknet-53!",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 5526
+          }
+        },
+        {
+          "id": "p2_text36",
+          "kind": "text",
+          "bbox": [
+            50.298301,
+            416.7791,
+            145.311964,
+            427.946219
+          ],
+          "text": "2.2. Class Prediction",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 3654
+          }
+        },
+        {
+          "id": "p2_text37",
+          "kind": "text",
+          "bbox": [
+            50.161813,
+            435.7614,
+            286.155882,
+            506.604142
+          ],
+          "text": "Each box predicts the classes the bounding box may con- tain usingmultilabel classification. We do not use a softmax as we have found it is unnecessary for good performance, instead we simply use independent logistic classifiers. Dur- ing training we use binary cross-entropy loss for the class predictions.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 3673
+          }
+        },
+        {
+          "id": "p2_text38",
+          "kind": "text",
+          "bbox": [
+            50.241514,
+            508.604142,
+            286.375059,
+            579.446884
+          ],
+          "text": "This formulation helps when we move to more complex domains like the Open Images Dataset [7]. In this dataset there are many overlapping labels (i.e. Woman and Person). Using a softmax imposes the assumption that each box has exactly one class which is often not the case. A multilabel approach better models the data.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 3931
+          }
+        },
+        {
+          "id": "p2_text39",
+          "kind": "text",
+          "bbox": [
+            50.298301,
+            586.4131,
+            187.29551,
+            597.580219
+          ],
+          "text": "2.3. Predictions Across Scales",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 4196
+          }
+        },
+        {
+          "id": "p2_text40",
+          "kind": "text",
+          "bbox": [
+            49.414618,
+            605.3964,
+            286.375059,
+            713.171847
+          ],
+          "text": "YOLOv3 predicts boxes at 3 different scales. Our sys- tem extracts features from those scales using a similar con- cept to feature pyramid networks [8]. From our base fea- ture extractor we add several convolutional layers. The last of these predicts a 3-d tensor encoding bounding box, ob- jectness, and class predictions. In our experiments with COCO [10] we predict 3 boxes at each scale so the tensor is N × N × [3 ∗ (4 + 1 + 80)] for the 4 bounding box offsets, 1 objectness prediction, and 80 class predictions.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 4223
+          }
+        },
+        {
+          "id": "p2_text41",
+          "kind": "text",
+          "bbox": [
+            388.651429,
+            701.9086,
+            465.116707,
+            711.00053
+          ],
+          "text": "Table 1. Darknet-53.",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 6405
+          }
+        },
+        {
+          "id": "p2_table1",
+          "kind": "table",
+          "bbox": [
+            329.0,
+            424.0,
+            521.0,
+            693.0
+          ],
+          "cells": [
+            [
+              "Type",
+              "Filters Size",
+              "Output"
+            ],
+            [
+              "Convolutional",
+              "32\n3 × 3",
+              "256 × 256"
+            ],
+            [
+              "Convolutional",
+              "64\n3 × 3 / 2",
+              "128 × 128"
+            ],
+            [
+              "Convolutional",
+              "32\n1 × 1",
+              ""
+            ],
+            [
+              "Convolutional\n1×",
+              "64\n3 × 3",
+              ""
+            ],
+            [
+              "Residual",
+              "",
+              "128 × 128"
+            ],
+            [
+              "Convolutional",
+              "128\n3 × 3 / 2",
+              "64 × 64"
+            ],
+            [
+              "Convolutional",
+              "64\n1 × 1",
+              ""
+            ],
+            [
+              "Convolutional\n2×",
+              "128\n3 × 3",
+              ""
+            ],
+            [
+              "Residual",
+              "",
+              "64 × 64"
+            ],
+            [
+              "Convolutional",
+              "256\n3 × 3 / 2",
+              "32 × 32"
+            ],
+            [
+              "Convolutional",
+              "128\n1 × 1",
+              ""
+            ],
+            [
+              "Convolutional\n8×",
+              "256\n3 × 3",
+              ""
+            ],
+            [
+              "Residual",
+              "",
+              "32 × 32"
+            ],
+            [
+              "Convolutional",
+              "512\n3 × 3 / 2",
+              "16 × 16"
+            ],
+            [
+              "Convolutional",
+              "256\n1 × 1",
+              ""
+            ],
+            [
+              "Convolutional\n8×",
+              "512\n3 × 3",
+              ""
+            ],
+            [
+              "Residual",
+              "",
+              "16 × 16"
+            ],
+            [
+              "Convolutional",
+              "1024\n3 × 3 / 2",
+              "8 × 8"
+            ],
+            [
+              "Convolutional",
+              "512\n1 × 1",
+              ""
+            ],
+            [
+              "Convolutional\n4×",
+              "1024\n3 × 3",
+              ""
+            ],
+            [
+              "Residual",
+              "",
+              "8 × 8"
+            ],
+            [
+              "Avgpool",
+              "Global",
+              ""
+            ],
+            [
+              "Connected\nSoftmax",
+              "1000",
+              ""
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 15,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.7987459897994995,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        }
+      ]
+    },
+    {
+      "number": 3,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p3_text1",
+          "kind": "text",
+          "bbox": [
+            50.301289,
+            72.0004,
+            285.886772,
+            108.044847
+          ],
+          "text": "This new network is much more powerful than Darknet- 19 but still more efficient than ResNet-101 or ResNet-152. Here are some ImageNetresults:",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 20,
+            "babeldoc_render_order": 6423
+          }
+        },
+        {
+          "id": "p3_text2",
+          "kind": "text",
+          "bbox": [
+            309.021402,
+            72.0004,
+            484.911105,
+            83.064623
+          ],
+          "text": "models like RetinaNet in this metric though.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 21,
+            "babeldoc_render_order": 8653
+          }
+        },
+        {
+          "id": "p3_text3",
+          "kind": "text",
+          "bbox": [
+            308.164618,
+            85.064623,
+            545.613106,
+            178.745623
+          ],
+          "text": "However, when we look at the “old” detection metric of mAP at IOU= .5 (or AP50 in the chart) YOLOv3 is very strong. It is almost on par with RetinaNet and far above the SSD variants. This indicates that YOLOv3 is a very strong detector that excels at producing decent boxes for ob- jects. However, performance drops significantly as the IOU threshold increases indicating YOLOv3 struggles to get the boxes perfectly aligned with the object.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 8691
+          }
+        },
+        {
+          "id": "p3_text4",
+          "kind": "text",
+          "bbox": [
+            308.911813,
+            180.745623,
+            544.985583,
+            250.516123
+          ],
+          "text": "In the past YOLO struggled with small objects. How- ever, now we see a reversal in that trend. With the new multi-scale predictions we see YOLOv3 has relatively high APS performance. However, it has comparatively worse performance on medium and larger size objects. More in- vestigation is needed to get to the bottom of this.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 9056
+          }
+        },
+        {
+          "id": "p3_text5",
+          "kind": "text",
+          "bbox": [
+            50.264429,
+            185.2066,
+            289.523846,
+            216.21653
+          ],
+          "text": "Table 2. Comparison of backbones. Accuracy, billions of oper- ations, billion floating point operations per second, and FPS for various networks.",
+          "metadata": {
+            "babeldoc_layout_label": "table_caption",
+            "babeldoc_layout_id": 22,
+            "babeldoc_render_order": 6700
+          }
+        },
+        {
+          "id": "p3_text6",
+          "kind": "text",
+          "bbox": [
+            50.161813,
+            226.0354,
+            286.275313,
+            307.868476
+          ],
+          "text": "Each network is trained with identical settings and tested at 256 ×256, single crop accuracy. Run times are measured on a Titan X at 256 × 256. Thus Darknet-53 performs on par with state-of-the-art classifiers but with fewer floating point operations and more speed. Darknet-53 is better than ResNet-101 and 1.5× faster. Darknet-53 has similar perfor- mance to ResNet-152 and is 2× faster.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 6824
+          }
+        },
+        {
+          "id": "p3_text7",
+          "kind": "text",
+          "bbox": [
+            309.13099,
+            252.516123,
+            545.135022,
+            287.490847
+          ],
+          "text": "When we plot accuracy vs speed on the AP50 metric (see figure5) weseeYOLOv3 has significant benefits over other detection systems. Namely, it’s faster and better.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 9328
+          }
+        },
+        {
+          "id": "p3_text8",
+          "kind": "text",
+          "bbox": [
+            309.089149,
+            297.3928,
+            501.771107,
+            311.810771
+          ],
+          "text": "4. Things We Tried That Didn’t Work",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 9463
+          }
+        },
+        {
+          "id": "p3_text9",
+          "kind": "text",
+          "bbox": [
+            49.414618,
+            310.1524,
+            286.165844,
+            370.107847
+          ],
+          "text": "Darknet-53 also achieves the highest measured floating point operations per second. This means the network struc- ture better utilizes the GPU, makingitmore efficient to eval- uate and thus faster. That’s mostly because ResNets have just way too many layers and aren’t very efficient.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 7149
+          }
+        },
+        {
+          "id": "p3_text10",
+          "kind": "text",
+          "bbox": [
+            308.911813,
+            318.3534,
+            544.965657,
+            352.336589
+          ],
+          "text": "We tried lots of stuff while we were working on YOLOv3. A lot of it didn’t work. Here’s the stuff we can remember.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 9492
+          }
+        },
+        {
+          "id": "p3_text11",
+          "kind": "text",
+          "bbox": [
+            308.951663,
+            354.2584,
+            545.117547,
+            413.144123
+          ],
+          "text": "Anchor box x, y offset predictions. We tried using the normal anchor box prediction mechanism where you pre- dict the x, y offset as a multiple of the box width or height using a linear activation. We found this formulation de- creased model stability and didn’t work very well.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 9584
+          }
+        },
+        {
+          "id": "p3_text12",
+          "kind": "text",
+          "bbox": [
+            50.298301,
+            378.1961,
+            109.706498,
+            391.412533
+          ],
+          "text": "2.5. Training",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 7388
+          }
+        },
+        {
+          "id": "p3_text13",
+          "kind": "text",
+          "bbox": [
+            50.161813,
+            397.5554,
+            286.345171,
+            457.510847
+          ],
+          "text": "Westill trainonfullimages withnohardnegative mining or any of that stuff. We use multi-scale training, lots of data augmentation, batch normalization, all the standard stuff. We use the Darknet neural network framework for training and testing [14].",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 7400
+          }
+        },
+        {
+          "id": "p3_text14",
+          "kind": "text",
+          "bbox": [
+            308.951663,
+            415.144123,
+            545.125059,
+            460.999142
+          ],
+          "text": "Linear x, y predictions instead of logistic. We tried using a linear activation to directly predict the x,y offset instead of the logistic activation. This led to a couple point drop in mAP.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 9814
+          }
+        },
+        {
+          "id": "p3_text15",
+          "kind": "text",
+          "bbox": [
+            308.991514,
+            462.999142,
+            545.132232,
+            533.844847
+          ],
+          "text": "Focal loss. We tried using focal loss. It dropped our mAP about 2 points. YOLOv3 may already be robust to the problem focal loss is trying to solve because it has sep- arate objectness predictions and conditional class predic- tions. Thus for most examples there is no loss from the class predictions? Or something? Wearen’t totally sure.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 9972
+          }
+        },
+        {
+          "id": "p3_text16",
+          "kind": "text",
+          "bbox": [
+            50.303283,
+            468.5878,
+            122.644198,
+            480.722328
+          ],
+          "text": "3. How We Do",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 7615
+          }
+        },
+        {
+          "id": "p3_text17",
+          "kind": "text",
+          "bbox": [
+            50.301289,
+            489.9404,
+            286.385738,
+            525.974884
+          ],
+          "text": "YOLOv3 is pretty good! See table 3. In terms of COCOs weird average mean AP metric it is on par with the SSD variants but is 3× faster. It is still quite a bit behind other",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 7624
+          }
+        },
+        {
+          "id": "p3_text18",
+          "kind": "text",
+          "bbox": [
+            50.264429,
+            679.1196,
+            547.357445,
+            711.12553
+          ],
+          "text": "Table 3. I’m seriously just stealing all these tables from [9] they take soooo long to make from scratch. Ok, YOLOv3 is doing alright. Keep in mind that RetinaNet has like 3.8× longer to process an image. YOLOv3 is much better than SSD variants and comparable to state-of-the-art models on theAP50 metric.",
+          "metadata": {
+            "babeldoc_layout_label": "table_footnote",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 8399
+          }
+        },
+        {
+          "id": "p3_table1",
+          "kind": "table",
+          "bbox": [
+            104.0,
+            544.0,
+            488.0,
+            680.0
+          ],
+          "cells": [
+            [
+              "",
+              "backbone",
+              "AP\nAP50\nAP75\nAPM\nAPL\nAPS"
+            ],
+            [
+              "Two-stage methods\nFaster R-CNN+++ [5]",
+              "ResNet-101-C4",
+              "55.7\n37.4\n15.6\n38.7\n34.9\n50.9"
+            ],
+            [
+              "Faster R-CNN w FPN [8]",
+              "ResNet-101-FPN",
+              "36.2\n18.2\n48.2\n59.1\n39.0\n39.0"
+            ],
+            [
+              "Faster R-CNN by G-RMI [6]",
+              "Inception-ResNet-v2 [21]",
+              "34.7\n55.5\n36.7\n13.5\n38.1\n52.0"
+            ],
+            [
+              "Faster R-CNN w TDM [20]",
+              "Inception-ResNet-v2-TDM",
+              "36.8\n57.7\n16.2\n39.2\n39.8\n52.1"
+            ],
+            [
+              "One-stage methods\nYOLOv2 [15]",
+              "DarkNet-19 [15]",
+              "22.4\n21.6\n44.0\n5.0\n35.5\n19.2"
+            ],
+            [
+              "SSD513 [11, 3]",
+              "ResNet-101-SSD",
+              "31.2\n50.4\n33.3\n10.2\n34.5\n49.8"
+            ],
+            [
+              "DSSD513 [3]",
+              "ResNet-101-DSSD",
+              "33.2\n53.3\n35.2\n13.0\n35.4\n51.1"
+            ],
+            [
+              "RetinaNet [9]",
+              "ResNet-101-FPN",
+              "42.7\n42.3\n21.8\n50.2\n39.1\n59.1"
+            ],
+            [
+              "RetinaNet [9]",
+              "ResNeXt-101-FPN",
+              "51.2\n40.8\n61.1\n44.1\n24.1\n44.2"
+            ],
+            [
+              "YOLOv3 608 × 608",
+              "Darknet-53",
+              "33.0\n34.4\n18.3\n35.4\n57.9\n41.9"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 12,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9595270752906799,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        },
+        {
+          "id": "p3_table2",
+          "kind": "table",
+          "bbox": [
+            47.0,
+            121.0,
+            297.0,
+            179.0
+          ],
+          "cells": [
+            [
+              "Backbone\nTop-1",
+              "Bn Ops\nBFLOP/s\nFPS\nTop-5"
+            ],
+            [
+              "74.1\nDarknet-19 [15]",
+              "91.8\n7.29\n171\n1246"
+            ],
+            [
+              "77.1\nResNet-101[5]",
+              "93.7\n19.7\n53\n1039"
+            ],
+            [
+              "ResNet-152 [5]\n77.6",
+              "29.4\n93.8\n37\n1090"
+            ],
+            [
+              "77.2\nDarknet-53",
+              "18.7\n1457\n93.8\n78"
+            ]
+          ],
+          "metadata": {
+            "babeldoc_layout_id": 14,
+            "babeldoc_class_name": "table",
+            "babeldoc_confidence": 0.9228497743606567,
+            "cell_grid_source": "adapter geometry reconstruction from BabelDOC positioned paragraph text; BabelDOC table layout object did not expose rows/columns/cells directly"
+          }
+        }
+      ]
+    },
+    {
+      "number": 4,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p4_text1",
+          "kind": "text",
+          "bbox": [
+            355.542137,
+            56.777311,
+            365.908496,
+            68.51324
+          ],
+          "text": "G",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 10335
+          }
+        },
+        {
+          "id": "p4_text2",
+          "kind": "text",
+          "bbox": [
+            100.331592,
+            75.271307,
+            116.393304,
+            86.447301
+          ],
+          "text": "58",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 10311
+          }
+        },
+        {
+          "id": "p4_text3",
+          "kind": "text",
+          "bbox": [
+            471.566641,
+            78.495509,
+            524.163025,
+            89.064646
+          ],
+          "text": "YOLOv3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 10385
+          }
+        },
+        {
+          "id": "p4_text4",
+          "kind": "text",
+          "bbox": [
+            472.200634,
+            95.37187,
+            552.545687,
+            105.641367
+          ],
+          "text": "RetinaNet-50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 10348
+          }
+        },
+        {
+          "id": "p4_text5",
+          "kind": "text",
+          "bbox": [
+            472.200634,
+            112.10024,
+            558.073291,
+            122.369737
+          ],
+          "text": "RetinaNet-101",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 10362
+          }
+        },
+        {
+          "id": "p4_text6",
+          "kind": "text",
+          "bbox": [
+            100.331592,
+            119.808817,
+            116.461404,
+            130.969677
+          ],
+          "text": "56",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 10309
+          }
+        },
+        {
+          "id": "p4_text7",
+          "kind": "text",
+          "bbox": [
+            76.257455,
+            122.665378,
+            89.100377,
+            242.871394
+          ],
+          "text": "-50 AP m CO CO",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 32,
+            "babeldoc_render_order": 10313
+          }
+        },
+        {
+          "id": "p4_text8",
+          "kind": "text",
+          "bbox": [
+            541.306277,
+            127.787099,
+            566.467279,
+            137.03899
+          ],
+          "text": "time",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 21,
+            "babeldoc_render_order": 10594
+          }
+        },
+        {
+          "id": "p4_text9",
+          "kind": "text",
+          "bbox": [
+            381.209558,
+            127.841916,
+            423.865173,
+            137.051172
+          ],
+          "text": "Method",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 20,
+            "babeldoc_render_order": 10391
+          }
+        },
+        {
+          "id": "p4_text10",
+          "kind": "text",
+          "bbox": [
+            488.856546,
+            127.841916,
+            534.062394,
+            137.051172
+          ],
+          "text": "mAP-50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 21,
+            "babeldoc_render_order": 10540
+          }
+        },
+        {
+          "id": "p4_text11",
+          "kind": "text",
+          "bbox": [
+            381.06947,
+            142.597434,
+            442.946361,
+            156.677249
+          ],
+          "text": "[B] SSD321",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 23,
+            "babeldoc_render_order": 10397
+          }
+        },
+        {
+          "id": "p4_text12",
+          "kind": "text",
+          "bbox": [
+            547.535047,
+            143.029879,
+            558.417366,
+            152.013776
+          ],
+          "text": "61",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 22,
+            "babeldoc_render_order": 10598
+          }
+        },
+        {
+          "id": "p4_text13",
+          "kind": "text",
+          "bbox": [
+            499.482955,
+            143.042061,
+            523.028195,
+            152.007685
+          ],
+          "text": "45.4",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 24,
+            "babeldoc_render_order": 10546
+          }
+        },
+        {
+          "id": "p4_text14",
+          "kind": "text",
+          "bbox": [
+            499.482955,
+            157.998574,
+            520.920786,
+            166.98247
+          ],
+          "text": "46.1",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 27,
+            "babeldoc_render_order": 10550
+          }
+        },
+        {
+          "id": "p4_text15",
+          "kind": "text",
+          "bbox": [
+            547.468049,
+            158.010755,
+            560.40905,
+            167.006834
+          ],
+          "text": "85",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 25,
+            "babeldoc_render_order": 10600
+          }
+        },
+        {
+          "id": "p4_text16",
+          "kind": "text",
+          "bbox": [
+            381.06947,
+            158.677249,
+            452.638591,
+            171.645943
+          ],
+          "text": "[C] DSSD321",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 26,
+            "babeldoc_render_order": 10407
+          }
+        },
+        {
+          "id": "p4_text17",
+          "kind": "text",
+          "bbox": [
+            100.331592,
+            164.376593,
+            116.552204,
+            175.514754
+          ],
+          "text": "54",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 28,
+            "babeldoc_render_order": 10307
+          }
+        },
+        {
+          "id": "p4_text18",
+          "kind": "text",
+          "bbox": [
+            547.468049,
+            172.97945,
+            560.40905,
+            181.975528
+          ],
+          "text": "85",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 29,
+            "babeldoc_render_order": 10602
+          }
+        },
+        {
+          "id": "p4_text19",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            172.991632,
+            522.845472,
+            181.969437
+          ],
+          "text": "51.9",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 31,
+            "babeldoc_render_order": 10554
+          }
+        },
+        {
+          "id": "p4_text20",
+          "kind": "text",
+          "bbox": [
+            381.06947,
+            173.645943,
+            437.538969,
+            186.614638
+          ],
+          "text": "[D] R-FCN",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 30,
+            "babeldoc_render_order": 10418
+          }
+        },
+        {
+          "id": "p4_text21",
+          "kind": "text",
+          "bbox": [
+            326.19256,
+            177.799587,
+            334.099746,
+            188.937748
+          ],
+          "text": "F",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 33,
+            "babeldoc_render_order": 10334
+          }
+        },
+        {
+          "id": "p4_text22",
+          "kind": "text",
+          "bbox": [
+            544.792102,
+            187.942054,
+            563.876798,
+            196.913769
+          ],
+          "text": "125",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 35,
+            "babeldoc_render_order": 10604
+          }
+        },
+        {
+          "id": "p4_text23",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            187.948145,
+            523.028195,
+            196.932041
+          ],
+          "text": "50.4",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 37,
+            "babeldoc_render_order": 10558
+          }
+        },
+        {
+          "id": "p4_text24",
+          "kind": "text",
+          "bbox": [
+            381.06947,
+            188.614638,
+            444.925863,
+            201.583333
+          ],
+          "text": "[E] SSD513",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 36,
+            "babeldoc_render_order": 10427
+          }
+        },
+        {
+          "id": "p4_text25",
+          "kind": "text",
+          "bbox": [
+            544.792102,
+            202.904658,
+            563.919433,
+            211.888554
+          ],
+          "text": "156",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 38,
+            "babeldoc_render_order": 10607
+          }
+        },
+        {
+          "id": "p4_text26",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            202.929021,
+            522.900289,
+            211.900736
+          ],
+          "text": "53.3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 10562
+          }
+        },
+        {
+          "id": "p4_text27",
+          "kind": "text",
+          "bbox": [
+            381.06947,
+            203.583333,
+            453.233489,
+            216.552027
+          ],
+          "text": "[F] DSSD513",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 39,
+            "babeldoc_render_order": 10437
+          }
+        },
+        {
+          "id": "p4_text28",
+          "kind": "text",
+          "bbox": [
+            100.331592,
+            208.921669,
+            116.42357,
+            220.067397
+          ],
+          "text": "52",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 41,
+            "babeldoc_render_order": 10305
+          }
+        },
+        {
+          "id": "p4_text29",
+          "kind": "text",
+          "bbox": [
+            186.196534,
+            209.536929,
+            195.63219,
+            220.690223
+          ],
+          "text": "D",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 42,
+            "babeldoc_render_order": 10332
+          }
+        },
+        {
+          "id": "p4_text30",
+          "kind": "text",
+          "bbox": [
+            499.495136,
+            217.727174,
+            521.225325,
+            226.887703
+          ],
+          "text": "59.1",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 45,
+            "babeldoc_render_order": 10566
+          }
+        },
+        {
+          "id": "p4_text31",
+          "kind": "text",
+          "bbox": [
+            544.792102,
+            217.879443,
+            563.88898,
+            226.63189
+          ],
+          "text": "172",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 43,
+            "babeldoc_render_order": 10610
+          }
+        },
+        {
+          "id": "p4_text32",
+          "kind": "text",
+          "bbox": [
+            381.06947,
+            218.552027,
+            462.499267,
+            232.631842
+          ],
+          "text": "[G] FPN FRCN",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 44,
+            "babeldoc_render_order": 10448
+          }
+        },
+        {
+          "id": "p4_text33",
+          "kind": "text",
+          "bbox": [
+            381.386191,
+            232.653233,
+            478.205969,
+            241.838125
+          ],
+          "text": "RetinaNet-50-500",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 47,
+            "babeldoc_render_order": 10460
+          }
+        },
+        {
+          "id": "p4_text34",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            232.86641,
+            522.845472,
+            241.844216
+          ],
+          "text": "50.9",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 48,
+            "babeldoc_render_order": 10570
+          }
+        },
+        {
+          "id": "p4_text35",
+          "kind": "text",
+          "bbox": [
+            547.522866,
+            232.86641,
+            560.396869,
+            241.838125
+          ],
+          "text": "73",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 46,
+            "babeldoc_render_order": 10613
+          }
+        },
+        {
+          "id": "p4_text36",
+          "kind": "text",
+          "bbox": [
+            265.080196,
+            244.295738,
+            273.532184,
+            255.449033
+          ],
+          "text": "E",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 49,
+            "babeldoc_render_order": 10333
+          }
+        },
+        {
+          "id": "p4_text37",
+          "kind": "text",
+          "bbox": [
+            381.386191,
+            247.621928,
+            485.141464,
+            256.80682
+          ],
+          "text": "RetinaNet-101-500",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 51,
+            "babeldoc_render_order": 10476
+          }
+        },
+        {
+          "id": "p4_text38",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            247.835105,
+            520.920786,
+            256.80682
+          ],
+          "text": "53.1",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 52,
+            "babeldoc_render_order": 10574
+          }
+        },
+        {
+          "id": "p4_text39",
+          "kind": "text",
+          "bbox": [
+            547.510684,
+            247.835105,
+            560.40905,
+            256.812911
+          ],
+          "text": "90",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 50,
+            "babeldoc_render_order": 10615
+          }
+        },
+        {
+          "id": "p4_text40",
+          "kind": "text",
+          "bbox": [
+            100.331592,
+            253.512146,
+            116.408437,
+            264.64274
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 53,
+            "babeldoc_render_order": 10303
+          }
+        },
+        {
+          "id": "p4_text41",
+          "kind": "text",
+          "bbox": [
+            381.386191,
+            262.590622,
+            485.141464,
+            271.787696
+          ],
+          "text": "RetinaNet-101-800",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 55,
+            "babeldoc_render_order": 10493
+          }
+        },
+        {
+          "id": "p4_text42",
+          "kind": "text",
+          "bbox": [
+            544.792102,
+            262.791618,
+            563.864616,
+            271.787696
+          ],
+          "text": "198",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 54,
+            "babeldoc_render_order": 10617
+          }
+        },
+        {
+          "id": "p4_text43",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            262.96216,
+            522.91247,
+            271.757242
+          ],
+          "text": "57.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 56,
+            "babeldoc_render_order": 10578
+          }
+        },
+        {
+          "id": "p4_text44",
+          "kind": "text",
+          "bbox": [
+            380.503028,
+            277.254778,
+            454.017299,
+            286.756391
+          ],
+          "text": "YOLOv3-320",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 58,
+            "babeldoc_render_order": 10510
+          }
+        },
+        {
+          "id": "p4_text45",
+          "kind": "text",
+          "bbox": [
+            547.455867,
+            277.632406,
+            560.439504,
+            286.506669
+          ],
+          "text": "22",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 57,
+            "babeldoc_render_order": 10620
+          }
+        },
+        {
+          "id": "p4_text46",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            277.82122,
+            522.91247,
+            286.725937
+          ],
+          "text": "51.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 59,
+            "babeldoc_render_order": 10582
+          }
+        },
+        {
+          "id": "p4_text47",
+          "kind": "text",
+          "bbox": [
+            380.503028,
+            292.223473,
+            454.02948,
+            301.725086
+          ],
+          "text": "YOLOv3-416",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 61,
+            "babeldoc_render_order": 10520
+          }
+        },
+        {
+          "id": "p4_text48",
+          "kind": "text",
+          "bbox": [
+            547.455867,
+            292.722917,
+            560.342052,
+            301.718995
+          ],
+          "text": "29",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 60,
+            "babeldoc_render_order": 10622
+          }
+        },
+        {
+          "id": "p4_text49",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            292.741189,
+            522.900289,
+            301.712904
+          ],
+          "text": "55.3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 62,
+            "babeldoc_render_order": 10586
+          }
+        },
+        {
+          "id": "p4_text50",
+          "kind": "text",
+          "bbox": [
+            100.225658,
+            298.034522,
+            116.393304,
+            309.210516
+          ],
+          "text": "48",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 63,
+            "babeldoc_render_order": 10301
+          }
+        },
+        {
+          "id": "p4_text51",
+          "kind": "text",
+          "bbox": [
+            380.503028,
+            307.192167,
+            453.999027,
+            316.69378
+          ],
+          "text": "YOLOv3-608",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 65,
+            "babeldoc_render_order": 10530
+          }
+        },
+        {
+          "id": "p4_text52",
+          "kind": "text",
+          "bbox": [
+            499.568226,
+            307.709884,
+            522.845472,
+            316.68769
+          ],
+          "text": "57.9",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 66,
+            "babeldoc_render_order": 10590
+          }
+        },
+        {
+          "id": "p4_text53",
+          "kind": "text",
+          "bbox": [
+            547.468049,
+            307.75861,
+            558.417366,
+            316.663326
+          ],
+          "text": "51",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 64,
+            "babeldoc_render_order": 10624
+          }
+        },
+        {
+          "id": "p4_text54",
+          "kind": "text",
+          "bbox": [
+            403.390858,
+            335.024505,
+            428.09893,
+            346.192933
+          ],
+          "text": "200",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 67,
+            "babeldoc_render_order": 10269
+          }
+        },
+        {
+          "id": "p4_text55",
+          "kind": "text",
+          "bbox": [
+            501.2827,
+            335.024505,
+            525.990772,
+            346.192933
+          ],
+          "text": "250",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 69,
+            "babeldoc_render_order": 10272
+          }
+        },
+        {
+          "id": "p4_text56",
+          "kind": "text",
+          "bbox": [
+            114.085002,
+            335.062339,
+            130.161848,
+            346.192933
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 71,
+            "babeldoc_render_order": 10261
+          }
+        },
+        {
+          "id": "p4_text57",
+          "kind": "text",
+          "bbox": [
+            208.605977,
+            335.062339,
+            232.315247,
+            346.192933
+          ],
+          "text": "100",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 68,
+            "babeldoc_render_order": 10263
+          }
+        },
+        {
+          "id": "p4_text58",
+          "kind": "text",
+          "bbox": [
+            306.497818,
+            335.062339,
+            330.207088,
+            346.192933
+          ],
+          "text": "150",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 70,
+            "babeldoc_render_order": 10266
+          }
+        },
+        {
+          "id": "p4_text59",
+          "kind": "text",
+          "bbox": [
+            185.712266,
+            342.265487,
+            195.63219,
+            354.069516
+          ],
+          "text": "C",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 72,
+            "babeldoc_render_order": 10331
+          }
+        },
+        {
+          "id": "p4_text60",
+          "kind": "text",
+          "bbox": [
+            139.248762,
+            342.605988,
+            148.449852,
+            353.759282
+          ],
+          "text": "B",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 73,
+            "babeldoc_render_order": 10330
+          }
+        },
+        {
+          "id": "p4_text61",
+          "kind": "text",
+          "bbox": [
+            274.491539,
+            355.554805,
+            418.033884,
+            376.180786
+          ],
+          "text": "inference time (ms)",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 74,
+            "babeldoc_render_order": 10275
+          }
+        },
+        {
+          "id": "p4_text62",
+          "kind": "text",
+          "bbox": [
+            50.219597,
+            380.0686,
+            547.356709,
+            412.907675
+          ],
+          "text": "Figure 3. Again adapted from the [9], this time displaying speed/accuracy tradeoff on the mAP at .5 IOU metric. You can tell YOLOv3 is good because it’s very high and far to the left. Can you cite your own paper? Guess who’s going to try, this guy → [16]. Oh, I forgot, we also fix a data loading bug in YOLOv2, that helped by like 2 mAP. Just sneaking this in here to not throw off layout.",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 9,
+            "babeldoc_render_order": 10629
+          }
+        },
+        {
+          "id": "p4_text63",
+          "kind": "text",
+          "bbox": [
+            50.141888,
+            432.8194,
+            286.234128,
+            503.639623
+          ],
+          "text": "Dual IOU thresholds and truth assignment. Faster R- CNN uses two IOU thresholds during training. If a predic- tion overlaps the ground truth by .7 it is as a positive exam- ple, by [.3 − .7] it is ignored, less than .3 for all ground truth objects it is a negative example. We tried a similar strategy but couldn’t get good results.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 10942
+          }
+        },
+        {
+          "id": "p4_text64",
+          "kind": "text",
+          "bbox": [
+            308.911813,
+            432.8194,
+            544.816218,
+            456.141727
+          ],
+          "text": "prisingly difficult.” [18] If humans have a hard time telling the difference, how much does it matter?",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 11898
+          }
+        },
+        {
+          "id": "p4_text65",
+          "kind": "text",
+          "bbox": [
+            308.991514,
+            456.7294,
+            545.613226,
+            538.562476
+          ],
+          "text": "But maybe a better question is: “What are we going to do with these detectors now that we have them?” A lot of the people doing this research are at Google and Facebook. I guess at least we know the technology is in good hands and definitely won’t be used to harvest your personal infor- mation and sell it to.... wait, you’re saying that’s exactly what it will be used for?? Oh.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 11983
+          }
+        },
+        {
+          "id": "p4_text66",
+          "kind": "text",
+          "bbox": [
+            50.241514,
+            505.639623,
+            286.374939,
+            552.549847
+          ],
+          "text": "We quite like our current formulation, it seems to be at a local optima at least. It is possible that some of these techniques could eventually produce good results, perhaps theyjust needsome tuningto stabilizethetraining.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 11213
+          }
+        },
+        {
+          "id": "p4_text67",
+          "kind": "text",
+          "bbox": [
+            308.931738,
+            540.4154,
+            544.915844,
+            575.371123
+          ],
+          "text": "Well the otherpeople heavily funding vision research are the military and they’ve never done anything horrible like killing lots of people with new technology oh wait.....1",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 12290
+          }
+        },
+        {
+          "id": "p4_text68",
+          "kind": "text",
+          "bbox": [
+            50.375014,
+            560.5638,
+            171.002982,
+            572.698328
+          ],
+          "text": "5. What This All Means",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 11402
+          }
+        },
+        {
+          "id": "p4_text69",
+          "kind": "text",
+          "bbox": [
+            308.911813,
+            577.371123,
+            545.135022,
+            671.012123
+          ],
+          "text": "I have a lot of hope that most of the people using com- puter vision are just doing happy, good stuff with it, like counting the number of zebras in a national park [13], or tracking their cat as it wanders around their house [19]. But computer vision is alreadybeing put to questionable use and as researchers we have a responsibility to at least consider the harm our work might be doing and think of ways to mit- igate it. We owe the world that much.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 12437
+          }
+        },
+        {
+          "id": "p4_text70",
+          "kind": "text",
+          "bbox": [
+            50.271402,
+            581.4854,
+            286.046293,
+            627.453476
+          ],
+          "text": "YOLOv3 is a good detector. It’s fast, it’s accurate. It’s not as great on the COCO average AP between .5 and .95 IOU metric. But it’s very good on the old detection metric of .5 IOU.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 11420
+          }
+        },
+        {
+          "id": "p4_text71",
+          "kind": "text",
+          "bbox": [
+            50.271402,
+            629.3064,
+            286.235583,
+            713.171847
+          ],
+          "text": "Why did we switch metrics anyway? The original COCO paper just has this cryptic sentence: “A full discus- sion of evaluation metrics will be added once the evaluation server is complete”. Russakovsky et al report that that hu- mans have a hard time distinguishing an IOU of .3 from .5! “Training humans to visually inspect a bounding box with IOU of 0.3 and distinguish it from one with IOU 0.5 is sur-",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 11567
+          }
+        },
+        {
+          "id": "p4_text72",
+          "kind": "text",
+          "bbox": [
+            320.996327,
+            673.012123,
+            541.52844,
+            684.056847
+          ],
+          "text": "In closing, do not @ me. (Because I finally quit Twitter).",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 12805
+          }
+        },
+        {
+          "id": "p4_text73",
+          "kind": "text",
+          "bbox": [
+            320.384514,
+            703.0299,
+            534.248278,
+            712.737482
+          ],
+          "text": "1The author is funded by the Office of Naval Research and Google.",
+          "metadata": {
+            "babeldoc_layout_label": "abandon",
+            "babeldoc_layout_id": 13,
+            "babeldoc_render_order": 12853
+          }
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p5_text1",
+          "kind": "text",
+          "bbox": [
+            309.651043,
+            72.9956,
+            547.453563,
+            207.453675
+          ],
+          "text": "[18] O. Russakovsky, L.-J. Li, and L. Fei-Fei. Best of both worlds: human-machine collaboration for object annotation. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pages 2121–2131, 2015. 4 [19] M. Scott. Smart camera gimbal bot scanlime:027, Dec 2017. 4 [20] A. Shrivastava, R. Sukthankar, J. Malik, and A. Gupta. Be- yond skip connections: Top-down modulation for object de- tection. arXiv preprint arXiv:1612.06851, 2016. 3 [21] C. Szegedy, S. Ioffe, V. Vanhoucke, and A. A. Alemi. Inception-v4, inception-resnet and the impact of residual connections on learning. 2017. 3",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 15380
+          }
+        },
+        {
+          "id": "p5_text2",
+          "kind": "text",
+          "bbox": [
+            50.422835,
+            73.701957,
+            105.321114,
+            82.130373
+          ],
+          "text": "References",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 12906
+          }
+        },
+        {
+          "id": "p5_text3",
+          "kind": "text",
+          "bbox": [
+            50.901043,
+            90.9286,
+            289.770565,
+            712.838112
+          ],
+          "text": "[1] Analogy. Wikipedia, Mar 2018. 1 [2] M. Everingham, L. Van Gool, C. K. Williams, J. Winn, and A. Zisserman. The pascal visual object classes (voc) chal- lenge. International journal of computer vision, 88(2):303– 338, 2010. 6 [3] C.-Y. Fu, W. Liu, A. Ranga, A. Tyagi, and A. C. Berg. Dssd: Deconvolutional single shot detector. arXiv preprint arXiv:1701.06659, 2017. 3 [4] D. Gordon, A. Kembhavi, M. Rastegari, J. Redmon, D. Fox, and A. Farhadi. Iqa: Visual question answering in interactive environments. arXiv preprint arXiv:1712.03316, 2017. 1 [5] K. He, X. Zhang, S. Ren, and J. Sun. Deep residual learn- ing for image recognition. In Proceedings of the IEEE con- ference on computer vision and pattern recognition, pages 770–778, 2016. 3 [6] J. Huang, V. Rathod, C. Sun, M. Zhu, A. Korattikara, A. Fathi, I. Fischer, Z. Wojna, Y. Song, S. Guadarrama, et al. Speed/accuracy trade-offs for modern convolutional object detectors. 3 [7] I. Krasin, T. Duerig, N. Alldrin, V. Ferrari, S. Abu-El-Haija, A. Kuznetsova, H. Rom, J. Uijlings, S. Popov, A. Veit, S. Belongie, V. Gomes, A. Gupta, C. Sun, G. Chechik, D. Cai, Z. Feng, D. Narayanan, and K. Murphy. Open- images: A public dataset for large-scale multi-label and multi-class image classification. Dataset available from https://github.com/openimages, 2017. 2 [8] T.-Y. Lin, P. Dollar, R. Girshick, K. He, B. Hariharan, and S. Belongie. Feature pyramid networks for object detection. In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition, pages 2117–2125, 2017. 2, 3 [9] T.-Y. Lin, P. Goyal, R. Girshick, K. He, and P. Doll ́ar. Focal loss for dense object detection. arXiv preprint arXiv:1708.02002, 2017. 1, 3, 4 [10] T.-Y. Lin, M. Maire, S. Belongie, J. Hays, P. Perona, D. Ra- manan, P. Doll ́ar, and C. L. Zitnick. Microsoft coco: Com- mon objects in context. In European conference on computer vision, pages 740–755. Springer, 2014. 2 [11] W. Liu, D. Anguelov, D. Erhan, C. Szegedy, S. Reed, C.- Y. Fu, and A. C. Berg. Ssd: Single shot multibox detector. In European conference on computer vision, pages 21–37. Springer, 2016. 3 [12] I. Newton. Philosophiae naturalis principia mathematica. William Dawson & Sons Ltd., London, 1687. 1 [13] J. Parham, J. Crall, C. Stewart, T. Berger-Wolf, and D. Rubenstein. Animal population censusing at scale with citizen science and photographic identification. 2017. 4 [14] J. Redmon. Darknet: Open source neural networks in c. http://pjreddie.com/darknet/, 2013–2016. 3 [15] J. Redmon and A. Farhadi. Yolo9000: Better, faster, stronger. In Computer Vision and Pattern Recognition (CVPR), 2017 IEEE Conference on, pages 6517–6525. IEEE, 2017. 1, 2, 3 [16] J. Redmon and A. Farhadi. Yolov3: An incremental improve- ment. arXiv, 2018. 4 [17] S. Ren, K. He, R. Girshick, and J. Sun. Faster r-cnn: To- wards real-time object detection with region proposal net- works. arXiv preprint arXiv:1506.01497, 2015. 2",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 12916
+          }
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "width": 612.0,
+      "height": 792.0,
+      "rotation": 0,
+      "regions": [
+        {
+          "id": "p6_text1",
+          "kind": "text",
+          "bbox": [
+            342.125753,
+            68.123998,
+            349.634641,
+            71.649133
+          ],
+          "text": "100",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 15,
+            "babeldoc_render_order": 16024
+          }
+        },
+        {
+          "id": "p6_text2",
+          "kind": "text",
+          "bbox": [
+            63.437735,
+            68.124555,
+            70.945402,
+            71.649118
+          ],
+          "text": "100",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 16,
+            "babeldoc_render_order": 15912
+          }
+        },
+        {
+          "id": "p6_text3",
+          "kind": "text",
+          "bbox": [
+            66.091992,
+            98.115178,
+            71.161247,
+            101.575047
+          ],
+          "text": "75",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 18,
+            "babeldoc_render_order": 15910
+          }
+        },
+        {
+          "id": "p6_text4",
+          "kind": "text",
+          "bbox": [
+            344.779937,
+            98.114629,
+            349.850016,
+            101.575061
+          ],
+          "text": "75",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 17,
+            "babeldoc_render_order": 16022
+          }
+        },
+        {
+          "id": "p6_text5",
+          "kind": "text",
+          "bbox": [
+            92.020946,
+            103.262147,
+            135.388066,
+            111.976682
+          ],
+          "text": "YOLOv3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 19,
+            "babeldoc_render_order": 15952
+          }
+        },
+        {
+          "id": "p6_text6",
+          "kind": "text",
+          "bbox": [
+            176.852206,
+            104.774447,
+            250.526012,
+            113.612509
+          ],
+          "text": "All the other slow ones",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 20,
+            "babeldoc_render_order": 15964
+          }
+        },
+        {
+          "id": "p6_text7",
+          "kind": "text",
+          "bbox": [
+            350.753186,
+            104.774447,
+            424.426992,
+            113.612509
+          ],
+          "text": "All the other slow ones",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 21,
+            "babeldoc_render_order": 16077
+          }
+        },
+        {
+          "id": "p6_text8",
+          "kind": "text",
+          "bbox": [
+            466.372616,
+            107.114017,
+            509.739736,
+            115.828552
+          ],
+          "text": "YOLOv3",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 22,
+            "babeldoc_render_order": 16065
+          }
+        },
+        {
+          "id": "p6_text9",
+          "kind": "text",
+          "bbox": [
+            51.636971,
+            110.059567,
+            68.499416,
+            152.610575
+          ],
+          "text": "AP 50 m",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 27,
+            "babeldoc_render_order": 15988
+          }
+        },
+        {
+          "id": "p6_text10",
+          "kind": "text",
+          "bbox": [
+            330.325024,
+            110.059567,
+            347.187469,
+            152.610575
+          ],
+          "text": "AP 50 m",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 28,
+            "babeldoc_render_order": 16104
+          }
+        },
+        {
+          "id": "p6_text11",
+          "kind": "text",
+          "bbox": [
+            66.070428,
+            128.481418,
+            71.161247,
+            132.00598
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 25,
+            "babeldoc_render_order": 15908
+          }
+        },
+        {
+          "id": "p6_text12",
+          "kind": "text",
+          "bbox": [
+            344.758369,
+            128.48141,
+            349.850016,
+            132.006545
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 26,
+            "babeldoc_render_order": 16020
+          }
+        },
+        {
+          "id": "p6_text13",
+          "kind": "text",
+          "bbox": [
+            66.065636,
+            158.892935,
+            71.161247,
+            162.42229
+          ],
+          "text": "25",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 29,
+            "babeldoc_render_order": 15906
+          }
+        },
+        {
+          "id": "p6_text14",
+          "kind": "text",
+          "bbox": [
+            344.753576,
+            158.892898,
+            349.850016,
+            162.422826
+          ],
+          "text": "25",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 30,
+            "babeldoc_render_order": 16018
+          }
+        },
+        {
+          "id": "p6_text15",
+          "kind": "text",
+          "bbox": [
+            69.010061,
+            188.83828,
+            71.37734,
+            192.362843
+          ],
+          "text": "0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 32,
+            "babeldoc_render_order": 15905
+          }
+        },
+        {
+          "id": "p6_text16",
+          "kind": "text",
+          "bbox": [
+            347.697753,
+            188.837723,
+            350.065417,
+            192.362858
+          ],
+          "text": "0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 31,
+            "babeldoc_render_order": 16017
+          }
+        },
+        {
+          "id": "p6_text17",
+          "kind": "text",
+          "bbox": [
+            396.594261,
+            193.732786,
+            405.467537,
+            199.537128
+          ],
+          "text": "12.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 41,
+            "babeldoc_render_order": 16029
+          }
+        },
+        {
+          "id": "p6_text18",
+          "kind": "text",
+          "bbox": [
+            443.876583,
+            193.732786,
+            448.973023,
+            197.262714
+          ],
+          "text": "25",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 34,
+            "babeldoc_render_order": 16033
+          }
+        },
+        {
+          "id": "p6_text19",
+          "kind": "text",
+          "bbox": [
+            252.534034,
+            193.733593,
+            260.357977,
+            197.270135
+          ],
+          "text": "200",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 33,
+            "babeldoc_render_order": 15925
+          }
+        },
+        {
+          "id": "p6_text20",
+          "kind": "text",
+          "bbox": [
+            487.51325,
+            193.739975,
+            496.738799,
+            199.537128
+          ],
+          "text": "37.5",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 42,
+            "babeldoc_render_order": 16035
+          }
+        },
+        {
+          "id": "p6_text21",
+          "kind": "text",
+          "bbox": [
+            354.077258,
+            193.744768,
+            356.444922,
+            197.269903
+          ],
+          "text": "0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 37,
+            "babeldoc_render_order": 16028
+          }
+        },
+        {
+          "id": "p6_text22",
+          "kind": "text",
+          "bbox": [
+            535.152914,
+            193.744768,
+            540.244561,
+            197.269903
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 39,
+            "babeldoc_render_order": 16039
+          }
+        },
+        {
+          "id": "p6_text23",
+          "kind": "text",
+          "bbox": [
+            75.389181,
+            193.745573,
+            77.75646,
+            197.270135
+          ],
+          "text": "0",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 38,
+            "babeldoc_render_order": 15916
+          }
+        },
+        {
+          "id": "p6_text24",
+          "kind": "text",
+          "bbox": [
+            119.066861,
+            193.745573,
+            124.15768,
+            197.270135
+          ],
+          "text": "50",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 40,
+            "babeldoc_render_order": 15917
+          }
+        },
+        {
+          "id": "p6_text25",
+          "kind": "text",
+          "bbox": [
+            162.56033,
+            193.745573,
+            170.067997,
+            197.270135
+          ],
+          "text": "100",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 35,
+            "babeldoc_render_order": 15919
+          }
+        },
+        {
+          "id": "p6_text26",
+          "kind": "text",
+          "bbox": [
+            207.705457,
+            193.745573,
+            215.213125,
+            197.270135
+          ],
+          "text": "150",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 36,
+            "babeldoc_render_order": 15922
+          }
+        },
+        {
+          "id": "p6_text27",
+          "kind": "text",
+          "bbox": [
+            430.962416,
+            200.654304,
+            451.807359,
+            209.368839
+          ],
+          "text": "FPS",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 43,
+            "babeldoc_render_order": 16101
+          }
+        },
+        {
+          "id": "p6_text28",
+          "kind": "text",
+          "bbox": [
+            119.14747,
+            202.679264,
+            205.057504,
+            214.658302
+          ],
+          "text": "Execution time (ms)",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 44,
+            "babeldoc_render_order": 15994
+          }
+        },
+        {
+          "id": "p6_text29",
+          "kind": "text",
+          "bbox": [
+            50.219597,
+            216.6506,
+            544.250304,
+            227.571675
+          ],
+          "text": "Figure 4. Zero-axis charts are probably more intellectually honest... and we can still screw with the variables to make ourselves look good!",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 45,
+            "babeldoc_render_order": 16110
+          }
+        },
+        {
+          "id": "p6_text30",
+          "kind": "text",
+          "bbox": [
+            308.888899,
+            248.4796,
+            548.085552,
+            281.317675
+          ],
+          "text": "precise bounding boxes are more important than better classifi- cation? A miss-classified example is much more obvious than a bounding box that is slightly shifted.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 8,
+            "babeldoc_render_order": 18267
+          }
+        },
+        {
+          "id": "p6_text31",
+          "kind": "text",
+          "bbox": [
+            50.422835,
+            249.364285,
+            94.095181,
+            257.613373
+          ],
+          "text": "Rebuttal",
+          "metadata": {
+            "babeldoc_layout_label": "title",
+            "babeldoc_layout_id": 14,
+            "babeldoc_render_order": 16229
+          }
+        },
+        {
+          "id": "p6_text32",
+          "kind": "text",
+          "bbox": [
+            50.228563,
+            268.0566,
+            288.654106,
+            399.525675
+          ],
+          "text": "We would like to thank the Reddit commenters, labmates, emailers, and passing shouts in the hallway for their lovely, heart- felt words. If you, like me, are reviewing for ICCV then we know you probably have 37 other papers you could be reading that you’ll invariably put off until the last week and then have some legend in the field email you about how you really should finish those re- views execept it won’t entirely be clear what they’re saying and maybe they’re from the future? Anyway, this paper won’t have be- come what it will in time be without all the work your past selves will have done also in the past but only a little bit further forward, not like all the way until now forward. And if you tweeted about it I wouldn’t know. Just sayin.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 2,
+            "babeldoc_render_order": 16237
+          }
+        },
+        {
+          "id": "p6_text33",
+          "kind": "text",
+          "bbox": [
+            308.906832,
+            281.3556,
+            547.155835,
+            323.32453
+          ],
+          "text": "mAP is already screwed up because all that matters is per-class rank ordering. For example, if your test set only has these two images then according to mAP two detectors that produce these results are JUST AS GOOD:",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 7,
+            "babeldoc_render_order": 18405
+          }
+        },
+        {
+          "id": "p6_text34",
+          "kind": "text",
+          "bbox": [
+            312.697641,
+            339.213048,
+            339.943273,
+            345.119448
+          ],
+          "text": "Detector #1",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 61,
+            "babeldoc_render_order": 18663
+          }
+        },
+        {
+          "id": "p6_text35",
+          "kind": "text",
+          "bbox": [
+            451.714904,
+            350.411091,
+            459.17075,
+            352.379891
+          ],
+          "text": "Bird: 99%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 62,
+            "babeldoc_render_order": 18629
+          }
+        },
+        {
+          "id": "p6_text36",
+          "kind": "text",
+          "bbox": [
+            490.931554,
+            354.630352,
+            500.706646,
+            356.599152
+          ],
+          "text": "Person: 99%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 64,
+            "babeldoc_render_order": 18640
+          }
+        },
+        {
+          "id": "p6_text37",
+          "kind": "text",
+          "bbox": [
+            370.137307,
+            354.876452,
+            379.912399,
+            356.845252
+          ],
+          "text": "Person: 99%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 65,
+            "babeldoc_render_order": 18596
+          }
+        },
+        {
+          "id": "p6_text38",
+          "kind": "text",
+          "bbox": [
+            393.112415,
+            364.769967,
+            402.55478,
+            366.738767
+          ],
+          "text": "Camel: 99%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 67,
+            "babeldoc_render_order": 18618
+          }
+        },
+        {
+          "id": "p6_text39",
+          "kind": "text",
+          "bbox": [
+            343.36458,
+            379.677278,
+            351.058651,
+            381.646078
+          ],
+          "text": "Dog: 99%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 69,
+            "babeldoc_render_order": 18609
+          }
+        },
+        {
+          "id": "p6_text40",
+          "kind": "text",
+          "bbox": [
+            464.939038,
+            381.961874,
+            473.906922,
+            383.930674
+          ],
+          "text": "Horse: 99%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 70,
+            "babeldoc_render_order": 18652
+          }
+        },
+        {
+          "id": "p6_text41",
+          "kind": "text",
+          "bbox": [
+            50.192698,
+            401.2086,
+            289.210022,
+            477.873709
+          ],
+          "text": "Reviewer #2 AKA DanGrossman (lol blinding who does that) insists that I point out here that our graphs have not one but two non-zero origins. You’re absolutely right Dan, that’s because it looks way better than admitting to ourselves that we’re all just here battling over 2-3% mAP. But here are the requested graphs. I threw in one with FPS too because we look just like super good when we plot on FPS.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 4,
+            "babeldoc_render_order": 16851
+          }
+        },
+        {
+          "id": "p6_text42",
+          "kind": "text",
+          "bbox": [
+            312.697641,
+            422.2086,
+            340.764263,
+            428.115
+          ],
+          "text": "Detector #2",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 75,
+            "babeldoc_render_order": 18762
+          }
+        },
+        {
+          "id": "p6_text43",
+          "kind": "text",
+          "bbox": [
+            451.714904,
+            433.406864,
+            459.17075,
+            435.375664
+          ],
+          "text": "Bird: 90%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 78,
+            "babeldoc_render_order": 18728
+          }
+        },
+        {
+          "id": "p6_text44",
+          "kind": "text",
+          "bbox": [
+            491.943124,
+            434.826516,
+            499.637194,
+            436.795316
+          ],
+          "text": "Dog: 45%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 79,
+            "babeldoc_render_order": 18809
+          }
+        },
+        {
+          "id": "p6_text45",
+          "kind": "text",
+          "bbox": [
+            375.292561,
+            435.230022,
+            384.260445,
+            437.198822
+          ],
+          "text": "Horse: 52%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 80,
+            "babeldoc_render_order": 18676
+          }
+        },
+        {
+          "id": "p6_text46",
+          "kind": "text",
+          "bbox": [
+            490.931554,
+            437.625904,
+            500.706646,
+            439.594704
+          ],
+          "text": "Person: 11%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 81,
+            "babeldoc_render_order": 18739
+          }
+        },
+        {
+          "id": "p6_text47",
+          "kind": "text",
+          "bbox": [
+            370.137307,
+            437.872004,
+            379.912399,
+            439.840804
+          ],
+          "text": "Person: 42%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 82,
+            "babeldoc_render_order": 18695
+          }
+        },
+        {
+          "id": "p6_text48",
+          "kind": "text",
+          "bbox": [
+            393.112415,
+            447.76574,
+            402.55478,
+            449.73454
+          ],
+          "text": "Camel: 10%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 84,
+            "babeldoc_render_order": 18717
+          }
+        },
+        {
+          "id": "p6_text49",
+          "kind": "text",
+          "bbox": [
+            362.345141,
+            448.179361,
+            371.313025,
+            450.148161
+          ],
+          "text": "Horse: 60%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 85,
+            "babeldoc_render_order": 18786
+          }
+        },
+        {
+          "id": "p6_text50",
+          "kind": "text",
+          "bbox": [
+            330.749174,
+            462.487516,
+            338.20502,
+            464.456316
+          ],
+          "text": "Bird: 89%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 88,
+            "babeldoc_render_order": 18775
+          }
+        },
+        {
+          "id": "p6_text51",
+          "kind": "text",
+          "bbox": [
+            343.36458,
+            462.67283,
+            351.058651,
+            464.64163
+          ],
+          "text": "Dog: 48%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 88,
+            "babeldoc_render_order": 18708
+          }
+        },
+        {
+          "id": "p6_text52",
+          "kind": "text",
+          "bbox": [
+            464.939038,
+            464.957425,
+            473.906922,
+            466.926225
+          ],
+          "text": "Horse: 70%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 89,
+            "babeldoc_render_order": 18751
+          }
+        },
+        {
+          "id": "p6_text53",
+          "kind": "text",
+          "bbox": [
+            496.151704,
+            466.685884,
+            503.60755,
+            468.654684
+          ],
+          "text": "Bird: 75%",
+          "metadata": {
+            "babeldoc_layout_label": "fallback_line",
+            "babeldoc_layout_id": 90,
+            "babeldoc_render_order": 18798
+          }
+        },
+        {
+          "id": "p6_text54",
+          "kind": "text",
+          "bbox": [
+            50.138899,
+            479.5656,
+            288.681005,
+            567.198675
+          ],
+          "text": "Reviewer#4 AKA JudasAdventus on Reddit writes “Entertain- ing read but the arguments against the MSCOCO metrics seem a bit weak”. Well, I always knew you would be the one to turn on me Judas. You know how when you work on a project and it only comes out alright so you have to figure out some way to justify how what you did actually was pretty cool? I was basically trying to do that and I lashed out at the COCO metrics a little bit. But now that I’ve staked out this hill I may as well die on it.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 5,
+            "babeldoc_render_order": 17182
+          }
+        },
+        {
+          "id": "p6_text55",
+          "kind": "text",
+          "bbox": [
+            308.969597,
+            499.0156,
+            546.937853,
+            520.895675
+          ],
+          "text": "Figure 5. These two hypothetical detectors are perfect according to mAP over these two images. They are both perfect. Totally equal.",
+          "metadata": {
+            "babeldoc_layout_label": "figure_caption",
+            "babeldoc_layout_id": 12,
+            "babeldoc_render_order": 18817
+          }
+        },
+        {
+          "id": "p6_text56",
+          "kind": "text",
+          "bbox": [
+            308.978563,
+            534.7036,
+            548.184182,
+            622.337675
+          ],
+          "text": "Now this is OBVIOUSLY an over-exaggeration of the prob- lems with mAP butI guess my newly retconned point is that there are such obvious discrepancies between what people in the “real world” would care about and our current metrics that I think if we’re going to come up with new metrics we should focus on these discrepancies. Also, like, it’s already mean average preci- sion, what do we even call the COCO metric, average mean aver- age precision?",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 3,
+            "babeldoc_render_order": 18929
+          }
+        },
+        {
+          "id": "p6_text57",
+          "kind": "text",
+          "bbox": [
+            49.484352,
+            568.8816,
+            288.600307,
+            678.432675
+          ],
+          "text": "See here’s the thing, mAP is already sort of broken so an up- date to it should maybe address some of the issues with it or at least justify why the updated version is better in some way. And that’s the big thing I took issue with was the lack of justification. For PASCAL VOC, the IOU threshold was ”set deliberately low to ac- count for inaccuracies in bounding boxes in the ground truth data“ [2]. Does COCO have better labelling than VOC? This is defi- nitely possible since COCO has segmentation masks maybe the labels are more trustworthy and thus we aren’t as worried about inaccuracy. But again, my problem was the lack of justification.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 1,
+            "babeldoc_render_order": 17581
+          }
+        },
+        {
+          "id": "p6_text58",
+          "kind": "text",
+          "bbox": [
+            309.005462,
+            622.3756,
+            547.637232,
+            677.131675
+          ],
+          "text": "Here’s a proposal, what people actually care about is given an image and a detector, how well will the detector find and classify objects in the image. What about getting rid of the per-class AP and just doing a global average precision? Or doing an AP calcu- lation per-image and averaging over that?",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 6,
+            "babeldoc_render_order": 19302
+          }
+        },
+        {
+          "id": "p6_text59",
+          "kind": "text",
+          "bbox": [
+            309.005462,
+            677.1696,
+            547.353096,
+            699.049675
+          ],
+          "text": "Boxes are stupid anyway though, I’m probably a true believer in masks except I can’t get YOLO to learn them.",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 11,
+            "babeldoc_render_order": 19550
+          }
+        },
+        {
+          "id": "p6_text60",
+          "kind": "text",
+          "bbox": [
+            50.33616,
+            680.1156,
+            286.370462,
+            701.995675
+          ],
+          "text": "The COCO metric emphasizes better bounding boxes but that emphasis must mean it de-emphasizes somethingelse, inthis case",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 18108
+          }
+        },
+        {
+          "id": "p6_text61",
+          "kind": "text",
+          "bbox": [
+            50.33616,
+            702.0336,
+            286.179379,
+            712.954675
+          ],
+          "text": "classification accuracy. Is there a good reason to think that more",
+          "metadata": {
+            "babeldoc_layout_label": "plain text",
+            "babeldoc_layout_id": 10,
+            "babeldoc_render_order": 18212
+          }
+        },
+        {
+          "id": "p6_figure1",
+          "kind": "figure",
+          "bbox": [
+            308.862,
+            418.379789,
+            426.663647,
+            496.914212
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 18584,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p6_figure2",
+          "kind": "figure",
+          "bbox": [
+            426.663647,
+            418.379789,
+            544.465294,
+            496.914212
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 18585,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p6_figure3",
+          "kind": "figure",
+          "bbox": [
+            308.862,
+            335.275375,
+            426.663647,
+            413.809798
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 18586,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        },
+        {
+          "id": "p6_figure4",
+          "kind": "figure",
+          "bbox": [
+            426.663647,
+            335.275375,
+            544.465294,
+            413.809798
+          ],
+          "metadata": {
+            "babeldoc_form_type": "image",
+            "babeldoc_render_order": 18587,
+            "figure_mapping": "non-full-page BabelDOC image form"
+          }
+        }
+      ]
+    }
+  ]
+}

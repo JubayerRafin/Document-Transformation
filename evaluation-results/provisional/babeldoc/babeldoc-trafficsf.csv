@@ -1,0 +1,2 @@
+experiment,documents,missing_documents,missing_pages,CER_lower_better,WER_lower_better,character_errors,table_detection_F1,table_cell_exact_F1,table_dimensions_recall,figure_detection_F1,figure_matched_mean_IoU,comparison_key
+babeldoc-trafficsf-provisional,1,0,0,0.522737528202557,0.5738125802310655,10426,1.0,0.07194244604316546,0.16666666666666666,0.0,,5cb057f557faa74402121838760447d47e17791a28b48807ef9859c97281a3b9

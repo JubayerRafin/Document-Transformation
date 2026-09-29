@@ -1,0 +1,231 @@
+{
+  "report_version": "1.0",
+  "evaluator_version": "1.0.1",
+  "experiment": "babeldoc-sample03-provisional",
+  "created_at": "2026-09-21T23:22:34.579313+00:00",
+  "dataset_sha256": "dafde4ce53cc2469bbd31dd91632f621e59a7a1bb71279f85e9f10a5790ebd57",
+  "protocol": {
+    "protocol": "extraction-eval-v1",
+    "iou_threshold": 0.5,
+    "text_normalization": "NFKC-collapse-whitespace-case-sensitive",
+    "matching": "maximum-cardinality-iou-priority",
+    "text_scope": "all-text-regions-in-predicted-order-excluding-table-cells",
+    "table_scoring": "exact-normalized-grid-slots-and-dimensions"
+  },
+  "evaluator_sha256": "5b74a29d57bc039453c5f349af9ad86aebef0eb88bbe9bd90ed69226432c2793",
+  "comparison_key": "8dd41edd49422cbdd7cb5ca4a8559ca39d91a484747d541a667a06f2b4d4d736",
+  "configuration": {
+    "backend": "babeldoc",
+    "backend_version": "0.6.4",
+    "settings": {
+      "ocr_engine": "BabelDOC internal parsing/OCR pipeline; no separate OCR engine explicitly configured in this run",
+      "ocr_version": "not explicitly exposed by the CLI run; record installed BabelDOC dependency versions if required",
+      "ocr_weights_sha256": "unavailable: BabelDOC installation did not expose/publish a single OCR-weights checksum for this experiment",
+      "ocr_mode": "BabelDOC default parsing behavior; translation skipped",
+      "languages": [
+        "en"
+      ],
+      "layout_model": "BabelDOC 0.6.4 default layout pipeline",
+      "table_model": "No structured table-cell model output exposed in inspected intermediate table object",
+      "preprocessing": "BabelDOC 0.6.4 default preprocessing; --skip-translation; --no-auto-extract-glossary; --debug. Adapter converts bottom-left PDF coordinates to TransformX top-left coordinates, uses geometric reading order, reconstructs the Sample02 table grid from BabelDOC-positioned table text, and maps non-full-page BabelDOC image forms to figure predictions.",
+      "translation": "skipped",
+      "translation_api_calls": "none observed; BabelDOC log reported 0 prompt and 0 completion tokens",
+      "adapter_notes": [
+        "BabelDOC page_layout exposed a table box but no explicit rows/columns/cells fields.",
+        "The adapter reconstructs a rectangular grid from positioned BabelDOC paragraph text inside the predicted table box without consulting the reference JSON.",
+        "BabelDOC exposed three image forms on Sample02; the adapter maps non-full-page image forms to figures."
+      ]
+    }
+  },
+  "documents_expected": 1,
+  "documents_missing": 0,
+  "counts": {
+    "evaluated_pages": 2,
+    "missing_pages": 0,
+    "character_errors": 1,
+    "reference_characters": 1464,
+    "word_errors": 2,
+    "reference_words": 203,
+    "text_pages": 2,
+    "tables_pages": 2,
+    "tables_tp": 2,
+    "tables_fn": 0,
+    "tables_fp": 0,
+    "tables_iou_sum": 1.8887790991746982,
+    "table_dimensions_correct": 1,
+    "cell_tp": 25,
+    "cell_fn": 35,
+    "cell_fp": 27,
+    "figures_pages": 2,
+    "figures_tp": 4,
+    "figures_fn": 0,
+    "figures_fp": 0,
+    "figures_iou_sum": 3.9999976255161567
+  },
+  "metrics": {
+    "text": {
+      "pages": 2,
+      "cer": 0.0006830601092896175,
+      "wer": 0.009852216748768473,
+      "character_errors": 1,
+      "reference_characters": 1464,
+      "word_errors": 2,
+      "reference_words": 203
+    },
+    "table_cells": {
+      "tp": 25,
+      "fp": 27,
+      "fn": 35,
+      "precision": 0.4807692307692308,
+      "recall": 0.4166666666666667,
+      "f1": 0.44642857142857145
+    },
+    "table_dimensions_recall": 0.5,
+    "tables": {
+      "tp": 2,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 2,
+      "matched_mean_iou": 0.9443895495873491
+    },
+    "figures": {
+      "tp": 4,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "pages": 2,
+      "matched_mean_iou": 0.9999994063790392
+    }
+  },
+  "documents": [
+    {
+      "source_sha256": "fd5acaf08f0c98562a03e112c6ec5afdd33a03de794a2fd9700b2d644af9edcd",
+      "source_name": "Sample03.pdf",
+      "missing_prediction": false,
+      "counts": {
+        "evaluated_pages": 2,
+        "missing_pages": 0,
+        "character_errors": 1,
+        "reference_characters": 1464,
+        "word_errors": 2,
+        "reference_words": 203,
+        "text_pages": 2,
+        "tables_pages": 2,
+        "tables_tp": 2,
+        "tables_fn": 0,
+        "tables_fp": 0,
+        "tables_iou_sum": 1.8887790991746982,
+        "table_dimensions_correct": 1,
+        "cell_tp": 25,
+        "cell_fn": 35,
+        "cell_fp": 27,
+        "figures_pages": 2,
+        "figures_tp": 4,
+        "figures_fn": 0,
+        "figures_fp": 0,
+        "figures_iou_sum": 3.9999976255161567
+      },
+      "pages": [
+        {
+          "page": 1,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 0,
+            "reference_characters": 1292,
+            "word_errors": 0,
+            "reference_words": 177,
+            "reference": "CONFIDENTIAL — Internal Use Only\nEmployee Onboarding Record\nDocument ID: HR-2024-00417 | Classification: Internal\n1. Employee Summary\nThis record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789. Resident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432.\nFields highlighted in this document contain sample PII and must be masked before external distribution.\n2. Personnel Data Table\n3. ID Photo on File\nPlaceholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction.\n4. Notes\nThis paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table — so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution.\nReviewer: Park Ji-hoon Signature date: 2024-03-20 Internal ext.: 04512\n5. Quarterly Performance Review\nPage 1",
+            "prediction": "CONFIDENTIAL — Internal Use Only Employee Onboarding Record Document ID: HR-2024-00417 | Classification: Internal 1. Employee Summary This record documents the onboarding details for Kim Min-jun (Employee ID EMP-2024-8831), joining the Enterprise Solutions team on 2024-03-18. Contact: minjun.kim@example-corp.com, mobile 010-2345-6789. Resident registration number on file: 901231-1******. Emergency contact: Lee Soo-jin, 010-9876-5432. Fields highlighted in this document contain sample PII and must be masked before external distribution. 2. Personnel Data Table 3. ID Photo on File Placeholder ID photo (synthetic, non-personal) — used to verify that embedded images are preserved and left untouched during text-only redaction. 4. Notes This paragraph mixes layout elements deliberately: bolded sensitive tokens, an inline icon above, an embedded photo, and a formatted table — so a redaction pipeline can be tested for (a) correct detection of PII strings such as names, emails, phone numbers, and account numbers; (b) preservation of non-text elements (icons/images) unless explicitly targeted; and (c) retention of table structure and cell formatting after text substitution. Reviewer: Park Ji-hoon Signature date: 2024-03-20 Internal ext.: 04512 5. Quarterly Performance Review Page 1"
+          },
+          "tables": {
+            "matches": [
+              {
+                "reference_id": "p1_table1",
+                "prediction_id": "p1_table1",
+                "iou": 0.95181439115214
+              },
+              {
+                "reference_id": "p1_table2",
+                "prediction_id": "p1_table2",
+                "iou": 0.9369647080225582
+              }
+            ],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [
+              {
+                "reference_id": "p1_figure1",
+                "prediction_id": "p1_figure1",
+                "iou": 0.9999998666666713
+              },
+              {
+                "reference_id": "p1_figure2",
+                "prediction_id": "p1_figure2",
+                "iou": 0.9999984761916292
+              },
+              {
+                "reference_id": "p1_figure3",
+                "prediction_id": "p1_figure3",
+                "iou": 0.9999995283951649
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        },
+        {
+          "page": 2,
+          "missing": false,
+          "tasks": [
+            "text",
+            "tables",
+            "figures"
+          ],
+          "text": {
+            "character_errors": 1,
+            "reference_characters": 172,
+            "word_errors": 2,
+            "reference_words": 26,
+            "reference": "CONFIDENTIAL — Internal Use Only\n6. Approval Signature\nApproved by: Park Ji-hoon (HR Manager, synthetic signature — not a real person's handwriting) Date: 2024-03-20\nPage 2",
+            "prediction": "CONFIDENTIAL — Internal Use Only 6. Approval Signature Approved by: Park Ji-hoon (HR Manager, synthetic signature — not a real person's handwriting) Date: 2024-03- 20 Page 2"
+          },
+          "tables": {
+            "matches": [],
+            "missed": [],
+            "extra": []
+          },
+          "figures": {
+            "matches": [
+              {
+                "reference_id": "p2_figure1",
+                "prediction_id": "p2_figure1",
+                "iou": 0.9999997542626912
+              }
+            ],
+            "missed": [],
+            "extra": []
+          }
+        }
+      ]
+    }
+  ],
+  "notes": [
+    "CER/WER include missing text and are order-sensitive; whitespace and NFKC normalized, case preserved.",
+    "Missing documents/pages count as empty predictions. No overall winner score is calculated.",
+    "Null means undefined or unannotated. Empty-reference text insertions remain in error counts; CER/WER can exceed 1.",
+    "Table scoring checks grid slots and dimensions, not full merged-cell topology/TEDS.",
+    "Figure detection evaluates region boxes, not image fidelity or caption association."
+  ]
+}
