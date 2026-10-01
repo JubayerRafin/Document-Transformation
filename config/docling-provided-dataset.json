@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Sample01.pdf",
+    "sha256": "2feaccc1b4301f7ae4be1675167c3eb7e56cbdf3dcd64286229785480b3d9cfc",
+    "pages": 1
+  },
+  {
+    "name": "Sample02.pdf",
+    "sha256": "684082b44c8c554ac095b31ab6c70d326a4f73fc02bb62fd1adbe68c92dcb772",
+    "pages": 1
+  },
+  {
+    "name": "Sample03.pdf",
+    "sha256": "fd5acaf08f0c98562a03e112c6ec5afdd33a03de794a2fd9700b2d644af9edcd",
+    "pages": 2
+  },
+  {
+    "name": "Sample05.pdf",
+    "sha256": "8aa208293af0bbcfcb72ea137d9349aa8a5e9a34bca19d06a4603305ab26da7b",
+    "pages": 1
+  },
+  {
+    "name": "Sample06.pdf",
+    "sha256": "5715ddb864febb70db3ae1de7023ce6d82a9746c143ec665f3e9231cfdf87012",
+    "pages": 1
+  },
+  {
+    "name": "Sample04.pdf",
+    "sha256": "2ba9ac9c9a42981800f85318d68959cef042b2921445777a963b09734ca14f0d",
+    "pages": 2
+  }
+]

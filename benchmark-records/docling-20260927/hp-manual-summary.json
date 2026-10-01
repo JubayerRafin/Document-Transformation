@@ -1,0 +1,310 @@
+{
+  "source": "hp-e877-series-user-guide.pdf",
+  "source_sha256": "0828f0eaa09fb698998e4a1975a709f75e66b1c7ea70affa151d3c73a63b8ac3",
+  "completed_sections": 25,
+  "completed_pages": 241,
+  "predicted_region_counts": {
+    "text": 4215,
+    "figure": 194,
+    "table": 117
+  },
+  "sum_section_seconds": 3339.156,
+  "warning_count": 211,
+  "missing_assets": [],
+  "sections": [
+    {
+      "start": 1,
+      "end": 10,
+      "pages": 10,
+      "seconds": 172.102,
+      "regions": {
+        "text": 38,
+        "figure": 5
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-82a6fa8b15-1d944786"
+    },
+    {
+      "start": 11,
+      "end": 20,
+      "pages": 10,
+      "seconds": 56.117,
+      "regions": {
+        "text": 150,
+        "figure": 10,
+        "table": 9
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-9362a4b3f5-9dfe7fac"
+    },
+    {
+      "start": 21,
+      "end": 30,
+      "pages": 10,
+      "seconds": 69.286,
+      "regions": {
+        "table": 16,
+        "text": 87,
+        "figure": 2
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-8b24db9228-9dd98d4c"
+    },
+    {
+      "start": 31,
+      "end": 40,
+      "pages": 10,
+      "seconds": 34.288,
+      "regions": {
+        "text": 48,
+        "figure": 13,
+        "table": 7
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-c453c2e131-5f1f0e55"
+    },
+    {
+      "start": 41,
+      "end": 50,
+      "pages": 10,
+      "seconds": 34.345,
+      "regions": {
+        "table": 4,
+        "text": 111,
+        "figure": 14
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-1e652e7fe3-1b517e34"
+    },
+    {
+      "start": 51,
+      "end": 60,
+      "pages": 10,
+      "seconds": 28.683,
+      "regions": {
+        "text": 87,
+        "figure": 22
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-41f2b9f99f-e98dbffb"
+    },
+    {
+      "start": 61,
+      "end": 70,
+      "pages": 10,
+      "seconds": 26.623,
+      "regions": {
+        "text": 259,
+        "figure": 6
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-01f5be57a4-e93e7dd5"
+    },
+    {
+      "start": 71,
+      "end": 80,
+      "pages": 10,
+      "seconds": 38.473,
+      "regions": {
+        "text": 321,
+        "figure": 8,
+        "table": 1
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-3729e38bf4-6662df64"
+    },
+    {
+      "start": 81,
+      "end": 90,
+      "pages": 10,
+      "seconds": 116.538,
+      "regions": {
+        "text": 241,
+        "figure": 4,
+        "table": 11
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-6ab38d02b3-7d2f993f"
+    },
+    {
+      "start": 91,
+      "end": 100,
+      "pages": 10,
+      "seconds": 131.416,
+      "regions": {
+        "text": 459,
+        "figure": 7
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-035d09f67e-ce20f33b"
+    },
+    {
+      "start": 101,
+      "end": 110,
+      "pages": 10,
+      "seconds": 105.442,
+      "regions": {
+        "text": 190,
+        "table": 10,
+        "figure": 4
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-94e718b104-0f2105d5"
+    },
+    {
+      "start": 111,
+      "end": 120,
+      "pages": 10,
+      "seconds": 89.359,
+      "regions": {
+        "text": 232,
+        "figure": 14,
+        "table": 6
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-e932b779e1-df4f2c8f"
+    },
+    {
+      "start": 121,
+      "end": 130,
+      "pages": 10,
+      "seconds": 86.529,
+      "regions": {
+        "text": 125,
+        "figure": 9,
+        "table": 10
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-5aff2c61fd-49aaea95"
+    },
+    {
+      "start": 131,
+      "end": 140,
+      "pages": 10,
+      "seconds": 112.137,
+      "regions": {
+        "table": 9,
+        "text": 225,
+        "figure": 8
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-0621cba2a9-7c7f9668"
+    },
+    {
+      "start": 141,
+      "end": 150,
+      "pages": 10,
+      "seconds": 99.384,
+      "regions": {
+        "table": 13,
+        "text": 134,
+        "figure": 3
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-ee2bc731de-0c79f491"
+    },
+    {
+      "start": 151,
+      "end": 160,
+      "pages": 10,
+      "seconds": 62.752,
+      "regions": {
+        "text": 163,
+        "table": 1,
+        "figure": 9
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-326c71a2cb-db4672bd"
+    },
+    {
+      "start": 161,
+      "end": 170,
+      "pages": 10,
+      "seconds": 51.874,
+      "regions": {
+        "text": 152,
+        "figure": 18,
+        "table": 1
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-eefec18609-87a03463"
+    },
+    {
+      "start": 171,
+      "end": 180,
+      "pages": 10,
+      "seconds": 116.496,
+      "regions": {
+        "text": 298,
+        "figure": 4,
+        "table": 9
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-9fa759896e-10723b09"
+    },
+    {
+      "start": 181,
+      "end": 190,
+      "pages": 10,
+      "seconds": 62.129,
+      "regions": {
+        "text": 167,
+        "figure": 13,
+        "table": 3
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-d9d7d36f26-e885db7e"
+    },
+    {
+      "start": 191,
+      "end": 200,
+      "pages": 10,
+      "seconds": 46.898,
+      "regions": {
+        "text": 182,
+        "figure": 6,
+        "table": 2
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-2af17a90c5-d1cd50fb"
+    },
+    {
+      "start": 201,
+      "end": 210,
+      "pages": 10,
+      "seconds": 43.608,
+      "regions": {
+        "text": 156
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-68070b9b78-1c07cf6e"
+    },
+    {
+      "start": 211,
+      "end": 220,
+      "pages": 10,
+      "seconds": 50.381,
+      "regions": {
+        "text": 130,
+        "table": 2,
+        "figure": 5
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-83bfe07736-62d1a40f"
+    },
+    {
+      "start": 221,
+      "end": 230,
+      "pages": 10,
+      "seconds": 85.263,
+      "regions": {
+        "text": 102,
+        "figure": 6,
+        "table": 2
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-2ddea13abb-b4e24475"
+    },
+    {
+      "start": 231,
+      "end": 240,
+      "pages": 10,
+      "seconds": 1609.953,
+      "regions": {
+        "text": 147,
+        "figure": 4,
+        "table": 1
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-ee896197d9-1a304b87"
+    },
+    {
+      "start": 241,
+      "end": 241,
+      "pages": 1,
+      "seconds": 9.08,
+      "regions": {
+        "text": 11
+      },
+      "run_dir": "experiments/docling-hp-e877-10pages-20260927/docling-310e5e4b92-e3fe2184"
+    }
+  ],
+  "accuracy_evaluated": false,
+  "note": "Section-local page numbers; original page = section start + local page - 1. Initial 50-page attempt failed with std::bad_alloc; all 10-page sections completed."
+}

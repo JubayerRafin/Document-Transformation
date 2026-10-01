@@ -1,0 +1,183 @@
+{
+  "source": "hp-e877-series-user-guide.pdf",
+  "source_sha256": "0828f0eaa09fb698998e4a1975a709f75e66b1c7ea70affa151d3c73a63b8ac3",
+  "total_pages": 241,
+  "page_mapping": "original_page = original_page_start + extracted_page_number - 1",
+  "sections": [
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-001-010.pdf",
+      "original_page_start": 1,
+      "original_page_end": 10,
+      "pages": 10,
+      "sha256": "82a6fa8b157711af2906c9b1d28f01f19c5f0ce0415c728980e628a3e5468e66"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-011-020.pdf",
+      "original_page_start": 11,
+      "original_page_end": 20,
+      "pages": 10,
+      "sha256": "9362a4b3f57af42cfe484a55f3228ec3a894e30e3ffaaed98a19bb42d1321a28"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-021-030.pdf",
+      "original_page_start": 21,
+      "original_page_end": 30,
+      "pages": 10,
+      "sha256": "8b24db922847d0240be1040f99d61e3164889c5b546e8b6a06d328b2c877b0d2"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-031-040.pdf",
+      "original_page_start": 31,
+      "original_page_end": 40,
+      "pages": 10,
+      "sha256": "c453c2e13142ba420e145e68b0f13e31eb819e3010099baf91e3815932948f2f"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-041-050.pdf",
+      "original_page_start": 41,
+      "original_page_end": 50,
+      "pages": 10,
+      "sha256": "1e652e7fe335c8d06540d756fcca18fe908120ea1f915b9a83c82e0d6d30a85d"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-051-060.pdf",
+      "original_page_start": 51,
+      "original_page_end": 60,
+      "pages": 10,
+      "sha256": "41f2b9f99f2d8a10c0a855467e52c1e41d27d1a8d2124e007fa6c26cd4e1d905"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-061-070.pdf",
+      "original_page_start": 61,
+      "original_page_end": 70,
+      "pages": 10,
+      "sha256": "01f5be57a4b2953065c1a1411c2bd9839f545deae995b9e4715a5ca039fe3446"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-071-080.pdf",
+      "original_page_start": 71,
+      "original_page_end": 80,
+      "pages": 10,
+      "sha256": "3729e38bf43eb3687b72090e591511b7bc76190f04227b15a698379d1fc8a1c8"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-081-090.pdf",
+      "original_page_start": 81,
+      "original_page_end": 90,
+      "pages": 10,
+      "sha256": "6ab38d02b3f22e5a6e73ad1d9657b632c433defbc7199fd4137f9c92fc955d5c"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-091-100.pdf",
+      "original_page_start": 91,
+      "original_page_end": 100,
+      "pages": 10,
+      "sha256": "035d09f67eddf7b8f3ef3dd3907664b552d4d4a819cb7946518bb34f8245f519"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-101-110.pdf",
+      "original_page_start": 101,
+      "original_page_end": 110,
+      "pages": 10,
+      "sha256": "94e718b104828cb9fc4b8a195062f2821cd3e9b81f25b0c4eb6a9cd922a0aa94"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-111-120.pdf",
+      "original_page_start": 111,
+      "original_page_end": 120,
+      "pages": 10,
+      "sha256": "e932b779e11386317c29c52e241d9ac633307aad596f97c7e51e74047848861a"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-121-130.pdf",
+      "original_page_start": 121,
+      "original_page_end": 130,
+      "pages": 10,
+      "sha256": "5aff2c61fd47f4dee96be3c4570b075aee6c4ad57545f4cbefd635132dc1608a"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-131-140.pdf",
+      "original_page_start": 131,
+      "original_page_end": 140,
+      "pages": 10,
+      "sha256": "0621cba2a9606726b8c19c8951a0e686e5482922c72a9c77abf773d5c1c4b3b2"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-141-150.pdf",
+      "original_page_start": 141,
+      "original_page_end": 150,
+      "pages": 10,
+      "sha256": "ee2bc731de59ce558ca079f4cd33f8ef717230c5221e29c942e2834ea9fc002d"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-151-160.pdf",
+      "original_page_start": 151,
+      "original_page_end": 160,
+      "pages": 10,
+      "sha256": "326c71a2cbb9897654f4526232629f4b3aa586d6d8578a815604cbb3269871f1"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-161-170.pdf",
+      "original_page_start": 161,
+      "original_page_end": 170,
+      "pages": 10,
+      "sha256": "eefec186094c01e157e965c3d5914b44bb0319577ca3446c43e8e8850e4b1fc8"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-171-180.pdf",
+      "original_page_start": 171,
+      "original_page_end": 180,
+      "pages": 10,
+      "sha256": "9fa759896e558824289d2a685f3e979303352d4af5478870503762ae71a7ecb8"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-181-190.pdf",
+      "original_page_start": 181,
+      "original_page_end": 190,
+      "pages": 10,
+      "sha256": "d9d7d36f26df61c8a021df96841f631a392219fdfd9d306f494def87a35da2f2"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-191-200.pdf",
+      "original_page_start": 191,
+      "original_page_end": 200,
+      "pages": 10,
+      "sha256": "2af17a90c54a4f266e2502b30f1ac318a9341f2e519c6db9a7449baa57c44a18"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-201-210.pdf",
+      "original_page_start": 201,
+      "original_page_end": 210,
+      "pages": 10,
+      "sha256": "68070b9b784fcb4d1d1c5863e667bb7fcd611c13fddb59c78b316a89787e39d7"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-211-220.pdf",
+      "original_page_start": 211,
+      "original_page_end": 220,
+      "pages": 10,
+      "sha256": "83bfe077361863794f12c2ec173c26b9c710abb1f0649f59c082fb974fa9aa99"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-221-230.pdf",
+      "original_page_start": 221,
+      "original_page_end": 230,
+      "pages": 10,
+      "sha256": "2ddea13abbae7239d20af2ea594b9e070012babb0fa80b85e39d91c75e2dac4c"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-231-240.pdf",
+      "original_page_start": 231,
+      "original_page_end": 240,
+      "pages": 10,
+      "sha256": "ee896197d94757600d10969644cc546b90d636bd1ad36bf8248af9cf82f93bea"
+    },
+    {
+      "file": "samples/manual-hp-e877-10pages/hp-e877-pages-241-241.pdf",
+      "original_page_start": 241,
+      "original_page_end": 241,
+      "pages": 1,
+      "sha256": "310e5e4b92e760415b76f3f072e47816b4727e142f5211ac2cefef8090062c54"
+    }
+  ]
+}

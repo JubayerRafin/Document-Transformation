@@ -1,0 +1,119 @@
+{
+  "reference_version": "1.0",
+  "source_name": "Sample01.pdf",
+  "source_sha256": "2feaccc1b4301f7ae4be1675167c3eb7e56cbdf3dcd64286229785480b3d9cfc",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": true,
+  "reviewed_by": "Dong-hyun",
+  "pages": [
+    {
+      "number": 1,
+      "width": 1000.0,
+      "height": 1400.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Asset & Access Report — Scanned JPG Sample\nDocument ID: SEC-2024-0093 | Classification: Internal | Format: flattened JPG (no text layer)\n1. Images with baked-in text\nAll text on this page — including this sentence — is rasterized into the JPEG.\nA plain text-extraction pass will find NOTHING; only OCR can recover it.\nHP ENTERPRISE — STAFF ID\nKim Min-jun\nID: EMP-2024-8831\nTitle: Software Engineer II\nDept: Enterprise Solutions\nIssued: 2024-03-18\nStaff ID badge scan\n!\nCAUTION\nRestricted access area.\nBadge EMP-2024-8831\nauthorized only.\nsecurity@example-corp.com\nFacility warning label\nApp Center — Device Console\nDevice: WPX-0042 Owner: minjun.kim@example-corp.com\nAPI Key: sk_live_4f9a...REDACT_ME\nLast login IP: 172.16.5.114\nScreenshot captured 2024-03-20 09:41 KST\nApp console screenshot\n2. Table with images embedded in cells\nNote: price stickers on photos are baked into the image; List Price column is separate rasterized text.\nGenerated as a synthetic test document. All names, IDs, keys, and figures are fictitious.",
+      "tables": [
+        {
+          "id": "p1_table1",
+          "bbox": [
+            30,
+            504,
+            970,
+            994
+          ],
+          "cells": [
+            [
+              "Photo",
+              "Item",
+              "SKU",
+              "Assigned To",
+              "List Price"
+            ],
+            [
+              "W1.2M LaserJet Pro X1",
+              "LaserJet Pro X1",
+              "SKU-PR-0417",
+              "Kim Min-jun",
+              "KRW 1,200,000"
+            ],
+            [
+              "W2.4M EliteBook 840",
+              "EliteBook 840",
+              "SKU-LT-0982",
+              "Park Ji-hoon",
+              "KRW 2,400,000"
+            ],
+            [
+              "W850K Field Scanner T3",
+              "Field Scanner T3",
+              "SKU-FS-2201",
+              "Lee Soo-jin",
+              "KRW 850,000"
+            ]
+          ]
+        }
+      ],
+      "figures": [
+        {
+          "id": "p1_figure1",
+          "bbox": [
+            30,
+            214,
+            330,
+            402
+          ]
+        },
+        {
+          "id": "p1_figure2",
+          "bbox": [
+            350,
+            214,
+            670,
+            339
+          ]
+        },
+        {
+          "id": "p1_figure3",
+          "bbox": [
+            690,
+            214,
+            970,
+            388
+          ]
+        },
+        {
+          "id": "p1_figure4",
+          "bbox": [
+            40,
+            552,
+            210,
+            681
+          ]
+        },
+        {
+          "id": "p1_figure5",
+          "bbox": [
+            40,
+            703,
+            210,
+            832
+          ]
+        },
+        {
+          "id": "p1_figure6",
+          "bbox": [
+            40,
+            853,
+            210,
+            982
+          ]
+        }
+      ]
+    }
+  ]
+}
