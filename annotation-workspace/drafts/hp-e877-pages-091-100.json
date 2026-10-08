@@ -1,0 +1,169 @@
+{
+  "reference_version": "1.0",
+  "source_name": "hp-e877-pages-091-100.pdf",
+  "source_sha256": "035d09f67eddf7b8f3ef3dd3907664b552d4d4a819cb7946518bb34f8245f519",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 2,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 3,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 4,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 5,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "c. Click Next.\n6. On the Configure Destination Folder dialog, complete the following information:\na. In the UNC Folder Path field, type a folder path where the scan will go.\nThe folder path can either be the fully-qualified domain name (FQDN) or the IP address of the server. Be sure that the folder path (e.g., \\scans) follows the FQDN or IP address.\nFQDN example: \\\\servername.us.companyname.net\\scans\nIP address example: \\\\16.88.20.20\\scans\nNOTE: The FQDN can be more reliable than the IP address. If the server gets its IP address via DHCP, the IP address can change. However, the connection with an IP address might be faster because the printer does not need to use DNS to find the destination server.\nb. From the Authentication Settings drop-down, select one of the following options:\n● Use credentials of user to connect after Sign In at the control panel\n● Always use these credentials\nNOTE: If Always use these credentials is selected, a user name and password must be entered in the corresponding fields, and the printer’s access to the folder must be verified by clicking Verify Access.\nc. In the Windows Domain field, type the Windows domain.\nTIP: To find the Windows domain in Windows 7, click Start, click Control Panel, click System.\nTo find the Windows domain in Windows 8, click Search, enter System in the search box, and then click System.\nThe domain is listed under Computer name, domain, and workgroup settings.\nd. Click Next.\n7. On the Configure File Scan Settings dialog, set the default scanning preferences for the Quick Set, and then click Next.\n8. Review the Summary dialog, and then click Finish.\nMethod two: Use Scan to Network Folder Setup\nThis option enables advanced configuration of the Save to Network Folder feature using the HP Embedded Web Server (EWS) for the printer.\nNOTE: Before you begin: To display the printer's IP address or host name, touch the Information icon , and then touch the Network icon on the printer's control panel.\nStep one: Begin the configuration\nUse the following steps to begin Scan to Network Folder setup.\n1. Click the Scan/Digital Send tab.\n2. In the left navigation pane, click Scan to Network Folder Setup.\n84 Chapter 6 Scan",
+      "tables": [],
+      "figures": [
+        {
+          "id": "p5_figure1",
+          "bbox": [
+            116.6,
+            196.4,
+            127.6,
+            207.4
+          ]
+        },
+        {
+          "id": "p5_figure2",
+          "bbox": [
+            134.6,
+            310.2,
+            145.6,
+            321.2
+          ]
+        },
+        {
+          "id": "p5_figure3",
+          "bbox": [
+            116.6,
+            381.2,
+            126.6,
+            393.2
+          ]
+        },
+        {
+          "id": "p5_figure4",
+          "bbox": [
+            73.4,
+            591.9,
+            84.4,
+            602.9
+          ]
+        },
+        {
+          "id": "p5_figure5",
+          "bbox": [
+            110.6,
+            603.9,
+            122.0,
+            615.3
+          ]
+        },
+        {
+          "id": "p5_figure6",
+          "bbox": [
+            270.5,
+            604.1,
+            281.6,
+            615.1
+          ]
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 7,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 8,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 9,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 10,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    }
+  ]
+}

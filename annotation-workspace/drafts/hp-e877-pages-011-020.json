@@ -1,0 +1,177 @@
+{
+  "reference_version": "1.0",
+  "source_name": "hp-e877-pages-011-020.pdf",
+  "source_sha256": "9362a4b3f57af42cfe484a55f3228ec3a894e30e3ffaaed98a19bb42d1321a28",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 2,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 3,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 4,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Figure 1-6 Printer front view\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\nNOTE: Not shown: A pull-out keyboard is included under the control panel for z models only.\nTable 1-1 Printer front view\nPrinter front view 3",
+      "tables": [
+        {
+          "id": "p4_table1",
+          "bbox": [
+            99.1,
+            491.7,
+            550.6,
+            705.5
+          ],
+          "cells": [
+            [
+              "Item",
+              "Description"
+            ],
+            [
+              "1",
+              "Automatic document feeder cover, for access for clearing jams"
+            ],
+            [
+              "2",
+              "Automatic document feeder input tray"
+            ],
+            [
+              "3",
+              "Automatic document feeder output tray"
+            ],
+            [
+              "4",
+              "Control panel with color touchscreen display (tilts up for easier viewing)"
+            ],
+            [
+              "5",
+              "On/off button"
+            ],
+            [
+              "6",
+              "Right door, for access for clearing jams"
+            ],
+            [
+              "7",
+              "Easy-access USB port\nInsert a USB flash drive for printing or scanning without a computer or to update the printer firmware.\nNOTE: An administrator must enable this port before use."
+            ]
+          ]
+        }
+      ],
+      "figures": [
+        {
+          "id": "p4_figure1",
+          "bbox": [
+            99.87,
+            74.28,
+            425.35,
+            447.68
+          ]
+        },
+        {
+          "id": "p4_figure2",
+          "bbox": [
+            82.8,
+            455.2,
+            93.8,
+            466.2
+          ]
+        }
+      ]
+    },
+    {
+      "number": 5,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 6,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 7,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 8,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 9,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 10,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    }
+  ]
+}
