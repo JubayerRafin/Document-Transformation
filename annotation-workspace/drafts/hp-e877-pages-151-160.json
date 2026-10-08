@@ -1,0 +1,142 @@
+{
+  "reference_version": "1.0",
+  "source_name": "hp-e877-pages-151-160.pdf",
+  "source_sha256": "326c71a2cbb9897654f4526232629f4b3aa586d6d8578a815604cbb3269871f1",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 2,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 3,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 4,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 5,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 6,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 7,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 8,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 9,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 10,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Figure 9-6 Stack-height markings\nFigure 9-7 Tab for the paper stack\n6. Make sure the paper guides in the tray are adjusted correctly for the size of paper. Adjust the guides to the appropriate indentation in the tray. The arrow on the tray guide should line up exactly with the marking on the tray.\nNOTE: Do not adjust the paper guides tightly against the paper stack. Adjust them to the indentations or markings in the tray.\nThe following images show examples of the paper-size indentations in the trays for various printers. Most HP printers have markings similar to these.\nThe printer picks up multiple sheets of paper 149",
+      "tables": [],
+      "figures": [
+        {
+          "id": "p10_figure1",
+          "bbox": [
+            117.25,
+            74.75,
+            450.5,
+            331.5
+          ]
+        },
+        {
+          "id": "p10_figure2",
+          "bbox": [
+            117.25,
+            359.5,
+            411.0,
+            563.5
+          ]
+        },
+        {
+          "id": "p10_figure3",
+          "bbox": [
+            100.8,
+            624.8,
+            111.8,
+            635.8
+          ]
+        }
+      ]
+    }
+  ]
+}

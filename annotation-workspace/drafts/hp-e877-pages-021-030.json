@@ -1,0 +1,181 @@
+{
+  "reference_version": "1.0",
+  "source_name": "hp-e877-pages-021-030.pdf",
+  "source_sha256": "8b24db922847d0240be1040f99d61e3164889c5b546e8b6a06d328b2c877b0d2",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Table 1-7 Scan specifications\nCopy specifications\nLearn about the copy specifications.\nTable 1-8 Copy specifications\n10 Chapter 1 Printer overview",
+      "tables": [
+        {
+          "id": "p1_table1",
+          "bbox": [
+            89.75,
+            73.81,
+            541.24,
+            483.26
+          ],
+          "cells": [
+            [
+              "Item",
+              "Specification"
+            ],
+            [
+              "Scan Speed (normal, A4)",
+              "E877/E826 dn models ADF: Simplex 90 ipm / Duplex 180 ipm\nE877/E826 z models ADF: Simplex 150 ipm / Duplex 300 ipm"
+            ],
+            [
+              "Input capacity",
+              "E877/E826 dn models ADF: 75 gsm / 200 sheets\nE877/E826 z models ADF: 75 gsm / 300 sheets"
+            ],
+            [
+              "Grayscale Levels",
+              "256"
+            ],
+            [
+              "Scan File Format",
+              "Digital Send: Hi-Compression PDF, PDF, JPEG, TIFF, MTIFF, XPS, PDF/A\nScan to easy access USB: Hi-Compression PDF, PDF, JPEG, TIFF, MTIFF, XPS, PDF/A\nPrint from easy access USB: PDF, PS, JPEG, TIFF, PNG, Print Ready files (.prn, .pcl, .cht)"
+            ],
+            [
+              "Scan Size Maximum",
+              "ADF:\n297 x 437 mm (11.7 x 17.2 in)\nFlatbed:\n297 x 437 mm (11.7 x 17.2 in)"
+            ],
+            [
+              "Scan Size Minimum",
+              "ADF:\n148 x 210 mm (5.5 x 8.5 in)"
+            ],
+            [
+              "Standard Media Size",
+              "ADF:\nLegal, Oficio, Executive, Statement, Ledger, A3, A4, A4R, A5, B4, B5, 16K\n● Width: 148 - 297 mm (5.8 - 11.7 in)\n● Length: 148 - 432 mm (5.8 - 17 in)"
+            ],
+            [
+              "Media Weights",
+              "ADF:\n● Simplex: 60 to 128 g/m² (16 to 28 lb)\n● Duplex: 60 to 128 g/m² (16 to 28 lb)"
+            ]
+          ]
+        },
+        {
+          "id": "p1_table2",
+          "bbox": [
+            89.75,
+            563.65,
+            541.24,
+            658.65
+          ],
+          "cells": [
+            [
+              "Item",
+              "Specification"
+            ],
+            [
+              "Copy Speed (Normal, A4, default rate from flatbed or ADF)",
+              "E87740 base: 40 cpm\nE87750: 50 cpm\nE87760: 60 cpm\nE87770: 70 cpm"
+            ]
+          ]
+        }
+      ],
+      "figures": []
+    },
+    {
+      "number": 2,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 3,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 4,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 5,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 6,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 7,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 8,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 9,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 10,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    }
+  ]
+}
