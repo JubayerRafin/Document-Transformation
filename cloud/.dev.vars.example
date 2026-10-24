@@ -1,0 +1,3 @@
+# Copy to .dev.vars for local development only. This file has no real secrets.
+# Cloud deployment: npx wrangler secret put SUPABASE_SECRET_KEY
+SUPABASE_SECRET_KEY=replace-with-supabase-secret-key

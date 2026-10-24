@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" fill="none">
+<defs>
+ <linearGradient id="paper" x1="23" y1="10" x2="76" y2="86" gradientUnits="userSpaceOnUse"><stop stop-color="#EFFAFF"/><stop offset=".48" stop-color="#78D8F7"/><stop offset="1" stop-color="#007FB7"/></linearGradient>
+ <linearGradient id="ribbon" x1="11" y1="85" x2="82" y2="27" gradientUnits="userSpaceOnUse"><stop stop-color="#60E5F0"/><stop offset=".5" stop-color="#0096D6"/><stop offset="1" stop-color="#0077B5"/></linearGradient>
+</defs>
+<path d="M9 28Q7 23 13 23H32L62 80H43Q39 80 37 76Z" fill="#007CB3" opacity=".45"/>
+<path d="M21 10H39Q44 10 47 15L80 80Q83 86 76 86H61Q55 86 52 80L16 17Q13 10 21 10Z" fill="url(#paper)"/>
+<path d="M39 10L49 29H43Q36 29 36 22V10Z" fill="#DFF8FF"/>
+<path d="M24 31H37M28 40H42M33 49H46" stroke="#126C9B" stroke-width="3" stroke-linecap="round"/>
+<path d="M10 80L60 29Q64 25 70 25H85L37 81Q33 86 26 86H13Q6 86 10 80Z" fill="url(#ribbon)"/>
+<path d="M17 80L62 33" stroke="#A1F1FA" stroke-opacity=".55" stroke-width="1.5" stroke-linecap="round"/>
+<rect x="77" y="12" width="9" height="9" rx="2" fill="#43C8F3"/>
+<rect x="89" y="3" width="7" height="7" rx="1.6" fill="#0096D6"/>
+<rect x="90" y="18" width="6" height="6" rx="1.4" fill="#79E7ED"/>
+</svg>

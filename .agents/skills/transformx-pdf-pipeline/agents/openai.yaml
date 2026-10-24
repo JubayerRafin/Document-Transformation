@@ -1,0 +1,4 @@
+interface:
+  display_name: "TransformX PDF Pipeline"
+  short_description: "Trace PDF extraction, OCR routing and IR handoffs"
+  default_prompt: "Use $transformx-pdf-pipeline for this TransformX task and validate against the current repository."

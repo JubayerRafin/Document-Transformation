@@ -1,0 +1,4 @@
+interface:
+  display_name: "TransformX PII Audit"
+  short_description: "Audit PII detection and final-document redaction"
+  default_prompt: "Use $transformx-pii-audit for this TransformX task and validate against the current repository."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "TransformX Reconstruction QA"
+  short_description: "Check PDF layout, figures, tables and fitting"
+  default_prompt: "Use $transformx-reconstruction-qa for this TransformX task and validate against the current repository."

@@ -1,0 +1,43 @@
+{
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    ".venv": true,
+    ".venv-*": true,
+    ".local": true,
+    ".chart-data-*": true,
+    "Microsoft": true,
+    "runs": true,
+    "output": true,
+    "outputs": true,
+    "experiments": true,
+    "evaluation-results": true,
+    "review-output": true,
+    "frontend/node_modules": true,
+    "frontend/.next": true,
+    "frontend/out": true,
+    "cloud/node_modules": true,
+    "cloud/.wrangler": true,
+    "cloud/generated": true,
+    "cloud/public": true
+  },
+  "search.exclude": {
+    "**/.venv*/**": true,
+    "**/node_modules/**": true,
+    "**/__pycache__/**": true,
+    ".local/**": true,
+    "runs/**": true,
+    "output/**": true,
+    "outputs/**": true,
+    "experiments/**": true,
+    "evaluation-results/**": true,
+    "review-output/**": true,
+    ".chart-data-*/**": true,
+    "Microsoft/**": true,
+    "frontend/.next/**": true,
+    "frontend/out/**": true,
+    "cloud/.wrangler/**": true,
+    "cloud/generated/**": true,
+    "cloud/public/**": true
+  }
+}

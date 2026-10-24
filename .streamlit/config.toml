@@ -2,6 +2,8 @@
 address = "127.0.0.1"
 maxUploadSize = 50
 headless = true
+fileWatcherType = "poll"
+runOnSave = true
 
 [browser]
 gatherUsageStats = false

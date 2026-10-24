@@ -1,0 +1,332 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "TransformX proposed backend API",
+    "version": "0.1.0-proposal",
+    "description": "Handoff contract only; no server is implemented."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/v1/jobs": {
+      "post": {
+        "operationId": "submitJob",
+        "description": "PROPOSED. Parse options JSON using Options and validate operation dependent fields; enforce owner and upload limits.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "options"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "options": {
+                    "type": "string",
+                    "description": "JSON serialized Options object."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Job state; filter paths and private diagnostics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid file or options"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "413": {
+            "description": "Upload exceeds configured limit"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "getJob",
+        "responses": {
+          "200": {
+            "description": "Job state; filter paths and private diagnostics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible job"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/events": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "streamJobEvents",
+        "description": "Persisted SSE events; authorize access and support Last-Event-ID replay.",
+        "responses": {
+          "200": {
+            "description": "Progress stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible job"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/cancel": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "post": {
+        "operationId": "cancelJob",
+        "description": "202 acknowledges request, not completed cancellation.",
+        "responses": {
+          "202": {
+            "description": "Job state; filter paths and private diagnostics.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Job"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already terminal"
+          },
+          "404": {
+            "description": "Missing or inaccessible job"
+          }
+        }
+      }
+    },
+    "/v1/jobs/{job_id}/artifacts/{artifact_id}": {
+      "parameters": [
+        {
+          "name": "job_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "artifact_id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "get": {
+        "operationId": "downloadArtifact",
+        "responses": {
+          "200": {
+            "description": "Authorized artifact stream",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Missing or inaccessible artifact"
+          }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "operationId": "liveness",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API process alive; not a model readiness check"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Options": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "operation"
+        ],
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": [
+              "translation",
+              "pii",
+              "combined"
+            ]
+          },
+          "source_language": {
+            "type": "string",
+            "default": "en"
+          },
+          "target_language": {
+            "type": "string"
+          },
+          "output_format": {
+            "type": "string",
+            "enum": [
+              "pdf",
+              "docx",
+              "pptx"
+            ]
+          },
+          "protected_values": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "document_context": {
+            "type": "string",
+            "maxLength": 8000
+          },
+          "pii_categories": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "Email addresses",
+                "Phone numbers",
+                "Names",
+                "Addresses",
+                "Identifiers",
+                "Bank accounts"
+              ]
+            }
+          }
+        }
+      },
+      "Job": {
+        "type": "object",
+        "required": [
+          "job_id",
+          "status",
+          "review_status"
+        ],
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "cancelling",
+              "cancelled",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "review_status": {
+            "type": "string",
+            "enum": [
+              "not_reviewed",
+              "requires_review",
+              "accepted",
+              "requires_revision"
+            ]
+          },
+          "stage": {
+            "type": "string"
+          },
+          "elapsed_seconds": {
+            "type": "number"
+          },
+          "artifact_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "error_code": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

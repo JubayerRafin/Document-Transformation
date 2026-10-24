@@ -1,0 +1,98 @@
+Quality hardening checkpoint — 2026-10-18
+========================================
+
+The full dataset/GPU run has NOT started. Previous runs and annotations remain
+unchanged. This checkpoint implements generalized policies and checks them with
+synthetic cases, package/engine tests and saved-source replays.
+
+1. Small image text
+   Source-relative OCR font fitting measures glyph components in native-density
+   source clips. Default floor: 8 pt. Detailed, confidently recognized sources can
+   use an estimated-source-relative floor (85 percent, absolute minimum 4 pt).
+   Actual rendered glyphs must fit the proven clear box. Neighbors, borders and
+   nonuniform artwork still block replacement. Font exceptions are scoped to the
+   verified OCR region in BabelDOC fitting and independent validation.
+   This does not promise that every small or colored label can be translated.
+
+2. Name/ID associations
+   Explicit source field/value bindings and parenthetical entity/identifier pairs
+   are checked separately from exact literal counts. Positive contradictions
+   cause a bounded TranslateGemma retry and then a failed, unapproved result.
+   Relationship hints are source data in the prompt. Unknown labels and grammar
+   remain unclassified; the check is not general semantic certification.
+   Offline replay rejects the actual bad Sample02 relationship from the baseline.
+
+3. Sensitive OCR literals
+   Digits, identifiers, email/token-like strings and currency glyphs require a
+   second recognizer. Two rescaled copies from one recognizer are insufficient.
+   Strong conflicting case, digit or punctuation readings remain review items.
+   Base confidence thresholds are unchanged. Calls remain bounded. OCR profiles
+   are hashed into cache keys, so earlier decisions are not silently reused.
+   More honest review flags and additional recognition time are possible.
+
+4. Terminology
+   One typed glossary reaches native PDF, OCR, figure and styled Office workers.
+   Configured terms take precedence. Exact model names may be preserved from
+   explicit Product/Model columns, or Item columns supported by SKU metadata.
+   Generic descriptions and arbitrary digit-bearing prose are not a glossary.
+   A glossary cannot authorize changing protected values or identifiers.
+
+5. Fragmented extraction
+   Short continuations can be regrouped only inside the same source PDF text
+   block with matching source character inventory. Tables, separate fields,
+   real formulas and ambiguous content are not flattened. Original region IDs,
+   style/glyph data and grouping provenance are retained. The actual source IR
+   used for translation and its external mapping are saved after this step.
+
+6. Dates and structured literals
+   Source-proven split dates are joined before translation, including rich
+   character groups. Dates, timestamps and structured literals are indivisible
+   during wrapping; textual formula characters participate in that check.
+   This addresses the actual saved signature-date split at source-unit level.
+
+7. Layout warnings
+   Figure reconstruction records actual translated text placements in page
+   coordinates. Independent validation labels exact matching image/text overlaps
+   as intended placements requiring review. Raw flags remain visible; intended
+   placement is not proof of visual correctness or automatic acceptance.
+
+8. Evaluation
+   tools/evaluation/ocr_ground_truth.py prepares unreviewed reference templates
+   and computes case/punctuation-sensitive CER and whitespace-token WER only
+   after explicit reviewer confirmation. References are frozen to source hashes
+   and region geometry, not model predictions. Missing references are not scores.
+   These metrics are conditional on detected lines. Undetected text, reading
+   order, tables and image detection require independent complete annotations.
+   Existing IoU/SSIM, semantic translation and preservation records remain useful
+   separate checks. Do not combine them into an invented overall accuracy score.
+
+Validation and remaining limits
+-------------------------------
+Read runs/validation-fixes/quality-policies-20261018/readiness/report.html for the
+test inventory, exact code fingerprint, evidence replays and blocked checks.
+Native Word/PowerPoint conversion tests were attempted separately; four subcases
+hit Windows COM E_ACCESSDENIED. They are not counted as passed. Package/styled-run
+tests run locally; real Office rendering needs an authorized desktop renderer or
+the backend's headless Office conversion environment.
+
+Next full run — after the checkpoint is reviewed
+------------------------------------------------
+1. Verify the current pod connection, server dependencies, model tag/quantization
+   and full GPU placement. Keep hardware/settings comparable to the baseline.
+2. Use configs/evaluation-quality-hardening-20261018.local.json. It registers the
+   same six frozen source files and writes to a separate output root:
+   runs/dataset-evaluation/quality-hardening-20261018-v1
+3. Run all six translation jobs sequentially. Retain rejected candidates, source
+   grouping, terminology, OCR source evidence, font policies and execution logs.
+4. Check generation, page dimensions, source coverage, role associations, exact
+   values, glyph containment, artwork preservation and intentional-overlay flags.
+   Review every changed page; compare PDF by PDF against the frozen baseline.
+5. Prepare/review OCR references from the new evidence and score CER/WER. Complete
+   independent layout/reference annotations before claiming benchmark accuracy.
+6. Measure runtime under named cache conditions. New OCR verification adds work;
+   separate recognition overhead from extraction, translation and reconstruction.
+7. Keep new results unapproved until semantic and visual findings are resolved.
+   PII and backend deployment remain separate workstreams.
+
+The dataset command is intentionally not launched at this checkpoint:
+python -m tools.evaluation.dataset run --config configs/evaluation-quality-hardening-20261018.local.json --phase translation
