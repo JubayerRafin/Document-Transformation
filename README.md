@@ -1,133 +1,82 @@
-# Document Transformation
+# TransformX
 
-A working extraction-first capstone foundation: run a whole-document backend, inspect text/tables/figures together, and export one intermediate representation (IR).
+Document translation, PII redaction and PDF reconstruction, with a customer web app and an internal Studio.
 
-**Shared evaluation is now available.** Follow `docs/EVALUATION.md`: create human-reviewed references, run one baseline, let teammates import other tools' normalized output, and score every experiment with the same command. `docs/PREDICTION_FORMAT.md` defines the adapter contract. No new model installation is needed to evaluate existing predictions.
+## Start here
 
-This is a standalone companion prototype for Deep Doc Extractor. It does not modify the upstream repository or implement translation, redaction, or document reconstruction yet. Those features follow after the extraction baseline is selected.
+- **Understand the code:** [repository layout](docs/REPOSITORY_LAYOUT.md).
+- **Choose a setup or evaluation guide:** [documentation index](docs/README.md).
+- **Run the customer app:** [frontend setup](docs/CUSTOMER_FRONTEND.md).
+- **Connect a processing server:** [private GPU workers](docs/PRIVATE_GPU_WORKERS.md).
+- **Contribute changes:** [contribution guide](CONTRIBUTING.md).
 
-This repository includes Sample02, its reviewed reference, saved Docling predictions, and evaluation reports. Follow docs/TEAM_START.md to reproduce the baseline or submit another tool. See `docs/VALIDATION.md` for measured execution results, `docs/ARCHITECTURE.md` for the Python flow, and `docs/TEAM_START.md` for the first team sprint.
+## What runs where
 
-## Start the application
-
-On the current machine, Python and the application dependencies are already installed:
-
-```powershell
-python -m streamlit run app.py
-```
-
-Run this from this project folder. Open http://127.0.0.1:8501 in your browser. The app binds only to localhost. Choose a saved run or upload a PDF. Native extraction needs no model downloads.
-
-On another machine, create an isolated environment first (Python 3.12 is a conservative starting point; this project was exercised on Python 3.14.3):
-
-```powershell
-python -m venv .venv
-.venv\Scripts\python -m pip install -r requirements.txt
-.venv\Scripts\python -m streamlit run app.py
-```
-
-## What runs together
-
-```text
-PDF validation
-  -> selected whole-document backend (PyMuPDF OR Docling)
-  -> shared IR
-  -> reconcile overlaps and validate geometry
-  -> page previews + figure/table crops
-  -> document.json + manifest.json
-  -> inspect, save team findings, compare runs, download
-```
-
-`extraction/pipeline.py` owns this sequence. Each backend receives the same PDF and returns a `Document`. You do not independently run text, table, and image extraction as unrelated applications.
-
-## Backends
-
-| Backend | Included functionality | Important limits |
+| Component | Location | Responsibility |
 |---|---|---|
-| `native` / PyMuPDF | Native text with word boxes, ruled tables, raster occurrences, source-page previews | No OCR; no semantic figure detector; vector graphics appear in previews but are not separately extracted; reading order is geometric |
-| `docling` | Joint layout, text/OCR, table structure and picture extraction; native output retained | Requires local model weights; exact typography is not preserved; geometry mismatches fail visibly |
+| Customer interface | `frontend/` | Next.js static export, React, TypeScript, Tailwind, Radix/shadcn components, Motion and GSAP |
+| Hosted API and Studio | `cloud/` | Cloudflare Worker API, static assets and Studio UI overrides |
+| Authentication and persistence | `supabase/` | PostgreSQL migrations, Auth roles and private Storage permissions |
+| Processing agent | `tools/service/cloud_worker.py` | Claims jobs and runs the engine on the processing server |
+| Document engine | `transformation/`, `extraction/` | Shared IR, translation, PII checks, OCR and reconstruction |
+| Local API and prototype | `backend/`, `ui/` | Separate FastAPI service and Streamlit workflow |
+| Evaluation | `evaluation/`, `tools/evaluation/`, `tests/` | References, metrics and regression checks |
 
-Native results identify full-page raster occurrences separately from figures. A scanned page producing zero text is flagged as needing OCR, not counted as successful text recognition. Embedded raster occurrences are not equivalent to complete diagrams or figures.
+The hosted site sends jobs to a connected processing worker. Ollama and PaddleOCR inference run on that worker's GPU; parsing, layout and file operations use its CPU. Cloudflare does not execute the Python PDF engine. Local FastAPI defaults to SQLite; the hosted application uses Supabase PostgreSQL. These are separate deployment routes.
 
-### Docling local setup
+The defaults are TranslateGemma 12B for translation and Qwen 3.5 9B for PII assistance. BabelDOC reconstructs PDFs. Models, credentials, private documents and results are not distributed with the source code. A generated output requires review; it is not automatic translation or privacy approval.
 
-```powershell
-python -m pip install -r requirements-docling.txt
-docling-tools models download
+## Web development
+
+Use the Node version supported by the pinned Next.js dependencies, and Python 3.11 for the existing engine environments.
+
+```sh
+npm --prefix frontend ci
+npm --prefix cloud ci
+npm --prefix frontend run typecheck
+npm --prefix frontend test
+npm --prefix cloud test
 ```
 
-Model setup requires internet and disk space; document processing does not enable remote model services. The app sets Hugging Face offline mode and uses existing caches or a supplied artifacts folder. RapidOCR requires the exact detection, recognition and classification ONNX model files pinned in `config/ocr-models.json`. Supply their folder in the sidebar or `--ocr-model-dir`. If omitted, the application checks the installed RapidOCR `models` folder. Every OCR-enabled run verifies SHA-256 checksums before initializing OCR; missing or different weights stop extraction. The manifest records the profile, model filenames and verified hashes, configuration hash, and OCR engine/runtime versions. Extra model files in the folder are ignored. Do not assume disabling Docling OCR removes the need for layout/table models.
+Cloud tests build the customer export and Studio before testing the Worker. They do not submit GPU jobs. For the integrated local web preview:
 
-For another OCR experiment, deliberately change and version `config/ocr-models.json` with the selected filenames, verified checksums and a distinct profile name. Teammates comparing the same configuration should use the same config file and model weights. These hashes identify the currently installed baseline files; they are not independent publisher authenticity verification. Historical runs retain their original metadata and are not retroactively checksum-verified. This change pins OCR weights only; layout/table weights and the full environment are not yet locked.
-
-Supported OCR language coverage depends on the supplied recognition model. Evaluate your agreed language pair before claiming multilingual support.
-
-The tested package versions are pinned for the main extraction tools. Code and model licenses differ across tools; review their actual terms before redistributing a deployment. PyMuPDF has AGPL/commercial licensing; this project does not relicense its dependencies.
-
-## Command-line extraction and comparison
-
-```powershell
-python main.py extract samples\example.pdf --backend native
-python main.py extract samples\example.pdf --backend docling
-python main.py extract samples\example.pdf --backend docling --no-ocr
-python main.py benchmark samples --backends native docling --output runs
-python -m unittest discover -s tests -v
+```sh
+npm --prefix cloud run dev
 ```
 
-The benchmark writes `benchmark.csv` plus independent run folders. A failed backend does not stop other comparisons; the command exits nonzero if any run failed. Each row describes a separate run, with runtime including conversion, IR work, and preview/crop creation. Model initialization is included; this is not a controlled performance benchmark.
+`npm --prefix frontend run dev` starts the separate Next development server; authenticated processing still needs a configured API. `npm --prefix cloud run deploy` publishes to Cloudflare, so use it only for an intentional deployment.
 
-**Extraction counts are diagnostics, not accuracy scores.** Different tools use different region granularity. The separate `evaluate` command now computes text, table and figure metrics against reviewed references. Real sample annotation remains required; no scores against unreviewed sample answers are claimed.
+## Python environments
 
-## Outputs and privacy
+Keep the existing dependency boundaries separate:
 
-```text
-runs/<backend>-<source-hash>-<unique-run>/
-  document.json          # Unified IR
-  manifest.json          # Tool version, settings, time, counts, status
-  native-docling.json    # Original Docling output when that backend is used
-  reviews.json           # Team observations, when saved
-  assets/
-    page-1.png           # Original page preview
-    p1_r3.png            # Table/figure/raster region crop
+| Requirements | Environment |
+|---|---|
+| `requirements.txt` | Extraction lab / Streamlit prototype |
+| `requirements-backend.txt` | Local FastAPI service |
+| `requirements-transformation.txt` | Pinned BabelDOC worker |
+| `requirements-deep-doc.txt` | Shared extraction integration |
+| `requirements-docling.txt` | Earlier Docling lab |
+| `requirements-evaluation.txt` | Translation and layout metrics |
+
+GPU Paddle packages must match the server and driver. Follow the [server guide](docs/SERVER_EXECUTION.txt) rather than combining every requirements file into one environment. No GPU rental or model inference is required to inspect the code or run mocked unit tests.
+
+For the local API after installing backend requirements:
+
+```sh
+python -m uvicorn backend.api:create_app --factory --host 127.0.0.1 --port 8000
 ```
 
-Uploads are stored locally under content hashes in `uploads/`. Extraction archives contain original document content; they are not redacted. Runs, uploads, and models are ignored by Git. Remove local runs/uploads when no longer needed. This local research app has no authentication or multi-user scheduling and should not be exposed as a public service.
+On an already configured Windows checkout, `Start TransformX Web.cmd` starts the local web API, `Start TransformX.cmd` starts Streamlit, and `Start Lab.cmd` starts the earlier extraction lab. The [archived Streamlit guide](docs/archive/STREAMLIT_GUIDE.md) retains the earlier walkthrough.
 
-Documents are untrusted input data. No document text is executed or interpreted as instructions, prompts, paths, or configuration.
+## Source, configuration and local evidence
 
-## IR contract
+Runtime modules keep their current paths so imports, launchers, builds and saved manifests stay compatible. The editor groups the project by hiding generated directories; disable individual `files.exclude` entries in `.vscode/settings.json` to browse local evidence.
 
-- One-based page numbers; stable region IDs within a fixed backend/version/configuration.
-- All region boxes use displayed-page coordinates in PDF points, with a top-left origin.
-- `bbox = [left, top, right, bottom]`; page dimensions match the rendered preview.
-- Kinds: `text`, `table`, `figure`, `raster_page`.
-- Table cells are preserved separately from body text. Native table assignment happens at word level.
-- Native text metadata keeps word geometry; Docling metadata keeps the original item, including cell spans and provenance.
-- Text/figure overlap is retained as a relationship. Uncertain text/table overlap is flagged rather than deleted.
-- The adapter is intentionally minimal. Detailed typography, character-level redaction geometry, caption inference and reconstruction need further engineering.
+- Commit source, tests, migrations, lockfiles, documentation and example configuration.
+- Keep credentials and machine paths in ignored `*.local.json` / `.env` files. See [configuration](configs/README.md).
+- Keep `runs/`, `output/`, `outputs/`, `experiments/`, `evaluation-results/` and `review-output/` locally. No existing results are deleted by the Git cleanup.
+- Earlier experiment files remain recoverable from prior Git commits. New private run evidence should not be added to source commits.
+- Keep only deliberately reviewed fixtures under `samples/` and `references/`; do not place arbitrary uploads there.
 
-## Team ownership
-
-| Owner | Tool | Current task |
-|---|---|---|
-| Jubayer | Docling | Baseline, shared evaluator and integration |
-| Nahid | BabelDOC | Parsing/intermediate extraction feasibility |
-| Mashrur | Marker | Whole-document extraction and adapter |
-| Hyun | PaddleOCR PP-StructureV3 | Whole-document extraction and adapter |
-
-Every tool handles text, tables and figures together. Other tools run separately and import their normalized output; they are not yet built-in backends. See [team setup and submission instructions](docs/TEAM_START.md).
-
-Streamlit discovers completed visual-review runs recursively under both `runs/` and `experiments/`. Imported predictions without manifests/previews can still be scored using the CLI.
-
-## Next engineering milestones
-
-1. Annotate a shared evaluation set and choose the baseline using evidence.
-2. Add targeted extraction improvements and test them against the unchanged baseline.
-3. Add reviewed translation/redaction transformations over the IR.
-4. Reconstruct PDFs and evaluate layout, translation quality and actual redaction removal.
-
-Official references: [Docling](https://docling-project.github.io/docling/), [Docling offline options](https://docling-project.github.io/docling/usage/advanced_options/), [PyMuPDF coordinates and page operations](https://pymupdf.readthedocs.io/en/latest/page.html).
-
-## PaddleOCR experiment
-
-See [PaddleOCR reproduction and limitations](docs/PADDLEOCR.md) for the submitted Sample02 experiment, adapter commands, and coordinate caveats.
+For persistent GPU OCR, fresh-result benchmark settings and their limits, see [OCR session experiments](docs/OCR_SESSION_EXPERIMENT.txt). Local evidence identifies what was actually deployed; a source checkout alone does not prove live service configuration.

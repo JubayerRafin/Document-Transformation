@@ -1,0 +1,33 @@
+{
+  "output_root": "runs/dataset-evaluation/gpu-baseline-v1",
+  "source_language": "en",
+  "targets": [
+    "ko"
+  ],
+  "translation_model": "translategemma:12b",
+  "pii_model": "qwen3.5:9b",
+  "endpoint": "http://127.0.0.1:11435/v1",
+  "babeldoc_python": "ABSOLUTE_PATH_TO_BABELDOC_PYTHON",
+  "timeout_seconds": 3600,
+  "pii_categories": [
+    "Email addresses",
+    "Phone numbers",
+    "Names",
+    "Addresses",
+    "Identifiers",
+    "Bank accounts"
+  ],
+  "ocr_remote": {
+    "host": "",
+    "port": 22,
+    "key": "ABSOLUTE_PATH_TO_PRIVATE_KEY"
+  },
+  "documents": [
+    {
+      "id": "document-1",
+      "path": "ABSOLUTE_PATH_TO_PDF",
+      "protected_values": [],
+      "document_context": ""
+    }
+  ]
+}

@@ -8,3 +8,60 @@ models/
 experiments/
 evaluation-results/
 .streamlit/secrets.toml
+configs/*.local.json
+cloud/.dev.vars
+cloud/node_modules/
+cloud/.wrangler/
+cloud/public/
+*.worker.local.json
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/*.tsbuildinfo
+output/playwright/
+
+# Generated customer frontend CSP hashes (rebuilt before cloud tests/deploy)
+cloud/generated/
+
+# Local evidence and scratch work. Existing tracked evidence is migrated out of
+# the index on the organization branch, while its files and history are retained.
+.local/
+output/
+outputs/
+review-output/
+.chart-data-*/
+Microsoft/
+
+# Secrets and host-specific state; commit example templates instead.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local.json
+*.local.toml
+*.local.yaml
+*.local.yml
+*.pem
+*.key
+id_ed25519*
+id_rsa*
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.log
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+coverage/
+
+# Per-project administrator bootstrap; share only the editable example.
+supabase/bootstrap-admin.sql

@@ -1,0 +1,21 @@
+Start with transform_app.py, ui/transformx.py and transformation/pipeline.py. Production code is already grouped by responsibility. This handoff preserves imports and frozen runs; it adds navigation and portable packaging rather than relocating live modules during evaluation.
+
+Path | Responsibility
+transform_app.py and ui/ | Current Streamlit application and workflow controls
+transformation/workflows.py | Independent run_translation and run_pii entry points
+transformation/pipeline.py | Shared orchestration and PDF redact_pdf implementation
+extraction/coordinator.py | Extraction routing and content IR conversion
+extraction/deep_doc_adapter.py | Adapt prior Stage 1 methods and select guarded candidates
+extraction/deep_doc_stage1/ | Prior extraction algorithms retained with provenance
+extraction/figures.py | Render and mask figure candidates and assets
+transformation/ocr/ and tools/ocr/ | Local or remote Paddle workers and OCR evidence
+transformation/llm/ | Ollama transport, translation adapters and protected text
+transformation/validation/privacy.py | PII category policy and exact span detection
+transformation/validation/privacy_verification.py | Fresh OCR checks on rendered output
+transformation/pdf/ and layout/ | BabelDOC integration, scan and fitting logic
+transformation/office/ | Native DOCX and PPTX routes requiring separate evaluation
+tools/evaluation/ | Batch registry, review bundles, scoring and comparisons
+tools/gpu/ and tools/handoff/ | Pod setup and portable team initialization
+tests/ | Regression tests and synthetic fixtures
+
+app.py, main.py, extraction/pipeline.py and the evaluation/ folder also support the earlier extraction lab. They are retained for reproducibility. They are not the current Streamlit translation entry point. docs/TEAM_START.md and docs/ARCHITECTURE.md describe that earlier milestone; use this report for the current PII handoff.

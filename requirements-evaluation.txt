@@ -1,0 +1,9 @@
+# Install in a separate evaluation environment; do not modify BabelDOC's environment.
+# Core offline review/CER/WER reporting uses existing project dependencies.
+# Optional neural translation metrics (CPU by default; GPU execution is explicit):
+unbabel-comet>=2.2,<3
+# COMET 2.2's torchmetrics dependency still imports pkg_resources.
+setuptools>=68,<81
+hf_xet>=1.2,<2
+# Supplementary rendered-page/image-crop SSIM evaluation.
+scikit-image>=0.24,<1

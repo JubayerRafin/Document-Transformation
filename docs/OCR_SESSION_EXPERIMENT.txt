@@ -1,0 +1,64 @@
+Persistent GPU OCR candidate (2026-10-24)
+
+Measured HP baseline: 320.7 seconds server processing, 140 sequential model
+requests, 23 image-region subruns totaling 119.6 seconds. 22 detected no text and
+retained source content for review. This is not 22 PDF job failures.
+
+Implementation:
+- Optional engine_profile.persistent_ocr=true on the hosted worker.
+- One private Unix-socket child uses the configured OCR interpreter and GPU 0.
+  Detection/recognition run there with cached predictors keyed by complete
+  constructor options. Serial requests preserve source/crop ownership.
+- The cloud worker owns the child, which watches its parent and exits after 300
+  idle seconds. Later jobs start a new session after idle exit. Native timeouts
+  stop only this OCR child; no failed crop is automatically replayed.
+- Models load lazily, never just for deployment/readiness. Translation and
+  Ollama settings are unchanged. No concurrent Paddle or tensor batching.
+- Existing source-density raster, detector limit, recognition views, independent
+  literal confirmation, confidence gates and source/archive verification remain.
+  Existing source/policy-hashed OCR cache retains verified no-text results too,
+  still subject to source verification and explicit review status.
+- No image skipping, filename branches, lower thresholds, PDF repair, new API
+  endpoints or automatic quality approvals.
+
+Evidence:
+See verification.json for test counts. Suites overlap; Linux lifecycle checks
+use fake OCR and do not establish accuracy. A separate real GPU test exercised
+two saved HP crops and one repeat through the actual private socket and archive
+verifier: first crop 4.013s, repeat 0.030s, text crop 2.018s. Detector polygons,
+recognized text, page-coordinate boxes and review decisions matched saved
+evidence exactly for these fixtures. This is not full OCR accuracy or six-PDF
+quality evaluation. Reviewed contact sheet: repeated no-text fixture is a small
+note/pencil icon; text-bearing fixture is a printer diagram. Existing decisions
+remain unapproved. No LLM calls or full-document runs were submitted by the agent.
+
+Fresh website run after approved deployment:
+Trusted engine_options.ignore_cache=true (BabelDOC receives --ignore-cache).
+Trusted engine_options.ocr_cache_mode="fresh", ocr_cache_root=null.
+Trusted engine_options.source_extraction_cache=null.
+Do not supply a saved ocr_recognition_dir. Bypass result caches without deleting
+baselines. Resident models and predictor reuse are allowed; this is fresh-results,
+not necessarily cold-model. Keep performance_probe=true and concurrency one.
+User submits the identical HP10 PDF/languages themselves. Previous 320.7s control
+used OCR cache reuse, so this is not an identical-cache controlled comparison.
+
+Collect per-crop ocr-timing.json, stage/transport JSONL, benchmark metadata,
+resource metrics, manifests and final output. OCR-session RSS is reported
+separately from job-tree RSS because it is a sibling process. GPU memory includes
+other visible workloads. Do not add nested spans or unrelated peaks. Preserve
+the eight previously uninspected content items in quality reporting.
+
+Deployment/rollback:
+Deployed with explicit user approval on 2026-10-24. Verification and server-side
+backup location: output/ocr-session-20261024/deployment.json. Installed file hashes,
+fresh-result options, private OCR socket, sequential translation and unchanged
+Ollama process were verified. No full document or model inference was submitted
+during deployment. The deployment scope was only OCR and fresh-result settings.
+
+For later deployments:
+Check idle worker and original hashes; back up files/private config server-side;
+install allowlisted files; restart with original arguments/environment. Secrets
+stay private. Verify readiness and unchanged translation/validator/Ollama hashes.
+Rollback restores exact backed-up files/profile, removes only new allowlisted
+modules and restarts idle worker. Do not deploy the earlier concurrency/validator
+candidate as part of this OCR experiment. No promised end-to-end speedup.
