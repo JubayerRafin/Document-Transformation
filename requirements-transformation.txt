@@ -1,0 +1,4 @@
+# Install in a separate Python 3.11 environment.
+babeldoc==0.6.4
+# BabelDOC imports BitStream, removed in bitstring 5.
+bitstring==4.4.0

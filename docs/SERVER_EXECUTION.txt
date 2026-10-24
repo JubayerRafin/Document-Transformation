@@ -1,0 +1,116 @@
+TransformX full server execution — 18 October 2026
+
+Connected mode
+Select "Run entire pipeline on GPU server" in Streamlit. The SSH host, port and
+private-key path come from configs/server.local.json and remain editable.
+The key stays on the laptop. No Ollama HTTP tunnel is required for this mode.
+Local mode is a separate, explicit choice. A server failure never selects it.
+
+Placement
+Server CPU: structural analysis, Deep Doc text/table/figure extraction, Docling,
+BabelDOC parsing/layout, fonts, reconstruction, document validation and Office
+rendering. GPU PaddleOCR is invoked directly on the same server when OCR is
+needed; no nested SSH upload. Ollama runs there for translation and PII models.
+The current Docling table and BabelDOC ONNX layout paths use the server CPU.
+This does not claim that every algorithm uses CUDA.
+Laptop: Streamlit controls, upload/download, progress polling, saved records and
+small output previews. Dataset registration still hashes files and records
+basic PDF metadata locally; actual pipeline analysis/extraction is server-side.
+
+Reusable engine and backend handoff
+workflows.run_workflow(..., execution_remote=ssh_settings) dispatches the whole
+job. remote_pipeline.py sends a code-only archive and the selected document,
+starts a bounded isolated SSH process group, polls progress and downloads the
+result archive. remote_worker.py calls the same run_workflow engine on Linux.
+No second extraction implementation, HTTP backend, database or queue was added.
+The backend teammate can invoke the existing engine directly in a server worker;
+this SSH transport is the prototype client adapter, not the future public API.
+
+Installed runtime paths on the existing pod
+/workspace/transformx-engine/bin/python — Python 3.11, Deep Doc/Docling/Office
+/workspace/transformx-babeldoc/bin/python — BabelDOC 0.6.4, bitstring 4.4.0,
+  PyMuPDF 1.28.2 (matches the working local BabelDOC runtime)
+/workspace/paddle-env/bin/python — existing GPU Paddle environment
+Ollama: http://127.0.0.1:11434/v1 on the server
+LibreOffice Writer/Impress and CJK fonts are installed for server-side rendering.
+Office format end-to-end evaluation and the PII dataset evaluation remain pending.
+
+Fresh pod setup (existing paid pod only; this does not rent or start one)
+1. Configure Ollama, selected models and GPU Paddle with setup_transformx.sh.
+2. Update configs/server.local.json for the pod's current SSH connection.
+3. From the project folder:
+   .\.venv-paddleocr\Scripts\python.exe -m tools.gpu.deploy_full_pipeline --config configs/server.local.json
+4. Open Streamlit and select full server mode.
+The deploy command uploads only engine source, requirements and setup script.
+It does not upload local datasets, credentials, venvs, history or prior outputs.
+Dependencies and public model/font assets must be reachable during first setup.
+Do not run dependency installation while a document job is active.
+
+Run all six later from PowerShell
+   .\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.dataset prepare --config configs/evaluation-server.local.json
+   .\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.dataset run --config configs/evaluation-server.local.json --phase translation
+This new configuration writes runs/dataset-evaluation/server-full-pipeline-20261018-v1.
+It has not been run as a full six-document batch yet. Existing baselines are kept.
+Use a new output_root for a new experiment; do not overwrite completed batches.
+GPU evidence for this mode comes from the server result, not a laptop HTTP tunnel.
+OCR cache mode fresh/reuse is honored on the server. No source-extraction cache
+from the laptop is silently reused. Cold assets and transfer/polling costs must
+be separated from server processing time when evaluating runtime.
+
+Returned artifacts
+All generated run directories, IR, validation reports, engine logs and outputs
+are downloaded. Used shared-cache OCR evidence is copied into the job archive;
+unrelated cached documents are excluded. JSON artifact paths are relocated for
+local browsing. server-terminal.json preserves original server path provenance.
+Success requires a matching uploaded-document hash and an existing in-job output.
+The archive reader rejects traversal, duplicate entries, symlinks and excessive
+uncompressed size. These prototype checks are not a public multi-tenant API.
+A cancelled client attempts to terminate only its own remote process group;
+server timeout remains the fallback if the SSH connection is lost.
+
+Storage and billing
+Original inputs, IR and artifacts remain in the private server job directories
+and downloaded copies remain on the laptop. Terminating a disposable pod can
+remove server copies; retrieve needed artifacts first. This implementation does
+not stop/terminate pods or delete storage automatically. Existing GPU billing
+continues while the pod is running. No new pod or credentials were created.
+
+Verification and limitations
+53 initial regression tests passed; final additional transport/evidence checks
+are recorded in server-pipeline-setup/final-tests.log. Streamlit AppTest rendered
+without exceptions and full server mode was selected by default.
+Sample05 and Sample01 generated on the server and downloaded; both PDFs open
+and render. Model evidence reports RTX 4090 and TranslateGemma entirely in VRAM.
+Sample01 fresh OCR reported gpu:0 and completed in 11.33 seconds. This confirms
+execution placement, not OCR or translation accuracy. Initial setup failures
+(venv symlink resolution and bitstring 5 removing BitStream) were fixed and kept
+as diagnostic records. All six-document quality, PII and cross-format evaluations
+are still separate work; prior human approvals were not carried to these runs.
+
+Evidence: runs/runtime-optimization/20261018/server-pipeline-setup/
+Verification outputs: runs/server-pipeline-verification/
+
+Final verification: 54 tests passed. Connected Streamlit AppTest imported no
+local processing engine and had no exceptions. Cached OCR evidence export was
+verified on a second Sample01 run, with downloaded gpu:0 evidence and locally
+usable recognition paths. Summary: server-pipeline-setup/verification-summary.json.
+
+Server runtime profile (2026-10-18)
+Connected jobs use translation_qps=8 with ONE translation worker. The limit
+previously delayed even protected/numeric fragments that made no model request.
+Prompts, model, document order and protected-value validation are unchanged.
+Set translation_qps=1 for a controlled previous-profile comparison.
+
+BabelDOC's layout ONNX session retains automatic thread count and its original
+model/preprocessing. Idle thread spinning is disabled on the server to reduce
+CPU contention. layout_idle_spinning=true restores the previous runtime policy.
+No thread-count cap is applied. The policy applies only inside BabelDOC's layout
+module, not to OCR, the engine's Docling runtime or the model server.
+
+Normal downloads use artifact_mode=review: disposable PDF files within the
+vendor work directory are omitted. JSON tracking, final PDFs, IR, validation,
+logs and referenced OCR evidence remain downloadable. All files remain on the
+server. artifact_mode=full retrieves the complete vendor work directory.
+Result manifests now record upload, processing/polling, download, unpacking and
+archive-size measurements. No extra SSH runtime-preflight connection is needed.
+Evidence: runs/runtime-optimization/20261018/server-pacing/.

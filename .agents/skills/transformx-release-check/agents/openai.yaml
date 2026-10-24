@@ -1,0 +1,4 @@
+interface:
+  display_name: "TransformX Release Check"
+  short_description: "Assess engine and hosted application readiness"
+  default_prompt: "Use $transformx-release-check for this TransformX task and validate against the current repository."

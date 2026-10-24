@@ -1,0 +1,4 @@
+interface:
+  display_name: "TransformX Performance"
+  short_description: "Measure per-PDF runtime and processing bottlenecks"
+  default_prompt: "Use $transformx-performance for this TransformX task and validate against the current repository."

@@ -1,0 +1,373 @@
+TransformX runtime investigation and optimization
+18 October 2026
+
+The saved six PDF Deep Doc batch took 1243.6 seconds. Its recorded stages were
+620.6 seconds for translation and reconstruction, 391.2 for image processing,
+222.8 for extraction and 9.0 for validation. There were 176 completed model
+requests with 204.3 seconds of recorded request time, including nested figures.
+Request time is not an independently measured GPU kernel time. The unassigned
+remainder includes parsing, model initialization, process startup, transport,
+scheduling, rendering, fitting and file work; old logs cannot separate it all.
+
+Nine saved completed OCR workers report 36.21 seconds in total. Their timers
+exclude laptop preparation, SSH setup and transfers, status polling and figure
+PDF reconstruction. Do not add these times to the already inclusive stage times.
+
+Implemented changes
+
+1. The production source extraction defers the legacy figure pass because the
+   spatial render and mask pass replaces those candidates immediately afterward.
+   Direct extraction callers retain the old behavior by default. A regression
+   test compares final figure pixels, boxes and text on an unseen fixture.
+2. Docling converters are reused per process with fixed CPU and no OCR policy.
+   Construction and conversion are serialized. Per page geometry and errors
+   remain on each adapter. Actual initialization and reuse are recorded.
+3. GPU OCR sends its source and three allowlisted workers in one tar upload
+   over one SSH connection and starts the detached worker afterward. Result
+   download, source hashing, strict host checks, timeout and scoped cleanup stay
+   in place. Actual remote execution of this transport still needs the GPU test.
+4. The BabelDOC layout hook reads source image, table and strict cell geometry
+   once per invocation and reuses it in before and after audits.
+5. runtime-timing.jsonl records source extraction, OCR handoff, spatial figure
+   analysis and nativeized extraction. transport-timing.json separates upload,
+   polling and download; Ollama transport events retain load, prompt and decode
+   duration counters. These logs do not include prompt or response content.
+6. Nested OCR errors are printed to the remote worker log. Batch errors now
+   retain the original processing failure before the secondary GPU warning.
+7. OCR cache policy can be explicitly reuse or fresh. Translation cache remains
+   disabled by the dataset runner so fresh model requests are still measured.
+
+Local verification
+
+The six original PDFs completed the offline extraction probe after the changes.
+All available native text tokens were retained relative to the native parser.
+Figure asset counts matched the prior extraction probe. This is a parser and
+pipeline regression check, not independently annotated extraction accuracy.
+Raw Sample01 still needs real OCR and was not OCRed by the extraction probe.
+
+The first Docling initialization measured 145.953 seconds on this laptop.
+Later documents reused it. First and repeated initialization conditions must
+therefore be reported separately. This does not establish an end to end GPU
+speedup or a controlled comparison with previous runs on other hardware.
+
+Remaining quality issues
+
+Sample01 has an unresolved API key punctuation disagreement between OCR views.
+Its source pixels and review block remain; no guessed correction was applied.
+The current Sample04 saved output shows its table photos. The older missing
+photo concern was not reproduced in this inspection. Its other layout review
+candidates and untranslated image text still require independent review.
+Persistent BabelDOC and OCR model services are later work: process lifetime,
+memory use, isolation, cancellation and restart recovery need a deliberate design.
+
+Benchmark after connecting a GPU
+
+The prepared configs/runtime-first-pass.local.json and
+configs/runtime-repeat-pass.local.json register the same six PDFs in separate
+roots and share a new OCR cache. Update the same current OCR SSH host, port and
+private key path in BOTH files. Keep the model, settings and source files equal.
+Do not reuse the old translation output root or use --resume after code changes.
+
+Run from the project folder in Windows PowerShell after the pod and tunnel work:
+
+.\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.benchmark --first configs/runtime-first-pass.local.json --repeat configs/runtime-repeat-pass.local.json --session runs/runtime-optimization/20261018/gpu-benchmark-session.json
+
+This explicitly runs two full translation batches. It uses the paid GPU already
+connected; it does not deploy, restart or automatically stop any pod. First pass
+uses an unused OCR cache, repeat reuses verified evidence. Both run in one Python
+process so Docling can remain loaded. Ollama residency is captured before each
+pass; the script does not unload models or claim a cold GPU from a label alone.
+Use a dedicated pod and record model loading conditions to run a strict cold
+model test. Never delete another experiment cache to simulate a cold run.
+
+After benchmarking, run tools.evaluation.runtime_audit for each new output root.
+Compare timing, native coverage, OCR uncertainty, translations, table fitting,
+image fidelity and protected values. Reevaluate new outputs rather than reusing
+the old output specific human approvals. Keep model downloads outside timed runs.
+
+Saved evidence and code snapshots
+
+runs/runtime-optimization/20261018/before contains source backups and hashes.
+runs/runtime-optimization/20261018/audit contains the read only saved run audit.
+runs/runtime-optimization/20261018/extraction-check contains the local rerun.
+Earlier experiment reports and teammate ZIP snapshots have not been overwritten.
+Coordinate these new engine changes with the PII and backend teammates before
+they merge; they should not replace their own work with an older snapshot ZIP.
+
+Next experiment: document-level native PDF processing (2026-10-18)
+
+The completed benchmark took 1437.9s first pass and 1047.0s repeat pass.
+The previous Deep Doc baseline took 1243.6s. Cache/load effects prevent treating
+the warm result as a proven code speedup.
+
+configs/runtime-document-mode.local.json enables pdf_page_mode=document.
+Eligible multi-page digital/mixed, unrotated PDFs now use one BabelDOC worker
+instead of loading the parser/layout model for every page. Original IR page
+numbers remain intact. Scans, blank pages and source-preserved pages retain
+page orchestration. Default mode remains page for existing configurations.
+Page-count validation, protected values, translation and layout checks remain.
+No sample-specific replacements, prompt changes or concurrency increases.
+
+Run from the project folder (keep the existing SSH tunnel open):
+.\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.dataset run --config configs/runtime-document-mode.local.json --phase translation
+
+New outputs: runs/dataset-evaluation/runtime-20261018-document-mode-v1
+All six sources were registered without inference. Earlier outputs are intact.
+The new run reuses benchmark-shared-ocr and disables translation cache. Compare
+against the repeat pass; Docling starts cold again in a new Python process.
+Record model load durations and review new output quality before acceptance.
+This optimization still requires a live GPU benchmark; no speedup is promised.
+
+Next experiment: persistent model HTTP connections
+
+The document-mode run generated six PDFs in 709.5s. Its 176 measured model calls
+took 251.785s client time versus 111.187s reported server time. The 140.598s gap
+includes transport, SSH tunneling, response transfer and client JSON handling;
+it is not all proven avoidable latency. See transport-audit/report.html under
+runs/runtime-optimization/20261018 for per-document and nested figure evidence.
+
+configs/runtime-keepalive.local.json enables http_keepalive=true. Each worker
+thread reuses one HTTP connection for sequential Ollama requests. Endpoints
+remain loopback-only, payloads and response validation unchanged. Failed or
+server-closed connections are discarded. Failed requests are never silently
+replayed by the transport. Existing translation retry policy remains in charge.
+The mode is opt-in; old configurations retain the existing urllib transport.
+New spans separate version checking and worker execution; worker progress
+markers help identify import/hook/model startup in the next measurement.
+
+Run from the project folder with the SSH tunnel open:
+.\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.dataset run --config configs/runtime-keepalive.local.json --phase translation
+
+Separate output root: runs/dataset-evaluation/runtime-20261018-keepalive-v1
+The six sources are registered. No GPU inference was launched during preparation.
+Compare against document-mode-v1 with the same OCR cache and hardware. Model load
+state must still be checked. This is not a measured speedup until the rerun.
+Figure runs marked failed for Samples02/03 reported verified empty OCR results;
+their original pixels were preserved. This does not prove missed text or OCR
+accuracy. Sample04's two translated figure runs took 41.4s and 45.9s, and still
+need visual review; removing those operations would change coverage.
+
+Issue inventory and next fixes: reuse-ir-v1
+
+1. Sample01 repeated semantic extraction after nativeizing OCR text: 105.313s
+   in keepalive-v1. New nativeized_ir_mode=reuse refreshes native glyph geometry
+   with PyMuPDF and keeps original accepted digital-page units unchanged. The
+   pipeline retains original raster-table evidence, locked OCR slots and blockers.
+   Original source extraction still uses Deep Doc/Docling as configured. This is
+   not an undocumented native fallback for source extraction. Opt-in only.
+2. Unused bilingual PDFs: vendor CLI and saved logs confirm both mono and dual
+   were produced. babeldoc_dual_output=false passes the supported --no-dual flag;
+   font subsetting, mono output, geometry and translation checks remain enabled.
+3. Repeated figure workers: Sample04 worker times 61.8s and 50.53s; each recorded
+   one model call (1.11s and 0.86s). Most of that time is outside model inference.
+   Persistent vendor workers remain unresolved: mutable hooks, error isolation,
+   cancellation and per-job environment need a separate safe worker design.
+4. HTTP setup overhead: keepalive reduced client model-call time from 251.785s
+   to about 170s for 176 calls while server time stayed about 112s. Retained.
+5. Cold starts: removing Sample01's repeated pass can move Docling initialization
+   to Sample02. Do not claim the entire 105s as savings. Compare repeated runs
+   and stage timings with unchanged hardware/cache policy. Cache effects remain.
+
+Saved Sample01 offline check: nativeized-refresh-check/report.json, 0.11s refresh,
+no missing native tokens. This does not certify identical semantic tables or
+translation quality; new outputs require evaluation.
+
+Next run:
+.\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.dataset run --config configs/runtime-reuse-ir.local.json --phase translation
+Separate outputs: runs/dataset-evaluation/runtime-20261018-reuse-ir-v1
+All six sources registered; no model inference started during preparation.
+
+Figure/IO experiment (user-authorized GPU rerun)
+
+configs/runtime-figure-io.local.json keeps all reuse-ir settings and enables:
+- figure_engine=ocr-slots: only isolated, verified OCR figure crops use a small
+  worker and the existing guarded raster renderer. Main PDF pages still use
+  BabelDOC. The verified slots come from nativeization evidence; uncertain
+  lines and unsafe backgrounds keep source pixels. Literal checks stay active.
+  This is a renderer-route change, not a persistent BabelDOC server. Its output
+  must be reviewed separately. PII retains the existing route.
+- light_pdf_io=true: vendor font-subset and PDF-clean subprocess targets point
+  to minimal modules implementing the same MuPDF calls, flags and exit status.
+  Vendor process timeouts, fallback behavior and output checks remain intact.
+  This avoids importing the layout/translation stack in PDF-only child jobs.
+- Content-free per-stage timing for parsing, layout, translation, font work and
+  PDF saving. Stages overlap nested requests; do not add those totals together.
+
+Tests: figure-worker verified-slot selection, identifier rejection and source
+preservation; real Windows spawn I/O jobs preserve text and rendered pixels;
+88 regression checks passed. The isolated Sample05 stage probe found 11.58s
+layout detection, 3.64s subset fonts, 3.62s save PDF. A CPU ONNX 4-thread trial
+showed no benefit and was not enabled. The initial probe hit a sandbox SQLite
+cache permission error, preserved in pdf-stage-probe; permissions were granted
+for the normal BabelDOC cache before continuing. Probe-v2 is diagnostic only,
+using native source extraction; it is not the final six-document experiment.
+
+Final experiment output: runs/dataset-evaluation/runtime-20261018-figure-io-v1
+Batch log: runs/runtime-optimization/20261018/figure-io-batch.log
+Run command:
+.\.venv-paddleocr\Scripts\python.exe -m tools.evaluation.dataset run --config configs/runtime-figure-io.local.json --phase translation
+Do not run a second copy while this batch is active. Earlier results are intact.
+
+Completed figure/IO rerun, 2026-10-18 (all six GPU verified)
+
+Observed seconds, reuse-ir-v1 -> figure-io-v1:
+Sample01 98.2 -> 92.2; Sample02 107.2 -> 121.2;
+Sample03 124.1 -> 119.6; Sample04 140.7 -> 86.2;
+Sample05 38.4 -> 36.6; Sample06 41.9 -> 36.4.
+Sample02 extraction rose from 24.1 to 43.7s; its translation/reconstruction
+fell from 81.4 to 75.8s. Sample04 image processing fell from 63.4 to 14.7s;
+the same two figures were processed and four uncertain figures source-preserved.
+All six PDFs open with the expected page counts. No recorded nested region
+translation errors or geometry blockers. Sample04 has three remaining layout
+review candidates. A visual spot check confirms the photos and preserved
+regions remain visible; brand wording differs, so semantic review is still needed.
+No human approvals or old annotations were transferred.
+
+Evidence: runs/runtime-optimization/20261018/figure-io-comparison/report.html,
+report.json, runtime.csv, output-checks.json, targeted-stage-checks.json and
+sample04-figure-check.png. Regression log: figure-io-tests.log (88 passed).
+Compare by PDF. Cold startup/network conditions differ; the percentages are
+observed changes, not isolated causal speedup estimates. Full persistent vendor
+serving is not implemented. These changes avoid unnecessary vendor startup for
+isolated OCR figures and heavy imports in vendor I/O subprocesses.
+
+Source extraction cache experiment (runtime only)
+
+Sample02's last 43.7s extraction included 37.313s converter initialization.
+extraction/source_cache.py adds opt-in verified reuse of the raw source Document
+before OCR, spatial figures or translation. Key includes PDF bytes, strategy,
+analysis hints, extraction code, dependency versions and cached Docling model
+file size/mtime inventory. Payload digest and Document geometry validation guard
+reads; corrupt entries are recomputed. External asset references are not cached.
+Cache errors do not turn a successful extraction into a failed document job.
+Per-run evidence marks hit/miss and labels stored extractor timings historical.
+No source-specific text replacements, layout adjustments or approvals are added.
+
+Config: configs/runtime-source-cache.local.json
+Cache: runs/runtime-optimization/20261018/source-extraction-cache
+Output: runs/dataset-evaluation/runtime-20261018-source-cache-v1
+Population: source-cache-population/report.json (about 61s, recorded separately)
+No OCR/translation inference occurs during population; all six payloads were
+round-tripped with identical extracted regions before the repeat-use GPU run.
+Tests: source-cache-tests.log, 48 checks passed, including integration forwarding,
+corruption recovery, source/strategy/analysis invalidation and asset rejection.
+
+This speeds repeated identical uploads/evaluation. A new PDF or changed policy
+still runs actual Deep Doc extraction once; it does not remove cold startup for
+new documents. Translation cache remains disabled and layout rules unchanged.
+
+Source-cache rerun completed: all six generated, GPU verified, six cache hits.
+Observed seconds, figure-io-v1 -> source-cache-v1:
+Sample01 92.2 -> 99.0; Sample02 121.2 -> 78.2;
+Sample03 119.6 -> 110.5; Sample04 86.2 -> 99.6;
+Sample05 36.6 -> 71.2; Sample06 36.4 -> 65.2.
+The target Sample02 extraction stage fell 43.7 -> 0.3s. Source cache population
+took 61.078s separately. This is not a demonstrated cold or universal speedup.
+No recorded nested translation errors, geometry blockers or output-open failures.
+Sample04 still has three layout review candidates; no layout fix was attempted.
+
+Remaining local variability: Sample05's model calls stayed about 8s, but worker
+time increased; stage layout went 1.89 -> 9.61s and time before first PDF stage
+went 9.06 -> 22.02s. Sample06 shows the same pattern (layout 1.97 -> 9.06s).
+Windows CIM CPU/memory metrics were unavailable in the agent sandbox. Do not
+attribute this definitively to thermal throttling, background load or caching.
+A balanced CPU ONNX thread probe produced equivalent numeric outputs but no
+consistent large performance gain; no CPU threading policy was changed.
+See layout-balanced-probe.json. Do not promote this repeat-use measurement as
+evidence that all runtime bottlenecks are fixed.
+
+Results: runs/runtime-optimization/20261018/source-cache-comparison/report.html
+with runtime.csv, report.json, output-checks.json and method.json.
+
+
+2026-10-18: shared BabelDOC layout session experiment
+-------------------------------------------------
+Translation inference remains on the RunPod GPU; BabelDOC parsing, ONNX layout,
+fonts and PDF reconstruction run locally. Fresh OCR uses the remote OCR route;
+this benchmark reused saved OCR evidence.
+
+transformation/pdf/layout_service.py owns one authenticated loopback ONNX session
+per CLI dataset batch. Workers retain independent PDF/translation state. Vendor
+preprocessing, model weights, thresholds and postprocessing are unchanged.
+Every worker checks the model SHA256. No predictions or translations are cached.
+The service is batch-scoped, restores parent environment, and is reaped on exit.
+A hung or failed service fails the job rather than silently selecting another
+model or inference route. No vendor files were edited.
+
+Opt-in config: configs/runtime-shared-layout.local.json
+  python -m tools.evaluation.dataset prepare --config configs/runtime-shared-layout.local.json
+  python -m tools.evaluation.dataset run --config configs/runtime-shared-layout.local.json --phase translation
+Do not resume this completed experiment into its existing output folder.
+Use a fresh output_root when performing another controlled comparison.
+The option is not enabled automatically in Streamlit or older profiles.
+
+31 targeted regression tests passed (shared-layout-tests.log). Initial test
+invocation needed project-local TEMP and tests on PYTHONPATH; those environment
+issues were corrected for the passing run. The real batch generated all six
+PDFs, GPU placement verified for each. Every output opens/renders and has the
+expected page count. Existing Sample04 layout review flags remain unchanged.
+
+Source-cache-v1 -> shared-layout-v1, seconds per PDF:
+Sample01 99.0 -> 137.8; Sample02 78.2 -> 103.5;
+Sample03 110.5 -> 126.4; Sample04 99.6 -> 89.8;
+Sample05 71.2 -> 38.8; Sample06 65.2 -> 37.8.
+One-time service startup: 3.812 seconds, separately from per-PDF times.
+One service session handled eight actual page inferences.
+This removes repeated ONNX construction, but mixed results do not establish
+consistent end-to-end improvement. Shared session remains experimental/opt-in.
+Local startup and layout variability are NOT fully fixed.
+
+Host counters showed 90-92% RAM use; one CPU snapshot was 75.8%, another 15.1%.
+AC was connected and battery saver off. Sandbox host-process attribution was
+unavailable. These observations show resource pressure, not proof that a
+particular application, thermal limit or hardware condition caused the delays.
+
+An alternating CPU resource probe (default/1/2/4/4/2/1/default) kept identical
+page detections. Single-thread inference took about 5.0-5.5s, two threads
+about 2s, four about 1.1s and default about 1s. Do not enable a thread cap:
+this test did not support it. Details: layout-resource-policy-probe.json.
+
+Results: runs/runtime-optimization/20261018/shared-layout-comparison/report.html
+with runtime.csv, report.json, method.json and output-checks.json.
+No new translation-quality approval or human-review label was assigned.
+
+Final exact-equivalence probe: all eight pages had bit-for-bit equal detection
+arrays (np.array_equal), not rounded boxes or IoU tolerance. Fresh construction
+was 0.72-0.84s/page, shared client initialization 0.078-0.141s/page in this probe.
+Inference remained about 1s/page. See shared-layout-probe-verified/report.json.
+2026-10-18 full-server pacing verification
+Evidence: runs/runtime-optimization/20261018/server-pacing/report.html
+Same uploaded Sample01 source SHA, existing RTX 4090 server, TranslateGemma 12B,
+fresh translation requests in both profiles, verified OCR cache reused in both.
+Sequential controlled run: previous profile vs revised server default.
+
+                                   Previous       Revised
+Server processing                    84.7s          52.2s
+Client total incl upload/download   116.2s          80.5s
+BabelDOC translation stage           49.76s         23.83s
+Actual model requests                21.33s         21.18s
+Model request count                     37             37
+Rate-limiter wait                    26.98s          1.53s
+Layout detection                     7.56s           2.03s
+Download archive                    17.35 MiB        8.84 MiB
+
+Fixes: qps 8 with one worker instead of qps 1; disable layout ONNX idle
+spinning with the same automatic thread count; merge SSH prerequisites into
+upload; omit three disposable vendor work PDFs from normal result download.
+All server files, translation tracking, IR, logs and OCR evidence are retained.
+
+57 relevant regression tests passed. Both PDFs open/render, zero translation
+errors, no geometry blockers, and the same uncertain OCR region remains.
+Layout probe detections matched exactly with spinning disabled. Fresh model
+answers differed in three text lines, so full output text/pixels are not
+identical; no translation-quality or human approval is inferred. No claims
+are made about six-document speedup from this one-document controlled check.
+Server processing improved 38.4%; client total improved 30.7% in this test.
+Model loading was negligible in both profiles (~0.1s); no large model cold-load
+advantage explains this result. Initial OCR/model-download cold starts are not
+covered by this cached-OCR comparison.
+
+Remaining measured costs: ~21s real model requests; 44.15s BabelDOC worker total
+includes these requests plus layout/import/font/PDF work; ~28s upload, polling,
+download and unpack overhead outside the reported server processing time.
+No validation, source-preservation or protected-value rule was relaxed.

@@ -1,0 +1,22 @@
+{
+  "engine_python": "/opt/transformx/engine/bin/python",
+  "python": "/opt/transformx/babeldoc/bin/python",
+  "ocr_python": "/opt/transformx/paddle/bin/python",
+  "ocr_device": "gpu:0",
+  "translation_endpoint": "http://127.0.0.1:11434/v1",
+  "pii_endpoint": "http://127.0.0.1:11434/v1",
+  "timeout_seconds": 3600,
+  "persistent_ocr": false,
+  "engine_options": {
+    "table_strategy": "auto",
+    "pdf_page_mode": "document",
+    "http_keepalive": true,
+    "nativeized_ir_mode": "reuse",
+    "babeldoc_dual_output": false,
+    "figure_engine": "ocr-slots",
+    "light_pdf_io": true,
+    "ocr_cache_mode": "reuse",
+    "translation_qps": 8,
+    "performance_probe": false
+  }
+}

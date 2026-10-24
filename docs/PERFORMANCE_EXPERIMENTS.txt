@@ -1,0 +1,110 @@
+TransformX performance implementation — 24 October 2026
+
+Status
+Local candidate implemented and tested. Production engine, registered worker
+profile and Ollama process/configuration have NOT been modified. No document
+translation or GPU benchmark has been submitted. The user will run HP10 first.
+
+Implemented
+1. Instrumentation: a distinct independent_output_validation span; content-free
+   mean/p50/p95 transport latency, decode throughput, retries and observed in-flight
+   counts in progress summaries. Optional hosted performance_probe captures source
+   and relevant code hashes, selected settings, initial model residency and sampled
+   process-tree RSS / total visible-GPU memory. Sampled peaks are not exact maxima;
+   GPU totals include other resident workloads. Model warmth is not cache warmth.
+2. Validation: a y-axis sweep excludes disjoint text rectangles, then applies the
+   same PyMuPDF intersection calculation and strict 0.35 threshold. Findings retain
+   original ordering, duplicates, image overlap checks and PII checks. Invalid
+   geometry falls back to exhaustive candidates. Worst-case dense layouts remain
+   quadratic because many genuine candidate pairs can exist.
+3. Opt-in native BabelDOC concurrency: translation_workers accepts 1/2/4, default 1.
+   ollama_parallelism declares expected capacity; it DOES NOT configure or verify
+   the Ollama server. A worker count above declared capacity is rejected. The pinned
+   vendor hook uses private paragraph/context copies and serialized commits, keeping
+   original IDs, page order and boxes. Unexpected page-wide annotations fail closed.
+   Source-repair and reconstruction hooks are retained. Scan/figure-slot translation
+   remains sequential and its effective worker count is reported separately.
+4. Duplicate-request prevention: concurrent identical text on one translator
+   instance is serialized around the EXISTING vendor cache. Cache keys, ignore-cache
+   behavior, prompts, literal validation, retry budgets and terminology are unchanged.
+   With ignore_cache enabled, every duplicate is still translated as requested.
+
+Validation evidence
+output/performance-implementation-20261024/validation.json:
+  Exact complete-report parity with default validator arguments for the six
+  saved translated samples and HP10; per-run font overrides were not reloaded.
+  HP10 saved-artifact validation: reference 9.3785 s, indexed 0.4757 s on this
+  machine, one comparison. This is NOT an end-to-end GPU speedup measurement.
+output/performance-implementation-20261024/pii-validation-parity.json:
+  Exact complete-report parity with default validator arguments for all six saved
+  redacted PDFs. This does not rerun selected-value PII leakage evaluation.
+204-test local regression suite passed; an additional 45-test focused suite passed
+after final scan/telemetry changes. Suites overlap; do not add counts as unique tests.
+Pinned BabelDOC 0.6.4 integration test passed on the server in an isolated candidate
+directory, with fake translations and two real vendor execution threads. It made
+no Ollama calls and does not establish translation quality or GPU throughput.
+
+Packages
+output/performance-implementation-20261024/instrumentation-only.tar.gz:
+  Telemetry and timing changes, without replacing the original production validator,
+  PDF runner or BabelDOC worker. Suitable for the first controlled HP10 baseline.
+output/performance-implementation-20261024/optimized-candidate.tar.gz:
+  Full candidate including indexed validation and gated native concurrency.
+Both packages leave the installed Ollama configuration unchanged. Their file hashes
+and the inspected production file hashes are recorded in package-manifest.json.
+
+Recommended HP experiment sequence
+A. Approve the instrumentation-only deployment and enable performance_probe in the
+   trusted worker engine_options. Keep translation concurrency one and Ollama one.
+   First run HP10 through the website yourself. Preserve the entire job directory,
+   terminal.json, request/stage JSONL, source/output hashes and resource snapshots.
+B. After saving A, deploy the indexed validator only; repeat the identical HP input
+   with the same translation/cache/OCR settings. This isolates validation impact.
+C. Only with separate approval, configure Ollama for two parallel requests and set
+   translation_workers=2, ollama_parallelism=2 in the trusted worker profile. Do not
+   merely change the declaration. Repeat HP10, compare quality and actual in-flight
+   evidence, then decide whether four is justified. No automatic escalation to four.
+D. Investigate persistent OCR/session reuse from the measured startup/OCR spans.
+   Retain existing OCR views, model-independent confirmation, DPI and PII coverage.
+   The original candidate did not implement persistence. The subsequent OCR-only
+   candidate is documented in OCR_SESSION_EXPERIMENT.txt; deployment approval
+   and a fresh-result end-to-end measurement remain separate steps.
+
+Use ignore_cache=true for uncached-translation throughput comparisons. Keep OCR
+cache policy identical (fresh for each controlled uncached run, or verified equal
+reuse conditions). Do not delete caches or unload models silently. Record initial
+residency and load duration: if coldness differs, label it instead of claiming an
+optimization. The historical HP 522.6 s is contextual evidence, not a controlled
+baseline for the current pod. Agree a GPU credit/time budget before multiple runs;
+stop on a failed run for inspection rather than automatically resubmitting it.
+
+Extract a content-free report after any run:
+python -m tools.evaluation.job_performance <saved-job-directory> --output <new.json>
+The tool never submits a job or calls a model. Request-duration sums may overlap
+under concurrency. Reconstruction spans exclude independent validation and OCR.
+
+Offline validator reproduction:
+python -m tools.evaluation.benchmark_validation <saved.pdf> --repeats 3 --output <new.json>
+This compares full findings with the exhaustive reference; it never edits the PDF.
+
+Quality gates
+Compare page count, protected literals/bindings, missing text, OCR evidence/review
+decisions, fonts, clipping, text/image overlaps and figure preservation, followed by
+rendered review. Preserve pre-existing defects in the denominator. No new human
+approval is assigned. Successful execution and unchanged checks are not a semantic
+translation-quality score or a guarantee for arbitrary PDFs.
+
+Deployment and rollback
+The supplied plan requires approval before production deployment or Ollama changes.
+For each approved deployment: verify the worker is idle, verify installed file hashes,
+back up every overwritten file and the private profile on the server, then install
+only the explicitly approved package. Keep secrets in the private profile; do not
+copy it into this repository or reports. Enabling a profile flag requires restarting
+the idle cloud worker because it reads the profile at startup. Preserve the original
+launch arguments/environment privately. Never interrupt an active PDF job.
+Rollback restores those exact backed-up files and the previous private profile;
+remove only newly added files listed in the deployment manifest, then restart the
+idle worker. Setting translation_workers=1 disables the new parallel hooks in new
+job subprocesses. Ollama changes have a separate rollback to the prior launch config.
+
+No end-to-end improvement or 300-second HP target is claimed before these runs.

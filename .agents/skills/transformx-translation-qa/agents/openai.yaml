@@ -1,0 +1,4 @@
+interface:
+  display_name: "TransformX Translation QA"
+  short_description: "Review translation evidence and preservation checks"
+  default_prompt: "Use $transformx-translation-qa for this TransformX task and validate against the current repository."

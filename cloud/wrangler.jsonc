@@ -1,0 +1,10 @@
+{
+  "name": "transformx",
+  "main": "src/index.mjs",
+  "compatibility_date": "2026-10-01",
+  "assets": {"directory": "./public", "binding": "ASSETS", "run_worker_first": true, "html_handling": "none"},
+  "vars": {
+    "SUPABASE_URL": "https://addlhzcbsuuqudhxcnlo.supabase.co",
+    "SUPABASE_PUBLISHABLE_KEY": "sb_publishable_Whr_DbnXi-xlIXot7Lb1GQ_AuPGh-dl"
+  }
+}

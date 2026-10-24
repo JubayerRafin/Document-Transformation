@@ -1,0 +1,7 @@
+# Install in the Streamlit/extraction environment, not the pinned BabelDOC env.
+pdfplumber==0.11.9
+camelot-py==1.0.9
+pypdf==3.17.4; python_version < "3.12"
+pypdf==5.9.0; python_version >= "3.12"
+# Optional structural table recognition (large model dependencies).
+docling==2.107.0
