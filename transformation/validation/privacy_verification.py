@@ -5,8 +5,11 @@ import pymupdf
 from transformation.validation.output_validation import normalized
 
 
-def verify(data,kind,run,values,categories,endpoint,model,assist,options):
+def verify(data,kind,run,values,categories,endpoint,model,assist,options,language=None):
+    """language is the output's text language: the target if translated, else the source."""
     from transformation.validation.privacy import detect
+    from tools.ocr.raster_policy import render_page
+    language=language or options.get('target','ko')
     if kind!='pdf':
         from transformation.office.office import to_pdf
         data=to_pdf(data,'output.'+kind)
@@ -16,14 +19,15 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options):
             folder=Path(run)/'privacy-verification'/str(index+1); folder.mkdir(parents=True,exist_ok=True)
             with pymupdf.open() as raster:
                 target=raster.new_page(width=page.rect.width,height=page.rect.height)
-                target.insert_image(target.rect,pixmap=page.get_pixmap(alpha=False))
+                # Same bounded OCR raster policy as source OCR; the 72 dpi default loses small text.
+                target.insert_image(target.rect,pixmap=render_page(page)[0])
                 raster.save(folder/'source.pdf')
             if options.get('ocr_remote'):
                 from transformation.ocr.remote_ocr import run_remote
-                events=run_remote(folder/'source.pdf',folder/'paddle',options['ocr_remote'],timeout=min(options.get('timeout',1200),1200),source_language=options.get('target','ko'))
+                events=run_remote(folder/'source.pdf',folder/'paddle',options['ocr_remote'],timeout=min(options.get('timeout',1200),1200),source_language=language)
             elif options.get('ocr_python'):
                 from transformation.ocr.paddle_pipeline import run_ocr
-                events=run_ocr(folder/'source.pdf',folder/'paddle',options['ocr_python'],timeout=min(options.get('timeout',1200),1200),source_language=options.get('target','ko'))
+                events=run_ocr(folder/'source.pdf',folder/'paddle',options['ocr_python'],timeout=min(options.get('timeout',1200),1200),source_language=language)
             else: raise ValueError('Fresh OCR mode is required for rendered-output privacy verification.')
             for progress in events: yield {'page':index+1,'progress':progress}
             from transformation.ocr.paddle_handoff import prepare

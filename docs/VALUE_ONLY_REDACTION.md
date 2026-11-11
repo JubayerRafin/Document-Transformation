@@ -50,10 +50,18 @@ Missing geometry raises `RedactionLocalizationError`; the pipeline writes
 artifact. Old saved OCR without word evidence may therefore need a fresh OCR
 pass. The OCR cache fingerprint includes the changed recognizer source.
 
-This deliberately replaces the previous whole-OCR-line fallback. It is a
-fail-closed behavior change; it can require review on documents that previously
-completed by erasing a complete field. It is not a new manual-review job state
-or a promise that every scan can be localized automatically.
+Update (2026-11-12): when neither of those applies, the line is split into its
+whitespace-separated words at the ink gaps in its own rendered pixels. The
+split is accepted only if the word count matches the OCR text, every word gap
+is wider than every letter gap, and word widths are consistent with their
+lengths; a value that starts or ends inside a word covers that whole word.
+Only if this also fails is the whole OCR line covered, and the audit records
+`localization: whole_line_fallback` and `label_preserved: false` and the job
+adds a warning. A line box with no visible ink still fails closed with
+`RedactionLocalizationError`. Each audit entry records its `localization`
+method. On the six samples, this let the scanned Sample01 and the image-bearing
+Sample04 complete (previously blocked); one of 15 image values used the
+whole-line fallback. See `output/phase1-eval-20261112/REPORT.md`.
 
 ## Verification
 

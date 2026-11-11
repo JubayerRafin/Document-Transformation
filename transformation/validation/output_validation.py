@@ -66,6 +66,9 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                                            'text':[text_spans[index]['text'],text_spans[other_index]['text']]})
                 for link in page.get_links(): check(str(link),'page '+str(number)+' link')
                 for annot in page.annots() or []: check(str(annot.info),'page '+str(number)+' annotation')
+                # annots() excludes form fields; their values are not page text.
+                for widget in page.widgets() or []: check(str(widget.field_value or '')+' '+str(widget.field_name or ''),'page '+str(number)+' form field')
+            check(' '.join(str(entry[1]) for entry in pdf.get_toc()),'PDF bookmarks')
             for index in range(pdf.embfile_count()):
                 name=pdf.embfile_names()[index]; check(name,'attachment name')
                 uninspected.append({'kind':'attachment','name':name})

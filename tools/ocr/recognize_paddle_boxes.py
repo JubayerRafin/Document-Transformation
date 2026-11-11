@@ -213,17 +213,22 @@ def bounded_recognition(crop,primary,secondary_factory,language,padded=None):
     view=cv2.cvtColor(cv2.resize(gray,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC),cv2.COLOR_GRAY2BGR)
     read(primary,view,'contrast_source',primary_name)
     secondary=secondary_factory(); checks=[]
-    secondary_name='PP-OCRv5_server_rec' if language=='en' else 'en_PP-OCRv5_mobile_rec'
+    # Without a distinct verification model (non-English bounded profile) the
+    # "second recognizer" is the primary model again. Label reads with the model
+    # that produced them and never treat repeat reads as independent agreement.
+    independent=secondary is not primary
+    secondary_name=('PP-OCRv5_server_rec' if language=='en' else 'en_PP-OCRv5_mobile_rec') if independent else primary_name
     verification_source=crop if padded is None else padded
     for name,view in [('verification_source',verification_source),('verification_source_2x',cv2.resize(verification_source,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC))]:
         checks.append(read(secondary,view,name,secondary_name))
-    confirmed=cross_model_candidate(reads[:-2],checks)
+    confirmed=cross_model_candidate(reads[:-2],checks) if independent else None
     if confirmed is not None:
         conflicts=[r for r in reads if r['score']>=.95 and consensus_key(r['text'])!=consensus_key(confirmed['text'])]
         if not sensitive or not conflicts:
             return confirmed,False,'cross_model_exact_agreement',reads
     if sensitive:
-        return max(reads,key=lambda r:r['score']),True,'sensitive_literal_model_disagreement',reads
+        decision='sensitive_literal_model_disagreement' if independent else 'sensitive_literal_single_model'
+        return max(reads,key=lambda r:r['score']),True,decision,reads
     strong=[r for r in reads if r['score']>=.95 and r['text'].strip()]
     if len(strong)>=2 and len({consensus_key(r['text']) for r in strong})==1:
         return max(strong,key=lambda r:r['score']),False,'high_confidence_source_views',reads
