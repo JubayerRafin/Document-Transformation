@@ -113,7 +113,9 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                     # for the same Paddle route; original upload stays untouched.
                     if original_page.rotation or profile_page['kind']=='vector_or_empty':
                         raster=single.new_page(width=original_page.rect.width,height=original_page.rect.height)
-                        raster.insert_image(raster.rect,pixmap=original_page.get_pixmap(alpha=False))
+                        # Keep the scan's native density (or ~216 dpi for vectors), not PyMuPDF's 72 dpi default.
+                        from tools.ocr.raster_policy import render_page
+                        raster.insert_image(raster.rect,pixmap=render_page(original_page)[0])
                     else: single.insert_pdf(pdf,from_page=unit['number']-1,to_page=unit['number']-1)
                     page_data=single.tobytes(); (folder/'source.pdf').write_bytes(page_data)
                 recognition=options.get('ocr_recognition_dir')
@@ -145,7 +147,9 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 from transformation.ocr.paddle_handoff import prepare
                 try:
                     with timed(run,'ocr_handoff',page=unit['number']):
-                        prepare(page_data,recognition,folder,filename)
+                        # A blank or illegible detector box is kept as a requires-review
+                        # region instead of failing the whole document.
+                        prepare(page_data,recognition,folder,filename,allow_unreadable=True)
                 except ValueError as exc:
                     # The handoff emits this only after verifying source image
                     # and detector hashes. Reuse validated empty evidence too.
@@ -218,6 +222,10 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                     info['redaction_review_required']=True
                     raise
                 save_json(run/'redaction-audit.json',redaction_audit)
+                fallbacks=sum(1 for a in redaction_audit if a.get('localization')=='whole_line_fallback')
+                if fallbacks:
+                    info['redaction_whole_line_fallbacks']=fallbacks
+                    info['warnings'].append(f'{fallbacks} scanned/image text line(s) were masked as a whole because the sensitive value could not be separated from its label.')
             else:
                 updates={r['id']:mask(r['text'],values) for r in text_regions(ir)}
                 safe_data,notes=write_package(safe_data,kind,updates,values); info['warnings'].extend(notes)
@@ -413,7 +421,8 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 independent['office_render_error']=str(exc)
         if redact and independent['uninspected_content'] and (options.get('ocr_python') or options.get('ocr_remote')):
             from transformation.validation.privacy_verification import verify
-            for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options):
+            output_language=options.get('target','ko') if translate else options.get('source','en')
+            for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,language=output_language):
                 if 'reports' in verification: independent['rendered_privacy']=verification
                 else: info['privacy_verification_page']=verification['page']; yield emit('privacy_verification')
             save_json(run/'privacy-verification.json',verification)

@@ -121,15 +121,96 @@ def verified_ocr_words(line, text, bbox):
     return result
 
 
-def _ocr_rectangles(region, values):
-    """Use complete-value boxes or verified word boxes; never erase a whole field."""
+def pixel_word_boxes(page, bbox, text):
+    """Split one OCR line into its whitespace-separated words using ink gaps.
+
+    Works on the rendered pixels inside the line box, so it needs no second OCR
+    model and no per-character width guesses. The k widest gaps (k = words - 1)
+    are taken as word gaps only when they are strictly wider than every other
+    gap, are a visible space, and give words whose widths are consistent with
+    their lengths (within a factor of two). Otherwise the split is ambiguous and
+    None is returned. Returns one display-coordinate Rect per word, or None.
+    """
+    import numpy as np
+    tokens=list(re.finditer(r'\S+',text))
+    rect=pymupdf.Rect(bbox)&page.rect
+    if not tokens or rect.is_empty or page.rotation:return None
+    scale=max(2.0,min(8.0,48/max(rect.height,1)))
+    pix=page.get_pixmap(matrix=pymupdf.Matrix(scale,scale),clip=rect,colorspace=pymupdf.csGRAY,alpha=False)
+    image=np.frombuffer(pix.samples,dtype=np.uint8).reshape(pix.height,pix.width)
+    if image.size==0:return None
+    border=np.concatenate([image[0],image[-1],image[:,0],image[:,-1]])
+    background=float(np.median(border))
+    ink=np.abs(image.astype(np.int16)-background)>64
+    columns=np.flatnonzero(ink.any(axis=0))
+    if not len(columns):return None
+    runs=[];start=prev=columns[0]
+    for c in columns[1:]:
+        if c!=prev+1:runs.append((start,prev));start=c
+        prev=c
+    runs.append((start,prev))
+    gaps=[(runs[i+1][0]-runs[i][1]-1,i) for i in range(len(runs)-1)]
+    k=len(tokens)-1
+    if k>len(gaps):return None
+    ordered=sorted(gaps,reverse=True)
+    rows=np.flatnonzero(ink.any(axis=1));ink_height=rows[-1]-rows[0]+1
+    if k:
+        narrowest=ordered[k-1][0]; next_gap=ordered[k][0] if k<len(ordered) else 0
+        # Word gaps must be wider than every letter gap and a visible space.
+        if narrowest<=next_gap or narrowest<max(2,.15*ink_height):return None
+    cuts=sorted(i for _,i in ordered[:k])
+    segments=[];first=0
+    for i in cuts+[len(runs)-1]:
+        segments.append((runs[first][0],runs[i][1]));first=i+1
+    widths=[b-a+1 for a,b in segments];lengths=[len(t.group()) for t in tokens]
+    for width,length in zip(widths,lengths):
+        actual=width/sum(widths);expected=length/sum(lengths)
+        if length>=2 and not .5<=actual/expected<=2:return None
+    return [pymupdf.Rect(rect.x0+a/scale,rect.y0,rect.x0+(b+1)/scale,rect.y1) for a,b in segments]
+
+
+def _ocr_rectangles(region, values, page=None, localization=None):
+    """Locate selected values inside an OCR line, preserving labels where possible.
+
+    In order: the whole line is the value; word boxes verified by two OCR
+    models; words split at ink gaps in the line's own pixels (whole words are
+    covered when a value starts or ends inside a word). If none of these can
+    place the value, the whole line is covered and the audit records that the
+    label was not preserved. A line box with no visible ink fails closed.
+    """
     text=region['text']; matches=[span for value in values for span in literal_spans(text,value)]
     if not matches:return []
+    record=localization if localization is not None else {}
+    if any(compact(text)==compact(value) for value in values):
+        record['localization']='whole_region_value';return [pymupdf.Rect(region['bbox'])]
     words=region.get('metadata',{}).get('redaction_words',[])
-    if not words:
-        if any(compact(text)==compact(value) for value in values):
-            return [pymupdf.Rect(region['bbox'])]
+    if words:
+        try:
+            result=_verified_word_rectangles(region,text,matches,words)
+            record['localization']='verified_words';return result
+        except RedactionLocalizationError:
+            if page is None:raise
+    elif page is None:
         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
+    boxes=pixel_word_boxes(page,region['bbox'],text)
+    if boxes:
+        tokens=list(re.finditer(r'\S+',text));result=[]
+        for a,b in matches:
+            chosen=[box for token,box in zip(tokens,boxes) if token.start()<b and token.end()>a]
+            if chosen:
+                union=chosen[0]
+                for box in chosen[1:]:union|=box
+                result.append(union+(-.75,-.5,.75,.5))
+        if len(result)==len(matches):
+            record['localization']='pixel_word_gaps';return result
+    if pixel_word_boxes(page,region['bbox'],'x') is None:
+        # Nothing visible in the line box: its geometry does not match the page.
+        raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
+    record['localization']='whole_line_fallback';record['label_preserved']=False
+    return [pymupdf.Rect(region['bbox'])+(-1,-1,1,1)]
+
+
+def _verified_word_rectangles(region,text,matches,words):
     result=[]
     for a,b in matches:
         selected=[w for w in words if a<w['end'] and b>w['start']]
@@ -145,6 +226,29 @@ def _ocr_rectangles(region, values):
                 raise RedactionLocalizationError([{'region_id':region['id'],'reason':'invalid_word_geometry'}])
             result.append(box)
     return result
+
+
+def remove_hidden_values(pdf,values):
+    """Selected values outside page content: form fields, comments, links, bookmarks.
+
+    Form fields are flattened so their visible values become page text and are
+    redacted with it. Comments and links whose text contains a selected value are
+    deleted; matching bookmark titles are replaced. Runs before glyph accounting.
+    """
+    needles=[compact(v) for v in values if compact(v)]
+    def contains(text):
+        text=compact(str(text or ''))
+        return any(n in text for n in needles)
+    if any(True for page in pdf for _ in (page.widgets() or [])):
+        pdf.bake(annots=False,widgets=True)
+    for page in pdf:
+        for annot in list(page.annots() or []):
+            if contains(' '.join(str(v) for v in annot.info.values())):page.delete_annot(annot)
+        for link in page.get_links():
+            if contains(link.get('uri')) or contains(link.get('file')):page.delete_link(link)
+    toc=pdf.get_toc(simple=False)
+    if any(contains(entry[1]) for entry in toc):
+        pdf.set_toc([[entry[0],'[REDACTED]' if contains(entry[1]) else entry[1],*entry[2:]] for entry in toc])
 
 
 def redact_pdf(data,ir,findings):
@@ -163,6 +267,7 @@ def redact_pdf(data,ir,findings):
             if region.get('metadata',{}).get('pii_detection_only'):
                 if actual.get(region['id'],{}).get('text')!=region['text']:
                     raise ValueError('PII native source evidence does not match the PDF.')
+        remove_hidden_values(pdf,values)
         for unit in ir['units']:
             index=unit['number']-1;page=pdf[index];blocks=native_blocks(page)
             native_rects=[]; boxes_by_value={v:[] for v in values}
@@ -194,14 +299,18 @@ def redact_pdf(data,ir,findings):
                     if any(c is not None and (region_box & pymupdf.Rect(c['bbox'])).get_area()>0
                            for block in blocks for c in block['chars']):
                         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'native_value_not_fully_located'}])
-                    rects=_ocr_rectangles(region,selected)
+                    localization={}
+                    rects=_ocr_rectangles(region,selected,page,localization)
                     for rect in rects:
                         rect=rect*page.derotation_matrix
-                        if not page.cropbox.contains(rect):raise RedactionLocalizationError([{'region_id':region['id'],'reason':'outside_page'}])
+                        # Page coordinates start at the crop box corner; page.cropbox is
+                        # measured from the media box, so compare with the crop box size.
+                        if not pymupdf.Rect(0,0,page.cropbox.width,page.cropbox.height).contains(rect):raise RedactionLocalizationError([{'region_id':region['id'],'reason':'outside_page'}])
                         page.add_redact_annot(rect,fill=(0,0,0));selected_boxes.append((index,rect))
                     audit.append({'region_id':region['id'],'method':'ocr_value_spans',
                         'selected_value_occurrences':sum(len(literal_spans(region['text'],v)) for v in selected),
-                        'propagated_exact_value':not any(f['region_id']==region['id'] for f in findings),'review_required':True})
+                        'propagated_exact_value':not any(f['region_id']==region['id'] for f in findings),'review_required':True,
+                        **localization})
             for value in values:
                 expected=[r for r in text_regions({'units':[unit]}) if literal_spans(r['text'],value)]
                 if expected and not native_rects and not any(a['region_id'] in {r['id'] for r in expected} for a in audit):

@@ -28,6 +28,23 @@ def _timestamp_spans(text):
     return spans
 
 
+def _phone_shape(value):
+    """Reject number columns that only resemble a phone after joining lines.
+
+    A printed phone number wraps at most once, and a wrapped one keeps a
+    separator within a line or an international '+'. Groups that are all
+    four-digit years are dates, not phone numbers.
+    """
+    breaks=value.count('\n')
+    if breaks>1:return False
+    if breaks and not value.startswith('+'):
+        lines=[line.strip() for line in value.split('\n')]
+        if not any(re.search(r'\d[- ().\t]+\d',line) for line in lines):return False
+    groups=re.findall(r'\d+',value)
+    if groups and all(len(g)==4 and 1900<=int(g)<=2099 for g in groups):return False
+    return True
+
+
 def _validated_proposals(response,text,categories):
     payload=json.loads(response)
     if not isinstance(payload,dict) or not isinstance(payload.get('findings'),list):
@@ -104,6 +121,7 @@ def detect(regions,categories,endpoint,model,assist=True):
             timestamps=_timestamp_spans(text)
             for m in re.finditer(r'(?<!\w)(?:\+\d[\d ()\t\r\n-]{7,}\d|\d{2,4}[- \t\r\n]+\d{2,4}[- \t\r\n]+\d{4})(?!\w)',text):
                 if any(m.start()<end and m.end()>start for start,end in timestamps):continue
+                if not _phone_shape(m.group()):continue
                 if 8<=len(re.sub(r'\D','',m.group()))<=15:
                     values.append((m.group(),'Phone numbers','pattern'))
         semantic=[c for c in categories if c not in {'Email addresses','Phone numbers'}]
