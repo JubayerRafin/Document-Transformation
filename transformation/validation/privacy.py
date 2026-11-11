@@ -39,6 +39,14 @@ def _validated_proposals(response,text,categories):
         value=finding.get('value')
         if not isinstance(value,str) or not value.strip() or value not in text:
             raise ValueError('PII response is not supported by an exact source span.')
+        # A field label is document structure, not part of its sensitive value.
+        # Reject an over-broad proposal so the existing bounded retry can correct
+        # it; never silently trim or invent the model's intended person/value.
+        separator=r'[ \t]*' if finding['category']=='Names' else r'[ \t]+'
+        for label in re.finditer(r'(?m)^[ \t]*([^\W\d_][^:\n]{0,59}:)'+separator+r'\S',text):
+            prefix=label.group(1)
+            if value.startswith(prefix) and text.find(value,label.start())==label.start(1):
+                raise ValueError('PII proposal includes a field label; return its value only.')
         proposals.append((value,finding['category'],'model_proposal'))
     return proposals
 
@@ -51,6 +59,7 @@ def _semantic_proposals(region,text,categories,endpoint,model):
     instruction=(
         'Identify sensitive information only in the supplied text field. Return JSON with findings: '
         'a list of objects with value (an exact contiguous substring of text) and category (one supplied category). '
+        'Return sensitive values only. Exclude field labels, headings, titles, separators and surrounding prose. '
         'extraction_context is background for interpreting the current cell only. Never return a value '
         'from a header, neighboring cell or extraction_context unless that exact value also occurs in text. '
         'If text contains no selected sensitive information, return findings: []. '
@@ -85,10 +94,15 @@ def detect(regions,categories,endpoint,model,assist=True):
         if 'Identifiers' in categories:
             values.extend((value,'Identifiers','credential_label_pattern') for value in _credential_values(text))
         if 'Email addresses' in categories:
-            values.extend((m.group(),'Email addresses','pattern') for m in re.finditer(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}',text))
+            # Retain exact source offsets across a wrapped domain. Do not join
+            # arbitrary preceding words into the local part of an address.
+            gap=r'[ \t]*(?:\n[ \t]*)?'
+            label=r'[\w-]+(?:[ \t]*\n[ \t]*[\w-]+){0,2}'
+            email=r'[\w.+-]+@'+gap+label+r'(?:'+gap+r'\.'+gap+label+r')*'+gap+r'\.'+gap+r'[A-Za-z]{2,}'
+            values.extend((m.group(),'Email addresses','pattern') for m in re.finditer(email,text))
         if 'Phone numbers' in categories:
             timestamps=_timestamp_spans(text)
-            for m in re.finditer(r'(?<!\w)(?:\+\d[\d ()-]{7,}\d|\d{2,4}[- ]\d{2,4}[- ]\d{4})(?!\w)',text):
+            for m in re.finditer(r'(?<!\w)(?:\+\d[\d ()\t\r\n-]{7,}\d|\d{2,4}[- \t\r\n]+\d{2,4}[- \t\r\n]+\d{4})(?!\w)',text):
                 if any(m.start()<end and m.end()>start for start,end in timestamps):continue
                 if 8<=len(re.sub(r'\D','',m.group()))<=15:
                     values.append((m.group(),'Phone numbers','pattern'))
@@ -102,8 +116,10 @@ def detect(regions,categories,endpoint,model,assist=True):
 
 
 def mask(text,values):
+    from transformation.validation.value_redaction import literal_spans
     for value in sorted(set(values),key=len,reverse=True):
-        text=text.replace(value,'[REDACTED]')
+        for a,b in reversed(literal_spans(text,value)):
+            text=text[:a]+'[REDACTED]'+text[b:]
     return text
 
 
@@ -112,8 +128,9 @@ def mask_runs(texts,values):
     text=''.join(texts); owners=[i for i,t in enumerate(texts) for _ in t]
     matches=[]
     for value in sorted(set(values),key=len,reverse=True):
-        for match in re.finditer(re.escape(value),text):
-            if not any(match.start()<b and match.end()>a for a,b in matches): matches.append((match.start(),match.end()))
+        from transformation.validation.value_redaction import literal_spans
+        for start,end in literal_spans(text,value):
+            if not any(start<b and end>a for a,b in matches): matches.append((start,end))
     starts={a:b for a,b in matches}; result=['']*len(texts); index=0
     while index<len(text):
         if index in starts: result[owners[index]]+='[REDACTED]'; index=starts[index]

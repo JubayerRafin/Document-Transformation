@@ -10,6 +10,37 @@ from tools.ocr.recognize_paddle_boxes import confirmed_label_prefix
 
 
 class PartialFieldTests(unittest.TestCase):
+    def test_geometry_only_words_cannot_upgrade_transcription_acceptance(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder);data,recognition,line=self.fixture(root)
+            line.update(text='Token: demo_123',recognition_score=.99,requires_review=False)
+            line.pop('confirmed_label')
+            line['candidates']=[{'text':line['text'],'score':.99,'variant':'detector_bounds','model':'en_PP-OCRv5_mobile_rec'}]
+            line['candidates'] += [{'text':line['text'],'score':.99,'variant':variant,'model':model,'purpose':'redaction_geometry_only'}
+                for variant,model in [('word_gap_primary','en_PP-OCRv5_mobile_rec'),('word_gap_english','PP-OCRv5_server_rec')]]
+            (recognition/'lines.jsonl').write_text(json.dumps(line)+'\n')
+            result=prepare(data,recognition,root/'out','unseen.pdf')
+            region=json.loads(Path(result['document_ir']).read_text())['pages'][0]['regions'][0]
+            self.assertFalse(region['metadata']['independent_literal_verified'])
+            self.assertTrue(region['metadata']['requires_review'])
+
+    def test_unreadable_region_requires_explicit_verification_mode(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root=Path(folder)
+            data,recognition,line=self.fixture(root)
+            line.update(text='',requires_review=True,recognition_decision='unreadable_source_region')
+            (recognition/'lines.jsonl').write_text(json.dumps(line)+'\n')
+            with self.assertRaisesRegex(ValueError,'must not be empty'):
+                prepare(data,recognition,root/'strict','unseen.pdf')
+            result=prepare(data,recognition,root/'verification','unseen.pdf',allow_unreadable=True)
+            ir=json.loads(Path(result['document_ir']).read_text())
+            region=ir['pages'][0]['regions'][0]
+            self.assertEqual(region['text'],'')
+            self.assertTrue(region['metadata']['requires_review'])
+            self.assertTrue(region['metadata']['ocr_unreadable'])
+            with pymupdf.open(result['input_pdf']) as output:
+                self.assertFalse(output[0].get_text().strip())
+
     def fixture(self,root):
         image=np.full((200,500,3),255,dtype=np.uint8)
         pix=pymupdf.Pixmap(pymupdf.csRGB,500,200,image.tobytes(),False)

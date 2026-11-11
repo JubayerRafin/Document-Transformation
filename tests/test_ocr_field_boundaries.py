@@ -11,6 +11,20 @@ from babeldoc.format.pdf.document_il.il_version_1 import (
 
 
 class RecognitionTests(unittest.TestCase):
+    def test_empty_targeted_reads_remain_explicitly_unresolved(self):
+        primary=self.Model([('',0.0)]*2)
+        secondary=self.Model([('',0.0)]*2)
+        best,review,decision,_=refine_recognition(np.full((20,100,3),255,np.uint8),primary,lambda:secondary,'en',[])
+        self.assertEqual(best['text'],'')
+        self.assertTrue(review)
+        self.assertEqual(decision,'unreadable_source_region')
+
+    def test_targeted_model_errors_are_not_silenced(self):
+        class Broken:
+            def predict(self,view): raise RuntimeError('predictor unavailable')
+        with self.assertRaisesRegex(RuntimeError,'predictor unavailable'):
+            refine_recognition(np.full((20,100,3),255,np.uint8),Broken(),lambda:Broken(),'en',[])
+
     def test_targeted_all_views_agree_with_confident_verification_engine(self):
         primary=self.Model([('Q8.4N',.88)]*2)
         secondary=self.Model([('Q8.4N',.97)]*2)

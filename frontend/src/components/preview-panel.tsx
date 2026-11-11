@@ -8,17 +8,25 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import { ApiClient, downloadUrl, seconds, type Job } from "@/lib/api";
+import {
+  ApiClient,
+  checkFindings,
+  downloadUrl,
+  seconds,
+  type Job,
+} from "@/lib/api";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
 export function PreviewPanel({
   job,
   api,
   onError,
+  readOnly = false,
 }: {
   job: Job;
   api: ApiClient;
   onError: (e: unknown) => void;
+  readOnly?: boolean;
 }) {
   const [urls, setUrls] = useState<{ source?: string; result?: string }>({}),
     [error, setError] = useState(""),
@@ -67,7 +75,7 @@ export function PreviewPanel({
             {job.filename}
           </h2>
           <p className="mb-0 text-xs text-muted-foreground">
-            {job.options.operation === "pii"
+            {job.options.operation === "manual_redaction" ? "Manual redaction" : job.options.operation === "pii"
               ? "PII redaction"
               : `${job.options.source_language.toUpperCase()} to ${job.options.target_language.toUpperCase()}`}{" "}
             · {job.pages || "Unknown"} pages
@@ -77,6 +85,20 @@ export function PreviewPanel({
           <Badge className="border-amber-800 bg-amber-950 text-amber-200">
             Review required
           </Badge>
+          {source && result && (
+            <Button asChild size="sm" variant="outline">
+              <a href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&compare=1`}>
+                Full-screen comparison
+              </a>
+            </Button>
+          )}
+          {result && !readOnly && (
+            <Button asChild size="sm" variant="outline">
+              <a href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&new=1`}>
+                Review &amp; add redactions
+              </a>
+            </Button>
+          )}
           {result && (
             <Button asChild size="sm">
               <a href={downloadUrl(job, result)}>
@@ -87,6 +109,35 @@ export function PreviewPanel({
           )}
         </div>
       </div>
+      {job.metrics.checks && (
+        <div
+          role="note"
+          aria-label="Automated checks"
+          className="rounded-xl border border-border bg-muted px-4 py-3 text-xs leading-5 text-muted-foreground sm:px-6"
+        >
+          <p className="mb-0 font-medium text-foreground">
+            {checkFindings(job.metrics.checks).length
+              ? "Automated checks flagged items for review"
+              : job.metrics.checks.acceptable
+                ? "Automated checks found no blocking issues"
+                : "Automated checks are incomplete for this output"}
+          </p>
+          {checkFindings(job.metrics.checks).length > 0 && (
+            <p className="mb-0">{checkFindings(job.metrics.checks).join(" · ")}</p>
+          )}
+          {job.options.operation !== "translation" && (
+            <p className="mb-0">
+              Rendered-output privacy check:{" "}
+              {job.metrics.checks.privacy_verification === "passed"
+                ? "passed"
+                : job.metrics.checks.privacy_verification === "failed"
+                  ? "found items to review"
+                  : "not run"}
+              . Automated checks do not replace a full human review.
+            </p>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="mb-0 text-xs text-muted-foreground">
           Compare the original document with the generated output.

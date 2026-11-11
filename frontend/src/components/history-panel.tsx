@@ -131,14 +131,14 @@ export function HistoryPanel({
                     </div>
                   </td>
                   <td className="whitespace-nowrap px-5 py-5 text-muted-foreground">
-                    {j.options.operation === "pii"
+                    {j.options.operation === "manual_redaction" ? "Manual redaction" : j.options.operation === "pii"
                       ? "PII redaction"
                       : j.options.operation === "combined"
                         ? "Translation + PII"
                         : "Translation"}
                   </td>
                   <td className="whitespace-nowrap px-5 py-5">
-                    <StatusBadge status={j.status} />
+                    <StatusBadge status={j.options.operation === "manual_redaction" && j.status === "uploading" ? "draft" : j.status} />
                   </td>
                   <td className="whitespace-nowrap px-5 py-5 text-muted-foreground tabular-nums">
                     {seconds(j.metrics.server_seconds)}

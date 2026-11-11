@@ -14,8 +14,13 @@ class PiiOccurrenceTests(unittest.TestCase):
         with pymupdf.open() as scan:
             p=scan.new_page(width=300,height=200);p.insert_image(p.rect,stream=png)
             source=scan.tobytes()
-        ir={'units':[{'number':1,'regions':[{'id':'a','text':'ID: DEMO-991','bbox':[30,30,130,50]},
-            {'id':'b','text':'Badge DEMO-991','bbox':[30,100,130,120]}]}]}
+        def region(id,text,box):
+            start=text.index('DEMO-991')
+            return {'id':id,'text':text,'bbox':box,'metadata':{'redaction_words':[
+                {'text':'DEMO-991','start':start,'end':start+8,'bbox':box,
+                 'evidence':'two_recognizers_at_detected_word_boundaries'}]}}
+        ir={'units':[{'number':1,'regions':[region('a','ID: DEMO-991',[30,30,130,50]),
+            region('b','Badge DEMO-991',[30,100,130,120])]}]}
         result,audit=redact_pdf(source,ir,[{'region_id':'b','value':'DEMO-991'}])
         self.assertEqual({a['region_id'] for a in audit},{'a','b'})
         self.assertTrue(next(a for a in audit if a['region_id']=='a')['propagated_exact_value'])

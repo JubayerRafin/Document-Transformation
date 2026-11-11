@@ -33,14 +33,17 @@ export function useWorkspace() {
     async (signal?: AbortSignal) => {
       const session = api.csrf;
       try {
-        const [j, w] = await Promise.all([
+        const [j, w] = await Promise.allSettled([
           api.jobs(signal),
           api.workers(signal),
         ]);
         if (signal?.aborted || !session || api.csrf !== session) return;
-        setJobs(j);
-        setWorkers(w);
-        setError("");
+        if (j.status === "fulfilled") setJobs(j.value);
+        if (w.status === "fulfilled") setWorkers(w.value);
+        const failures = [j, w].filter((r) => r.status === "rejected");
+        const failed = failures.find((r) => r.reason instanceof ApiError && r.reason.status === 401) || failures[0];
+        if (failed) handleError(failed.reason);
+        else setError("");
       } catch (e) {
         if (signal?.aborted || api.csrf !== session) return;
         handleError(e);

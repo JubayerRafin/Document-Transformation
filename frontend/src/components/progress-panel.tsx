@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import {
   ApiClient,
+  failureMessage,
   stageName,
   seconds,
   type Job,
@@ -122,7 +123,7 @@ export function ProgressPanel({
               : complete
                 ? "Generation is complete. Review the document before sharing it."
                 : failed
-                  ? "The engine or connection did not complete successfully. Your original document remains available."
+                  ? failureMessage(job.error_code)
                   : job.status === "cancelled"
                     ? "This queued job will not start."
                     : "Recorded stages appear below as the worker reports them. Closing this page does not stop processing."}

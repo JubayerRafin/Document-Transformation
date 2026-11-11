@@ -117,9 +117,19 @@ Source and result uploads are bounded to 50 MB. Generated is distinct from appro
 fresh jobs do not inherit COMET scores or prior human approval.
 
 If the worker crashes or result transport fails, inspect its private logs and
-processes first. A persisted running lease may represent still-running GPU work.
-Only after confirming it stopped should an administrator mark the job interrupted
-and submit a new run. Closing the website does not stop GPU billing.
+processes first. Closing the website does not stop GPU billing.
+
+Job recovery (`supabase/migrations/202611120001_job_recovery.sql`, run once after
+`202610220002_private_workers.sql`): a running job whose worker sends no heartbeat
+for 15 minutes is marked `interrupted` (`WORKER_HEARTBEAT_LOST`) when its owner
+opens their history or revokes the worker. When the same worker claims again (it
+runs one job at a time) its silent job is interrupted after 2 minutes. Interrupted
+jobs are never replayed; resubmit them. A late result for an interrupted job is
+rejected, and a still-running worker that is told its lease is gone stops its
+engine processes. The worker also stops engines that exceed `timeout_seconds`
+plus 5 minutes, retries result uploads for about 4 minutes, and reports only a
+reason code (for example `ENGINE_TIMEOUT`, `REDACTION_REVIEW_REQUIRED`) plus
+counts of automated-check findings; engine error text stays in its private logs.
 
 ## 5. Deployment acceptance checks
 

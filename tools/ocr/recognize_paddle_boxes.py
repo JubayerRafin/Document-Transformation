@@ -130,6 +130,38 @@ def confirmed_label_prefix(primary,secondary):
     return None
 
 
+def redaction_word_candidates(crop, record, primary, secondary_factory, language):
+    """Bounded source-word localization for fields; never interpolate characters.
+
+    Distinct English/mobile and multilingual/server predictors must agree on
+    every word. Unsupported languages, skew, long fields and disagreement keep
+    their ordinary OCR evidence and require precise-region review if selected.
+    """
+    import math
+    text=record.get('text','').strip();poly=record.get('polygon_pixels',[])
+    if language!='en' or not (re.match(r'^[^:\n]{1,48}:\s*\S',text) or '@' in text):return []
+    if len(poly)!=4 or any(abs(poly[a][axis]-poly[b][axis])>1.5
+                          for a,b,axis in [(0,1,1),(2,3,1),(0,3,0),(1,2,0)]):return []
+    pieces=split_word_crops(crop)
+    if not 1<len(pieces)<=8:return []
+    candidates=[]
+    for model,variant,name in [(primary,'word_gap_primary','en_PP-OCRv5_mobile_rec'),
+            (secondary_factory(),'word_gap_english','PP-OCRv5_server_rec')]:
+        words=[];offset=0
+        for piece in pieces:
+            result=list(model.predict(piece))
+            if len(result)!=1:raise ValueError('Expected one OCR word-localization result.')
+            token=str(result[0]['rec_text']).strip();score=float(result[0]['rec_score'])
+            if not math.isfinite(score) or not 0<=score<=1:raise ValueError('Invalid OCR word-localization confidence.')
+            words.append({'text':token,'score':score,'start':offset,'end':offset+piece.shape[1]})
+            offset+=piece.shape[1]
+        joined=' '.join(w['text'] for w in words)
+        if joined!=text or any(not w['text'] or w['score']<.90 for w in words):return []
+        candidates.append({'text':joined,'score':min(w['score'] for w in words),
+                           'variant':variant,'model':name,'words':words,'purpose':'redaction_geometry_only'})
+    return candidates
+
+
 def sensitive_literal(text):
     """Sensitive glyph decisions require another recognizer, not resized copies."""
     import unicodedata
@@ -295,7 +327,10 @@ def refine_recognition(crop,primary,secondary_factory,language,previous):
     if confirmed and (not strong or strong=={consensus_key(confirmed['text'])}):
         return confirmed,False,'targeted_source_model_agreement',reads
     nonempty=[r for r in previous+reads if r['text'].strip()]
-    if not nonempty: raise ValueError('Targeted OCR could not read any source text.')
+    if not nonempty:
+        # A detector can select blank, masked or illegible pixels. Preserve the
+        # uncertainty without inventing text or discarding the other regions.
+        return dict(reads[0], text='', score=0.0),True,'unreadable_source_region',reads
     return max(nonempty,key=lambda r:r['score']),True,'targeted_source_unresolved',reads
 
 
@@ -411,6 +446,7 @@ def main(argv=None, model_factory=None):
         metadata = {'status': 'processing', 'model': model_name, 'device': args.device, 'cpu_threads': 10,'profile':args.profile,
                     'targeted_retry':'source-density-tight-word-gaps-v1' if args.profile=='bounded' else None,
                     'maximum_targeted_calls_per_region':16 if args.profile=='bounded' else None,
+                    'maximum_redaction_localization_calls_per_region':16 if args.profile=='bounded' else None,
                     'source_language':args.source_language,
                     'verification_model':'PP-OCRv5_server_rec',
                     'crop_padding_pixels': args.padding,
@@ -444,6 +480,10 @@ def main(argv=None, model_factory=None):
                             candidates.extend(retries)
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
+                        # Localization evidence supplements the transcription. It
+                        # never changes its text, confidence or acceptance decision.
+                        candidates.extend(redaction_word_candidates(unpadded_crops[i],record,model,
+                                                                    verification_model,args.source_language))
                         evidence.write(json.dumps(record,ensure_ascii=False)+'\n'); evidence.flush()
                         print(f'Recognized {i+1}/{len(records)} ({len(candidates)} source views)',flush=True)
                         continue

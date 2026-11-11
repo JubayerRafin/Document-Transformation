@@ -9,6 +9,22 @@ def response(value,category='Names'):
 
 
 class PrivacyProposalTests(unittest.TestCase):
+    def test_field_label_is_retried_instead_of_redacted_with_person(self):
+        with patch('transformation.llm.ollama_native.chat',side_effect=[response('Full Name: Maya Stone'),response('Maya Stone')]) as chat:
+            findings=detect([{'id':'r','text':'Full Name: Maya Stone'}],['Names'],'unused','model')
+        self.assertEqual(findings[0]['value'],'Maya Stone')
+        self.assertEqual(chat.call_count,2)
+
+    def test_repeated_whole_field_proposals_do_not_release_over_redaction(self):
+        with patch('transformation.llm.ollama_native.chat',return_value=response('Name: Maya')):
+            with self.assertRaisesRegex(ValueError,'validation after retry'):
+                detect([{'id':'r','text':'Name: Maya'}],['Names'],'unused','model')
+
+    def test_colon_bearing_identifier_is_not_mistaken_for_a_field_label(self):
+        for value in ('urn:demo-981','dead:beef:0:0:0:0:0:1'):
+            with patch('transformation.llm.ollama_native.chat',return_value=response(value,'Identifiers')):
+                self.assertEqual(detect([{'id':'r','text':value}],['Identifiers'],'unused','model')[0]['value'],value)
+
     def test_neighbor_value_retried_without_context_not_silently_accepted(self):
         region={'id':'cell','text':'Employee ID','metadata':{'row_values':['Employee ID','Maya Stone']}}
         with patch('transformation.llm.ollama_native.chat',side_effect=[response('Maya Stone'),('{"findings":[]}',{})]) as chat:

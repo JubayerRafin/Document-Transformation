@@ -35,7 +35,7 @@ describe("existing API contract", () => {
     api.csrf = "session-csrf";
     await api.submit(
       new File(["%PDF-test"], "sample.pdf"),
-      job.options,
+      { ...job.options, operation: "translation" },
       "stable-key",
     );
     const [path, init] = transport.mock.calls[0];

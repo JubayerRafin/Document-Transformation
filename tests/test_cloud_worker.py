@@ -82,11 +82,11 @@ class CloudWorkerReadinessTests(unittest.TestCase):
     def test_translation_model_does_not_advertise_pii_or_combined(self):
         state=self.check(['translategemma:12b'])
         self.assertTrue(state['ready'])
-        self.assertEqual(state['operations'],['translation'])
+        self.assertEqual(state['operations'],['translation','manual_redaction'])
 
     def test_both_models_advertise_all_operations(self):
         state=self.check(['translategemma:12b','qwen3.5:9b'])
-        self.assertEqual(state['operations'],['translation','pii','combined'])
+        self.assertEqual(state['operations'],['translation','pii','combined','manual_redaction'])
 
     def test_cpu_paddle_never_advertises_gpu_readiness(self):
         self.assertFalse(self.check(['translategemma:12b'],cuda=False)['ready'])

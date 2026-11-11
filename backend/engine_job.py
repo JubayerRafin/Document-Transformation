@@ -42,8 +42,9 @@ def main():
             for event in run_workflow(Path(request['source']).read_bytes(),request['filename'],operation,**options):
                 terminal=event
                 log.write(json.dumps({'stage':event.get('stage','processing'),'elapsed_seconds':event.get('seconds',0)},default=str)+'\n')
-    except Exception:
+    except Exception as exc:
         (folder/'engine-error.log').write_text(traceback.format_exc(),encoding='utf8')
-        terminal={'status':'failed','stage':'failed'}
+        terminal={'status':'failed','stage':'failed',
+                  'failure_code':'ENGINE_TIMEOUT' if isinstance(exc,TimeoutError) else 'ENGINE_FAILED'}
     terminal_path.write_text(json.dumps(terminal or {'status':'failed'},ensure_ascii=False,default=str),encoding='utf8')
 if __name__=='__main__':main()
