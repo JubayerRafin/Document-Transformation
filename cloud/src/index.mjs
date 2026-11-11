@@ -1,5 +1,19 @@
 import frontendCsp from '../generated/frontend-csp.json' with {type:'json'};
+import {manualRoute} from './manual-redaction.mjs';
 const BUCKET='transformx-private', MAX=50_000_000;
+// Reasons a worker may report. Free text from the engine never reaches the API.
+export const FAILURE_CODES=['ENGINE_FAILED','ENGINE_TIMEOUT','INPUT_REJECTED','OUTPUT_INVALID','RESULT_UPLOAD_FAILED',
+ 'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED'];
+// Running jobs heartbeat every ~10 s; silence this long means the worker stopped.
+const STALE_SECONDS=900;
+const CHECK_COUNTS=['known_sensitive_residuals','geometry_blockers','layout_review_candidates','uninspected_content','scan_acceptance_blockers','translation_errors'];
+export function checks(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
+ const c={acceptable:raw.acceptable===true,
+  privacy_verification:['passed','failed','not_run'].includes(raw.privacy_verification)?raw.privacy_verification:'not_run'};
+ for(const k of CHECK_COUNTS)c[k]=Number.isInteger(raw[k])&&raw[k]>=0&&raw[k]<=1_000_000?raw[k]:0;
+ return c;
+}
 export class Fault extends Error { constructor(code,status=400){super(code);this.status=status;} }
 const json=(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 export const sha=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -66,11 +80,19 @@ export function createHandler(transport=fetch){
   const r=await transport(env.SUPABASE_URL+'/storage/v1/object/'+BUCKET+'/'+pathKey(key),{method:'POST',headers:{apikey:secret(),'Content-Type':mime,'x-upsert':'false'},body:bytes});
   if(!r.ok)throw new Fault('STORAGE_UPLOAD_FAILED',502);
  }
+ // Retries reuse content-addressed keys. An object left by an earlier attempt
+ // is accepted only when its bytes hash to the expected digest.
+ async function uploadOnce(key,bytes,mime,hash){
+  try{await upload(key,bytes,mime);}catch(e){
+   let r;try{r=await transport(await signed(key));}catch{throw e;}
+   if(!r.ok||await sha(await r.arrayBuffer())!==hash)throw e;
+  }
+ }
  async function body(){try{const text=await request.text();if(text.length>120000)throw new Fault('BODY_TOO_LARGE',413);return JSON.parse(text);}catch(e){if(e instanceof Fault)throw e;throw new Fault('INVALID_JSON');}}
- async function output(j){
-  const [arts,source]=await Promise.all([db('tx_artifacts','?job_id=eq.'+j.id+'&kind=neq.manifest&select=id,kind,filename,sha256,size'),Promise.resolve(j.source_sha256)]);
+ async function output(j,knownArtifacts){
+  const arts=knownArtifacts??await db('tx_artifacts','?job_id=eq.'+j.id+'&kind=neq.manifest&select=id,kind,filename,sha256,size');
   const {lease,request_hash,idempotency_key,...visible}=j;
-  return {...visible,source_sha256:source,pages:j.metrics.pages||0,artifacts:arts,created:Date.parse(j.created)/1000,updated:Date.parse(j.updated)/1000};
+  return {...visible,source_sha256:j.source_sha256,pages:j.metrics.pages||0,artifacts:arts,created:Date.parse(j.created)/1000,updated:Date.parse(j.updated)/1000};
  }
  try{
   if(!env.SUPABASE_URL||!env.SUPABASE_PUBLISHABLE_KEY)throw new Fault('SUPABASE_NOT_CONFIGURED',503);
@@ -98,7 +120,7 @@ export function createHandler(transport=fetch){
    const w=await worker();await patch('tx_workers','?id=eq.'+w.id,{heartbeat:new Date().toISOString()});
    if(p==='/worker/status'&&method==='POST'){
     const b=await body(),c=b.capabilities;
-    if(!c||typeof c!=='object'||!Array.isArray(c.operations)||c.operations.some(o=>!['translation','pii','combined'].includes(o)))throw new Fault('INVALID_CAPABILITIES');
+    if(!c||typeof c!=='object'||!Array.isArray(c.operations)||c.operations.some(o=>!['translation','pii','combined','manual_redaction'].includes(o)))throw new Fault('INVALID_CAPABILITIES');
     const capabilities={ready:c.ready===true,operations:[...new Set(c.operations)],
       gpu:typeof c.gpu==='string'?c.gpu.slice(0,150):'',note:typeof c.note==='string'?c.note.slice(0,300):'',
       models:Array.isArray(c.models)?c.models.filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,100)):[]};
@@ -106,26 +128,55 @@ export function createHandler(transport=fetch){
    }
    if(p==='/worker/claim'&&method==='POST'){
     const rows=await sb('/rest/v1/rpc/tx_claim',{method:'POST',body:JSON.stringify({p_worker:w.id})});if(!rows.length)return json({job:null});
-    const j=rows[0],a=await db('tx_artifacts','?job_id=eq.'+j.id+'&kind=eq.source');return json({job:{id:j.id,lease:j.lease,filename:j.filename,source_sha256:j.source_sha256,options:j.options,input_url:await signed(a[0].storage_key)}});
+    const j=rows[0],a=await db('tx_artifacts','?job_id=eq.'+j.id+'&kind=eq.source');
+    if(!a[0]){
+     // Never leave a claimed job running without input: it would block this worker.
+     await patch('tx_jobs','?id=eq.'+j.id+'&status=eq.running&lease=eq.'+j.lease,{status:'failed',stage:'failed',error_code:'INPUT_REJECTED',updated:new Date().toISOString()});
+     return json({job:null});
+    }
+    return json({job:{id:j.id,lease:j.lease,filename:j.filename,source_sha256:j.source_sha256,options:j.options,input_url:await signed(a[0].storage_key)}});
    }
    const m=p.match(/^\/worker\/jobs\/([^/]+)\/(heartbeat|result|fail)$/);if(!m||method!=='POST')throw new Fault('NOT_FOUND',404);
-   const j=await lease(m[1],w),condition='?id=eq.'+j.id+'&status=eq.running&lease=eq.'+j.lease;
+   let j;
+   try{j=await lease(m[1],w);}catch(e){
+    // A result retry after a lost response: the job already finished under this
+    // lease with these exact bytes. Acknowledge instead of reporting a conflict.
+    if(!(e instanceof Fault&&e.message==='LEASE_INVALID'&&m[2]==='result'))throw e;
+    const done=(await db('tx_jobs','?id=eq.'+m[1]+'&worker_id=eq.'+w.id+'&status=eq.succeeded'))[0];
+    if(!done||done.lease!==request.headers.get('X-Job-Lease'))throw e;
+    const file=(await request.formData()).get('file');if(!file||typeof file==='string')throw e;
+    const arts=await db('tx_artifacts','?job_id=eq.'+done.id+'&kind=eq.result&select=sha256');
+    if(!arts[0]||arts[0].sha256!==await sha(await file.arrayBuffer()))throw e;
+    return json({status:'recorded',replayed:true});
+   }
+   const condition='?id=eq.'+j.id+'&status=eq.running&lease=eq.'+j.lease;
    if(m[2]==='heartbeat'){
     const b=await body(),stage=typeof b.stage==='string'?b.stage.slice(0,80):'processing',elapsed=Number(b.elapsed_seconds||0);
     if(!Number.isFinite(elapsed)||elapsed<0)throw new Fault('INVALID_PROGRESS');
     await patch('tx_jobs',condition,{heartbeat:new Date().toISOString(),updated:new Date().toISOString(),stage});
     if(j.stage!==stage)await insert('tx_events',{job_id:j.id,stage,elapsed_seconds:elapsed});return json({status:'recorded'});
    }
-   if(m[2]==='fail'){await patch('tx_jobs',condition,{status:'failed',stage:'failed',error_code:'ENGINE_FAILED',updated:new Date().toISOString()});return json({status:'recorded'});}
+   if(m[2]==='fail'){
+    // Older workers send {}; unknown codes are recorded as a generic engine failure.
+    const b=await body(),code=FAILURE_CODES.includes(b?.code)?b.code:'ENGINE_FAILED';
+    const changed=await patch('tx_jobs',condition,{status:'failed',stage:'failed',error_code:code,updated:new Date().toISOString()});
+    if(changed?.length)await insert('tx_events',{job_id:j.id,stage:'failed'});
+    return json({status:'recorded'});
+   }
    const f=await request.formData(),file=f.get('file');if(!file||typeof file==='string'||file.size>MAX)throw new Fault('INVALID_RESULT');
    let metrics;try{metrics=JSON.parse(f.get('metrics'));}catch{throw new Fault('INVALID_METRICS');}
    if(!metrics||typeof metrics!=='object'||Array.isArray(metrics)||metrics.source_sha256!==j.source_sha256)throw new Fault('SOURCE_HASH_MISMATCH');
+   if(j.options.operation==='manual_redaction'&&metrics.manual_redaction_verified!==true)throw new Fault('MANUAL_REDACTION_NOT_VERIFIED',409);
    const bytes=await file.arrayBuffer();if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')throw new Fault('INVALID_PDF');
-   const hash=await sha(bytes),key=j.owner+'/'+j.id+'/result-'+hash+'.pdf';await upload(key,bytes,'application/pdf');
+   const hash=await sha(bytes),key=j.owner+'/'+j.id+'/result-'+hash+'.pdf';await uploadOnce(key,bytes,'application/pdf',hash);
    // Store only bounded scalar evidence; no private filesystem paths or credentials.
    const measured={acceptance_checked:false,evaluation_status:'pending',source_sha256:j.source_sha256};
    for(const k of ['server_seconds','total_seconds','pages','blockers'])if(typeof metrics[k]==='number'&&Number.isFinite(metrics[k])&&metrics[k]>=0)measured[k]=metrics[k];
    measured.gpu_verified=metrics.gpu_verified===true;
+   const c=checks(metrics.checks);if(c)measured.checks=c;
+   if(j.options.operation==='manual_redaction'){
+    measured.manual_redaction_verified=true;measured.manual_regions=j.options.regions.length;
+   }
    await sb('/rest/v1/rpc/tx_finish',{method:'POST',body:JSON.stringify({p_job:j.id,p_worker:w.id,p_lease:j.lease,p_artifact:{storage_key:key,filename:j.filename.replace(/\.pdf$/i,'')+'-transformed.pdf',sha256:hash,size:bytes.byteLength},p_metrics:measured})});return json({status:'recorded'});
   }
   if(p.startsWith('/v1/')){
@@ -154,8 +205,18 @@ export function createHandler(transport=fetch){
     return json({database:'PostgreSQL · Supabase',worker:ws.some(w=>Date.now()-Date.parse(w.heartbeat)<60000)?'connected':'offline',gpu_verified:false,software_version:'cloud-v1'});
    }
    if(p==='/v1/jobs'&&method==='GET'){
+    // Mark this account's silent running jobs interrupted so the page and its
+    // worker do not wait forever. Best effort: a database without the
+    // 202611120001 migration still lists history.
+    try{await sb('/rest/v1/rpc/tx_interrupt_stale',{method:'POST',body:JSON.stringify({p_owner:u.id,p_worker:null,p_grace_seconds:STALE_SECONDS})});}catch{}
     const filter=u.role==='admin'?'':u.role==='mentor'||u.role==='viewer'?'&or=(owner.eq.'+u.id+',baseline.eq.true)':'&owner=eq.'+u.id;
-    const jobs=await db('tx_jobs','?select=*&order=created.desc&limit=100'+filter);return json(await Promise.all(jobs.map(output)));
+    const jobs=await db('tx_jobs','?select=*&order=created.desc&limit=100'+filter);
+    // Keep history within the Workers subrequest budget as records accumulate.
+    // Authorize/filter jobs first, then fetch only their public artifact metadata.
+    const arts=jobs.length?await db('tx_artifacts','?job_id=in.('+jobs.map(j=>j.id).join(',')+')&kind=neq.manifest&select=job_id,id,kind,filename,sha256,size'):[];
+    const grouped=new Map(jobs.map(j=>[j.id,[]]));
+    for(const {job_id,...a} of arts)grouped.get(job_id)?.push(a);
+    return json(await Promise.all(jobs.map(j=>output(j,grouped.get(j.id)))));
    }
    if(p==='/v1/jobs'&&method==='POST'){
     if(!['admin','mentor','customer'].includes(u.role))throw new Fault('PROCESSING_ROLE_REQUIRED',403);
@@ -189,6 +250,8 @@ export function createHandler(transport=fetch){
    const match=p.match(/^\/v1\/jobs\/([^/]+)(?:\/(.*))?$/);
    if(match){
     const j=await job(match[1],u),sub=match[2];
+    const manual=await manualRoute({sub,method,j,u,body,db,insert,patch,sb,transport,env,BUCKET,MAX,signed,sha,Fault,json,request});
+    if(manual)return manual;
     if(!sub&&method==='GET')return json(await output(j));
     if(sub==='events'&&method==='GET')return json((await db('tx_events','?job_id=eq.'+j.id+'&order=id&limit=500')).map(e=>({...e,created:Date.parse(e.created)/1000})));
     if(sub==='cancel'&&method==='POST'){
@@ -203,10 +266,15 @@ export function createHandler(transport=fetch){
      await insert('tx_reviews',{job_id:j.id,reviewer:u.id,output_sha256:arts[0].sha256,decision:b.decision,note:b.note});return json({status:'recorded'});
     }
     if(sub==='report'&&method==='GET'){const r=json(await output(j));r.headers.set('Content-Disposition','attachment; filename="run-report.json"');return r;}
-    const a=sub?.match(/^artifacts\/([a-f0-9-]+)(?:\/url)?$/);
+    const a=sub?.match(/^artifacts\/([a-f0-9-]+)(?:\/(url|content))?$/);
     if(a&&method==='GET'){
      const arts=await db('tx_artifacts','?id=eq.'+a[1]+'&job_id=eq.'+j.id+'&kind=neq.manifest');if(!arts[0])throw new Fault('NOT_FOUND',404);
-     const link=await signed(arts[0].storage_key);return sub.endsWith('/url')?json({url:link}):Response.redirect(link,302);
+     const link=await signed(arts[0].storage_key);
+     if(a[2]==='content'){
+      const upstream=await transport(link);if(!upstream.ok)throw new Fault('PREVIEW_UNAVAILABLE',502);
+      return new Response(upstream.body,{headers:{'Content-Type':'application/pdf','Cache-Control':'no-store','Content-Disposition':'inline'}});
+     }
+     return sub.endsWith('/url')?json({url:link}):Response.redirect(link,302);
     }
    }
    if(p==='/v1/baselines'&&method==='GET')return json([]);
@@ -227,6 +295,7 @@ export default {async fetch(request,env){
  const path=new URL(request.url).pathname.replace(/\/$/,'')||'/';
  const page=path==='/index.html'?'/':path.replace(/\.html$/,'');
  const hashes=frontendCsp[page];
- r.headers.set('Content-Security-Policy',`default-src 'self'; script-src 'self'${hashes?.length?' '+hashes.join(' '):''}; style-src 'self'; ${hashes?"style-src-attr 'unsafe-inline'; ":''}img-src 'self' data:; connect-src 'self'; frame-src ${env.SUPABASE_URL}; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'`);
+ const editor=path==='/redaction-review.html';
+ r.headers.set('Content-Security-Policy',`default-src 'self'; script-src 'self'${editor?" 'wasm-unsafe-eval'":''}${hashes?.length?' '+hashes.join(' '):''}; style-src 'self'; ${hashes||editor?"style-src-attr 'unsafe-inline'; ":''}img-src 'self' data: blob:; connect-src 'self'; worker-src 'self'; frame-src ${env.SUPABASE_URL}; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'`);
  if(new URL(request.url).pathname.startsWith('/v1/'))r.headers.set('Cache-Control','no-store');return r;
 }};

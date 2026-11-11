@@ -21,6 +21,18 @@ or Vercel runtime is required. Studio retains its plain HTML/CSS/JavaScript UI a
 the Python engine executes on the worker host. Local FastAPI uses SQLite by
 default with PostgreSQL configuration support; it is a separate deployment.
 
+Manual-redaction review adds the shared `cloud/ui/redaction-review.*` editor and
+`cloud/src/manual-redaction.mjs`; `build_cloud_frontend.py` packages pinned
+`pdfjs-dist` viewer resources from frontend dependencies. It uses non-runnable
+uploading child jobs for private drafts and the existing claim/finish SQL for
+finalization, with no new schema migration. Older workers must not claim manual
+jobs: verify an updated owned worker advertises `manual_redaction`. Run
+`tools/service/test_manual_redaction.ps1`, then browser-check the synthetic
+fixture and an authorized live synthetic version. DOM tests stub PDF.js and do
+not establish actual browser rendering. Failed Next exports must not be replaced
+with stale frontend assets. Deployment/worker update must preserve existing
+jobs and translation/PII settings. Details: `docs/MANUAL_REDACTION.md`.
+
 Commands from the repository root:
 
 ```powershell

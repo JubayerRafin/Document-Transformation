@@ -19,46 +19,17 @@ def save_json(path,value):
 
 
 def redact_pdf(data,ir,findings):
-    regions={r['id']:r for r in text_regions(ir)}
-    for finding in findings:
-        if finding['region_id'] not in regions or not finding.get('value') or finding['value'] not in regions[finding['region_id']]['text']:
-            raise ValueError('PII redaction requires an exact source-region finding.')
-    values=sorted({f['value'] for f in findings},key=len,reverse=True)
-    audit=[]
-    with pymupdf.open(stream=data,filetype='pdf') as pdf:
-        for unit in ir['units']:
-            page=pdf[unit['number']-1]
-            native=bool(page.get_text().strip())
-            unit_regions=text_regions({'units':[unit]})
-            if native:
-                # A selected value stays sensitive at every occurrence, including
-                # pages where the model did not propose it a second time.
-                for value in values:
-                    matches=page.search_for(value)
-                    expected=[r for r in unit_regions if value in r.get('text','')]
-                    if expected and not matches:raise ValueError('PII value could not be located safely in the PDF.')
-                    for box in matches:page.add_redact_annot(box,fill=(0,0,0))
-                    for region in expected:
-                        audit.append({'region_id':region['id'],'method':'exact_search','review_required':True})
-            else:
-                for region in unit_regions:
-                    selected=[v for v in values if v in region.get('text','')]
-                    if not selected:continue
-                    box=(pymupdf.Rect(region['bbox'])+(-2,-2,2,2))&page.rect
-                    if box.is_empty:raise ValueError('PII value could not be located safely in the PDF.')
-                    page.add_redact_annot(box,fill=(0,0,0))
-                    audit.append({'region_id':region['id'],'method':'whole_ocr_line',
-                                  'selected_value_occurrences':sum(region['text'].count(v) for v in selected),
-                                  'propagated_exact_value':not any(f['region_id']==region['id'] for f in findings),
-                                  'review_required':True})
-            page.apply_redactions(images=2,graphics=2,text=0)
-        pdf.set_metadata({}); pdf.del_xml_metadata()
-        for name in pdf.embfile_names(): pdf.embfile_del(name)
-        result=pdf.tobytes(garbage=4,deflate=True,clean=True)
-    with pymupdf.open(stream=result,filetype='pdf') as verified:
-        if any(page.search_for(v) for page in verified for v in values):
-            raise ValueError('Selected sensitive text remains searchable after redaction.')
-    return result,audit
+    from transformation.validation.value_redaction import redact_pdf as precise_redact
+    return precise_redact(data,ir,findings)
+
+
+def failure_code(exc):
+    """Reason code for the hosted API; the free-text error stays in the private run folder."""
+    from transformation.validation.value_redaction import RedactionLocalizationError,RedactionVerificationError
+    if isinstance(exc,RedactionLocalizationError):return 'REDACTION_REVIEW_REQUIRED'
+    if isinstance(exc,RedactionVerificationError):return exc.code
+    if isinstance(exc,TimeoutError):return 'ENGINE_TIMEOUT'
+    return 'ENGINE_FAILED'
 
 
 def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(),pii_assist=True,
@@ -222,10 +193,30 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
         if redact:
             yield emit('pii_detection')
             findings=detect(text_regions(ir),pii_categories,pii_endpoint,pii_model,pii_assist)
+            if kind=='pdf':
+                from transformation.validation.value_redaction import native_pattern_regions,compact
+                # Native blocks retain real line breaks and style-run boundaries.
+                # They supplement deterministic detection, not translation input.
+                extra=native_pattern_regions(data)
+                categories=[c for c in pii_categories if c in {'Email addresses','Phone numbers'}]
+                additional=detect(extra,categories,pii_endpoint,pii_model,False)
+                known={(f['category'],compact(f['value'])) for f in findings}
+                for finding in additional:
+                    key=(finding['category'],compact(finding['value']))
+                    if key not in known: findings.append(finding);known.add(key)
+                used={f['region_id'] for f in findings}
+                ir['pii_source_regions']=[r for r in extra if r['id'] in used]
+                save_json(run/'source-ir.json',ir)
             save_json(run/'pii-findings.json',findings)
             values=[f['value'] for f in findings]
             if kind=='pdf':
-                safe_data,redaction_audit=redact_pdf(data,ir,findings)
+                from transformation.validation.value_redaction import RedactionLocalizationError
+                try:
+                    safe_data,redaction_audit=redact_pdf(data,ir,findings)
+                except RedactionLocalizationError as exc:
+                    save_json(run/'redaction-review-required.json',{'regions':exc.regions,'output_released':False})
+                    info['redaction_review_required']=True
+                    raise
                 save_json(run/'redaction-audit.json',redaction_audit)
             else:
                 updates={r['id']:mask(r['text'],values) for r in text_regions(ir)}
@@ -408,6 +399,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 independent=inspect_output(artifact,output_kind,all_values,intended_overlays=intended_overlays)
         save_json(run/'independent-validation.json',independent)
         if independent['known_sensitive_residuals']:
+            info['failure_code']='PRIVACY_CHECK_BLOCKED'
             raise ValueError('Independent output validation found selected sensitive values in the artifact.')
         if output_kind!='pdf':
             try:
@@ -426,6 +418,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 else: info['privacy_verification_page']=verification['page']; yield emit('privacy_verification')
             save_json(run/'privacy-verification.json',verification)
             if any(p['known_residual_values'] for p in verification['reports']):
+                info['failure_code']='PRIVACY_CHECK_BLOCKED'
                 raise ValueError('Fresh output OCR found a selected sensitive value; the result is blocked.')
             if verification['passed']:
                 independent['ocr_checked_content']=[c for c in independent['uninspected_content'] if c['kind'] in {'image','raster'}]
@@ -443,4 +436,5 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
         save_json(run/'validation.json',info['validation'])
         yield emit('complete')
     except Exception as exc:
+        info.setdefault('failure_code',failure_code(exc))
         info.update(status='failed',error=str(exc)); yield emit('failed')

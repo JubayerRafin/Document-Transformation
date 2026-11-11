@@ -57,6 +57,10 @@ def serve(path,root,parent,idle_seconds=300,processor=None):
                             'model_load_seconds':after['model_load_seconds']-before['model_load_seconds']}
                         connection.sendall(encode({'status':'completed','metrics':metrics}))
                     except Exception as exc:
+                        # Private service stderr retains the cause; public responses
+                        # still expose only the exception type, never source text.
+                        import traceback
+                        traceback.print_exc()
                         try:connection.sendall(encode({'status':'failed','error_type':type(exc).__name__}))
                         except OSError:pass
                     finally:

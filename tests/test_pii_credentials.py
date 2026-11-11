@@ -26,18 +26,25 @@ class PiiCredentialTests(unittest.TestCase):
     def test_uncertain_scan_field_is_removed_even_if_model_omits_it(self):
         with pymupdf.open() as drawing:
             p=drawing.new_page(width=400,height=150);p.insert_text((30,60),'API Key: demo_live_93ab')
+            value_box=list(p.search_for('demo_live_93ab')[0])
+            label_box=list(p.search_for('API Key:')[0])
             png=p.get_pixmap().tobytes('png')
         with pymupdf.open() as pdf:
             p=pdf.new_page(width=400,height=150);p.insert_image(p.rect,stream=png);source=pdf.tobytes()
-        region={'id':'scan','text':'API Key: demo_live_93ab','bbox':[25,45,210,65],'metadata':{'requires_review':True}}
+        region={'id':'scan','text':'API Key: demo_live_93ab','bbox':[25,45,210,65],
+            'metadata':{'requires_review':True,'redaction_words':[{'text':'demo_live_93ab','start':9,'end':23,
+                'bbox':value_box,'evidence':'two_recognizers_at_detected_word_boundaries'}]}}
         with patch('transformation.llm.ollama_native.chat',return_value=('{"findings":[]}',{})):
             findings=detect([region],['Identifiers'],'unused','model')
         result,audit=redact_pdf(source,{'units':[{'number':1,'regions':[region]}]},findings)
-        self.assertEqual(audit[0]['method'],'whole_ocr_line')
+        self.assertEqual(audit[0]['method'],'ocr_value_spans')
         self.assertTrue(audit[0]['review_required'])
         with pymupdf.open(stream=result,filetype='pdf') as pdf:
-            pix=pdf[0].get_pixmap(clip=pymupdf.Rect(region['bbox']))
+            pix=pdf[0].get_pixmap(clip=pymupdf.Rect(value_box)+(1,1,-1,-1))
             self.assertEqual(max(pix.samples),0)
+            with pymupdf.open(stream=source,filetype='pdf') as original:
+                label=pymupdf.Rect(label_box)
+                self.assertEqual(original[0].get_pixmap(clip=label).samples,pdf[0].get_pixmap(clip=label).samples)
 
     def test_native_credential_is_removed_with_label_and_other_text_preserved(self):
         with pymupdf.open() as pdf:

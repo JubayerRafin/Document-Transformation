@@ -78,3 +78,11 @@ test('content-length rejects large request before contacting Supabase',async()=>
  const f=fixture();assert.equal((await f.handle(req('/worker/claim',{method:'POST',headers:{'Content-Length':'51000000'}}),env)).status,413);assert.equal(f.calls.length,0);
 });
 test('SHA256 uses actual bytes',async()=>assert.equal(await sha(new TextEncoder().encode('abc')),'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'));
+test('a full history uses one batched artifact request rather than exceeding Workers subrequest limits',async()=>{
+ const jobs=Array.from({length:100},()=>({id:crypto.randomUUID(),owner,metrics:{},created:new Date().toISOString(),updated:new Date().toISOString(),options:{operation:'pii'}}));
+ const f=fixture({jobs}),r=await f.auth('/v1/jobs');assert.equal(r.status,200);assert.equal((await r.json()).length,100);
+ assert.equal(f.calls.length,5,'Auth, profile, stale-job sweep, jobs, and a single artifact batch');
+ const requests=f.calls.filter(c=>c[0].includes('/tx_artifacts'));assert.equal(requests.length,1);
+ assert.ok(requests[0][0].includes('job_id=in.('));for(const j of jobs)assert.ok(requests[0][0].includes(j.id));
+ assert.ok(f.calls.find(c=>c[0].includes('/tx_jobs'))[0].includes('owner=eq.'+owner));
+});

@@ -25,7 +25,7 @@ export type Job = {
   created: number;
   updated: number;
   baseline: boolean;
-  options: TransformOptions;
+  options: Omit<TransformOptions, "operation"> & { operation: Operation | "manual_redaction" };
   metrics: {
     server_seconds?: number;
     total_seconds?: number;
@@ -33,12 +33,62 @@ export type Job = {
     evaluation_status?: string;
     acceptance_checked?: boolean;
     gpu_verified?: boolean;
+    checks?: JobChecks;
   };
   source_sha256: string;
   assigned_worker_id?: string;
   artifacts: Artifact[];
   error_code?: string;
 };
+/** Counts of automated-check findings reported by the worker; no document content. */
+export type JobChecks = {
+  acceptable: boolean;
+  privacy_verification: "passed" | "failed" | "not_run";
+  known_sensitive_residuals: number;
+  geometry_blockers: number;
+  layout_review_candidates: number;
+  uninspected_content: number;
+  scan_acceptance_blockers: number;
+  translation_errors: number;
+};
+const FAILURES: Record<string, string> = {
+  WORKER_HEARTBEAT_LOST:
+    "The processing server stopped responding (for example, the pod was stopped or restarted). Submit the document again when the server is ready.",
+  ENGINE_TIMEOUT:
+    "Processing exceeded the server’s time limit and was stopped. Try fewer pages or raise the server’s time limit.",
+  INPUT_REJECTED:
+    "The server could not open this PDF. Encrypted PDFs and documents over 200 pages are not supported.",
+  OUTPUT_INVALID:
+    "The server produced an output that failed basic checks, so it was not released.",
+  RESULT_UPLOAD_FAILED:
+    "Processing finished, but the result could not be uploaded after several attempts. The output remains on the processing server.",
+  REDACTION_REVIEW_REQUIRED:
+    "Some sensitive values could not be located precisely enough to remove safely, so no output was released.",
+  PRIVACY_CHECK_BLOCKED:
+    "A selected sensitive value was still found in the output, so it was blocked.",
+  MANUAL_REDACTION_FAILED:
+    "The selected areas could not be removed and verified, so no redacted copy was released.",
+};
+export function failureMessage(code?: string) {
+  return (
+    (code && FAILURES[code]) ||
+    "The engine or connection did not complete successfully. Your original document remains available."
+  );
+}
+const CHECK_LABELS: [keyof JobChecks, string][] = [
+  ["known_sensitive_residuals", "sensitive values remaining"],
+  ["geometry_blockers", "layout problems"],
+  ["layout_review_candidates", "possible overlaps"],
+  ["uninspected_content", "images or attachments not checked automatically"],
+  ["scan_acceptance_blockers", "scanned regions needing review"],
+  ["translation_errors", "untranslated passages"],
+];
+export function checkFindings(checks?: JobChecks) {
+  if (!checks) return [];
+  return CHECK_LABELS.filter(([k]) => Number(checks[k]) > 0).map(
+    ([k, label]) => `${checks[k]} ${label}`,
+  );
+}
 export type Worker = {
   id: string;
   name: string;

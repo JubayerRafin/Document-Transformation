@@ -27,7 +27,7 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options):
             else: raise ValueError('Fresh OCR mode is required for rendered-output privacy verification.')
             for progress in events: yield {'page':index+1,'progress':progress}
             from transformation.ocr.paddle_handoff import prepare
-            prepare((folder/'source.pdf').read_bytes(),progress['recognition_dir'],folder,'verification.pdf')
+            prepare((folder/'source.pdf').read_bytes(),progress['recognition_dir'],folder,'verification.pdf',allow_unreadable=True)
             ir=json.loads((folder/'ocr-document.json').read_text(encoding='utf-8'))
             regions=ir['pages'][0]['regions']; text=' '.join(r['text'] for r in regions)
             residual=[v for v in values if normalized(v) in normalized(text)]

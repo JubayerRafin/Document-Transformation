@@ -79,6 +79,10 @@ export function Workspace() {
     setMobile(false);
   }
   function open(j: Job) {
+    if (j.options.operation === "manual_redaction" && j.status === "uploading") {
+      location.assign(`/redaction-review.html?job=${encodeURIComponent(j.id)}`);
+      return;
+    }
     setSelected(j.id);
     setExtra(j);
     navigate(j.status === "succeeded" ? "result" : "progress");
@@ -332,6 +336,7 @@ export function Workspace() {
                             job={job}
                             api={s.api}
                             onError={s.handleError}
+                            readOnly={readOnly}
                           />
                         ) : (
                           <ProgressPanel

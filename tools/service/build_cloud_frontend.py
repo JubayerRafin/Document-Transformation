@@ -36,6 +36,7 @@ html=html.replace('HTTPS tunnel access requires this computer, API and internet 
  'The hosted application is independent of your laptop. New processing requires a connected GPU worker. Saved results are available subject to hosting limits.')
 html=html.replace('PDF to PDF for this evaluated V1 route.','PDF to PDF · Live cloud jobs require a connected processing worker.')
 worker_ui=(PROJECT/'cloud/ui/workers.html').read_text(encoding='utf8')
+html=html.replace('<a id="download-output"', '<a id="fullscreen-comparison" class="tx-linkbutton">Full-screen comparison</a><a id="manual-redaction" class="tx-linkbutton">Review &amp; add redactions</a><a id="download-output"')
 html=html.replace('</main></div>',worker_ui+'</main></div>')
 html=html.replace('<button data-view="jobs">Documents</button>','<button data-view="jobs">Documents</button><button data-view="workers">GPU servers</button>')
 html=html.replace('<button data-view="jobs">My documents</button>','<button data-view="jobs">My documents</button><button data-view="workers">GPU servers</button>')
@@ -43,6 +44,9 @@ html=html.replace('<button data-view="jobs">Your documents</button>','<button da
 html=html.replace('<form id="upload-form">','<form id="upload-form"><label class="tx-field">Processing server<select id="gpu-worker" required><option value="">Select your GPU server</option></select></label><button type="button" data-view="workers">Connect a GPU server</button>')
 (target/'index.html').write_text(product_copy(html),encoding='utf8')
 js=(source/'app.js').read_text(encoding='utf8')
+js=js.replace("selected=jobs.find(j=>j.id===id);eventsAfter=0;", "selected=jobs.find(j=>j.id===id);if(selected?.options.operation==='manual_redaction'&&selected.status==='uploading'){location.assign('/redaction-review.html?job='+encodeURIComponent(selected.id));return;}eventsAfter=0;")
+js=js.replace("${j.status==='succeeded'?'Review':'Status'}", "${j.options.operation==='manual_redaction'&&j.status==='uploading'?'Continue redaction':j.status==='succeeded'?'Review':'Status'}")
+js=js.replace("q('#review-name').textContent=selected.filename;", "q('#fullscreen-comparison').href='/redaction-review.html?job='+encodeURIComponent(selected.id)+'&compare=1';q('#manual-redaction').href='/redaction-review.html?job='+encodeURIComponent(selected.id)+'&new=1';q('#manual-redaction').hidden=user?.role==='viewer';q('#review-name').textContent=selected.filename;")
 js=js.replace("['admin','reviewer','viewer']","['admin','mentor','viewer']").replace("['admin','customer']","['admin','mentor','customer']").replace("['admin','reviewer']","['admin','mentor']")
 start=js.index('function renderPages()')
 end=js.index('async function renderReview()',start)
@@ -71,3 +75,12 @@ js=js.replace("init();setInterval", "q('#compare').hidden=true;init();setInterva
 with (target/'app.css').open('a',encoding='utf8') as f:
     f.write('\n#tx-v1 .tx-compare iframe{width:100%;height:650px;border:0;background:white} @media(max-width:700px){#tx-v1 .tx-compare iframe{height:480px}}\n')
 print('Cloud frontend built. Local frontend and processing engine unchanged.')
+for name in ('redaction-review.html','redaction-review.css','redaction-review.mjs'):
+    shutil.copy2(PROJECT/'cloud/ui'/name,target/name)
+pdfjs=PROJECT/'frontend/node_modules/pdfjs-dist'
+for name in ('pdf.mjs','pdf.worker.mjs'):
+    (target/'pdfjs').mkdir(exist_ok=True)
+    shutil.copy2(pdfjs/'build'/name,target/'pdfjs'/name)
+for name in ('cmaps','standard_fonts','wasm','iccs'):
+    shutil.copytree(pdfjs/name,target/'pdfjs'/name,dirs_exist_ok=True)
+shutil.copy2(pdfjs/'LICENSE',target/'pdfjs/LICENSE')

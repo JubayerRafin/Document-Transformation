@@ -10,7 +10,13 @@ import pymupdf
 from extraction.models import Document, Page, Region
 
 
-def prepare(data, recognition_dir, output_dir, source_name):
+def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=False):
+    """Build verified OCR IR; verification-only mode retains unreadable boxes.
+
+    The default source/translation handoff remains strict. Empty verification
+    regions carry no invented text and always require review; they cannot count
+    as successful privacy inspection.
+    """
     root = Path(recognition_dir).resolve()
     meta = json.loads((root / 'manifest.json').read_text(encoding='utf-8'))
     if meta.get('status') != 'completed':
@@ -40,18 +46,29 @@ def prepare(data, recognition_dir, output_dir, source_name):
         evidence = pymupdf.Pixmap(str(detector / 'page-1.png'))
         if (original.width, original.height, original.n, original.samples) != (evidence.width, evidence.height, evidence.n, evidence.samples):
             raise ValueError('Uploaded PDF does not match the saved OCR page image.')
-        if not lines:
+        if not lines and not allow_unreadable:
             raise ValueError('No OCR text detected in the verified source image; preserve it for visual review.')
         regions = []
+        if not lines:
+            regions.append(Region('unreadable_page', 'raster_page', list(page.rect),
+                metadata={'requires_review': True, 'ocr_unreadable': True},
+                warnings=['No recognized text; privacy inspection is incomplete.']))
         for line in lines:
             line=dict(line)
             text = line['text']
             if not text.strip():
+                if allow_unreadable and line.get('requires_review') and line.get('recognition_decision')=='unreadable_source_region':
+                    regions.append(Region(line['id'], 'figure', list(line['bbox']),
+                        metadata={'requires_review': True, 'ocr_unreadable': True,
+                                  'recognition_decision': 'unreadable_source_region'},
+                        warnings=['Detected region could not be read; privacy inspection is incomplete.']))
+                    continue
                 raise ValueError('OCR source text must not be empty.')
             from tools.ocr.recognize_paddle_boxes import sensitive_literal,independent_literal_evidence
             candidates=line.get('candidates',[])
-            sensitive=sensitive_literal(text) or any(sensitive_literal(c.get('text','')) for c in candidates)
-            independent=independent_literal_evidence(candidates,text) if sensitive else None
+            transcription_candidates=[c for c in candidates if c.get('purpose')!='redaction_geometry_only']
+            sensitive=sensitive_literal(text) or any(sensitive_literal(c.get('text','')) for c in transcription_candidates)
+            independent=independent_literal_evidence(transcription_candidates,text) if sensitive else None
             if sensitive and not independent:
                 line['requires_review']=True
                 line['recognition_decision']='sensitive_literal_independent_evidence_not_established'
@@ -73,12 +90,15 @@ def prepare(data, recognition_dir, output_dir, source_name):
                 bbox[0]=label_box.x1
                 candidate=next(c['text'] for c in line['candidates'] if c.get('variant')=='word_gap_english')
                 text=candidate.split(':',1)[1].strip() if ':' in candidate else text
+            from transformation.validation.value_redaction import verified_ocr_words
+            word_boxes=verified_ocr_words(line,text,bbox)
             regions.append(Region(line['id'], 'text', bbox, text=text,
                                   metadata={'recognition_score': line['recognition_score'],
                                             'original_line_text':line['text'],
                                             'source_value_preserved':bool(label and line.get('requires_review')),
                                             'recognition_decision': line.get('recognition_decision','legacy'),
                                             'independent_literal_verified':independent,
+                                            'redaction_words':word_boxes,
                                             'requires_review': line.get('requires_review', line['recognition_score'] < .95),
                                             'candidates': line.get('candidates', [])},
                                   warnings=['Unreviewed OCR transcription']))

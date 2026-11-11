@@ -6,6 +6,8 @@
    `supabase/migrations/202610220002_private_workers.sql` once. Do not rerun the
    initial migration. This adds worker capability metadata, explicit assignment
    and replacement claim/revoke functions without deleting jobs or documents.
+   Then run `supabase/migrations/202611120001_job_recovery.sql` once, which
+   recovers jobs left running by a stopped worker (see CLOUD_SETUP.md).
 2. From `cloud/`, run `npm run deploy`. The script rebuilds and tests the app.
 3. Hard refresh the deployed site. Sign in, open **GPU servers**, register a
    server and download its private configuration. Customer, mentor and admin
