@@ -1,7 +1,11 @@
 import {getDocument,GlobalWorkerOptions} from '/pdfjs/pdf.mjs';
 GlobalWorkerOptions.workerSrc='/pdfjs/pdf.worker.mjs';
 const $=s=>document.querySelector(s),MAX=500;
-let csrf='',draft,doc,originalDoc,originalRenderTask,page=1,marks=[],selected=-1,undo=[],redo=[],busy=false,dirty=false,renderTask,renderGeneration=0,pointer=null,timer,abort=new AbortController(),polling=false;
+let csrf='',draft,doc,originalDoc,originalRenderTask,page=1,marks=[],selected=-1,undo=[],redo=[],busy=false,dirty=false,renderTask,renderGeneration=0,pointer=null,timer,abort=new AbortController(),polling=false,armed=0;
+// Final confirmation stays in the page: browsers and embedded viewers may suppress
+// window.confirm, which silently cancelled finalization.
+const ARM_MS=15000,FINALIZE_LABEL='Apply redactions to a new copy';
+function disarm(){armed=0;$('#finalize').textContent=FINALIZE_LABEL;}
 const comparison=new URLSearchParams(location.search).get('compare')==='1';
 $('#fullscreen').onclick=async()=>{
  try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.classList.contains('expanded'))document.documentElement.classList.remove('expanded');else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else document.documentElement.classList.add('expanded');}
@@ -20,7 +24,7 @@ const base=()=>'/v1/jobs/'+draft.job_id;
 const copy=xs=>xs.map(x=>({...x}));
 const editable=()=>!busy&&draft?.status==='uploading';
 function remember(){undo.push(copy(marks));if(undo.length>100)undo.shift();redo=[];dirty=true;}
-function changed(){dirty=true;$('#confirm').checked=false;status('Unsaved draft changes. Nothing has been removed yet.');draw();}
+function changed(){dirty=true;$('#confirm').checked=false;disarm();status('Unsaved draft changes. Nothing has been removed yet.');draw();}
 function draw(){
  $('#overlay').replaceChildren();$('#areas').replaceChildren();
  marks.forEach((r,i)=>{
@@ -108,8 +112,13 @@ $('#finalize').onclick=async()=>{
  if(!editable()||!marks.length)return;
  if(!$('#confirm').checked){status('Review all pages and confirm before applying.');return;}
  if(!$('#worker').value){status('Choose an online server with manual-redaction support.');return;}
- if(!window.confirm('Permanently remove selected areas from a new PDF copy? The original is preserved.'))return;
- busy=true;draw();try{await save();await api(base()+'/redaction-finalize',{method:'POST',body:JSON.stringify({revision:draft.revision,worker_id:$('#worker').value})});draft.status='queued';$('#editor').hidden=true;$('#finished').hidden=false;dirty=false;void poll();}catch(e){error(e);}finally{busy=false;draw();}
+ if(!armed||Date.now()-armed>ARM_MS){
+  armed=Date.now();$('#finalize').textContent='Click again to permanently remove';
+  status('Click the button again within 15 seconds to permanently remove the selected areas in a new PDF copy. The original is preserved.');
+  setTimeout(()=>{if(armed&&Date.now()-armed>=ARM_MS){disarm();status('Not applied. Click the button again when you are ready.');}},ARM_MS);
+  return;
+ }
+ disarm();busy=true;draw();try{await save();await api(base()+'/redaction-finalize',{method:'POST',body:JSON.stringify({revision:draft.revision,worker_id:$('#worker').value})});draft.status='queued';$('#editor').hidden=true;$('#finished').hidden=false;dirty=false;void poll();}catch(e){error(e);}finally{busy=false;draw();}
 };
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
 window.addEventListener('pagehide',()=>{clearTimeout(timer);abort.abort();renderTask?.cancel();originalRenderTask?.cancel();void doc?.destroy();void originalDoc?.destroy();});
