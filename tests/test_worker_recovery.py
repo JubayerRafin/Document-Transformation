@@ -132,7 +132,7 @@ class ReportingTests(unittest.TestCase):
                     'layout_review_candidates':[{},{}],'uninspected_content':[{'kind':'raster'}],
                     'rendered_privacy':{'passed':False,'reports':[{'detected_pii':['Jane Doe']}]}}}}
         summary=cw.summarize_checks(result)
-        self.assertEqual(summary,{'acceptable':False,'known_sensitive_residuals':0,'geometry_blockers':1,
+        self.assertEqual(summary,{'acceptable':False,'known_sensitive_residuals':0,'partial_name_residuals':0,'geometry_blockers':1,
             'layout_review_candidates':2,'uninspected_content':1,'scan_acceptance_blockers':1,
             'translation_errors':2,'privacy_verification':'failed'})
         self.assertNotIn('Jane',json.dumps(summary))

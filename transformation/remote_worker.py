@@ -38,6 +38,43 @@ def server_options(options, job):
         ocr_cache_root=Path('/workspace/transformx-cache/ocr') if cache_mode=='reuse' else None,root=Path(job)/'runs')
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def ocr_session(python,job):
+    """Keep one GPU OCR process (models loaded once) for every page and figure of a job.
+
+    Each fresh OCR call otherwise starts a new Paddle process and reloads its models.
+    Falls back to per-call processes if the session cannot start; yields whether it is on.
+    """
+    if os.name!='posix':
+        yield False;return
+    from transformation.ocr.service import Session,ENV
+    # Job folders and the shared OCR cache both live under /workspace on the server.
+    root=Path('/workspace') if Path('/workspace').is_dir() and job.is_relative_to('/workspace') else job
+    session=Session(python,root)
+    try:
+        session.ensure()
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        session.close()
+        yield False;return
+    previous=os.environ.get(ENV);os.environ[ENV]=str(session.path)
+    # Load OCR models while extraction/detection run (same language family as the job).
+    from transformation.ocr.service import prewarm
+    prewarm(job/'runs')
+    os.environ['TRANSFORMX_OCR_SERVICE_PID']=str(session.process.pid)
+    try:
+        yield True
+    finally:
+        session.close()
+        if previous is None:os.environ.pop(ENV,None)
+        else:os.environ[ENV]=previous
+        os.environ.pop('TRANSFORMX_OCR_SERVICE_PID',None)
+
+
 def save(path,value):
     path=Path(path); pending=path.with_suffix('.tmp')
     pending.write_text(json.dumps(value,ensure_ascii=False,default=str),encoding='utf-8')
@@ -109,9 +146,11 @@ def main(job):
         check_models(request['workflow'],options.get('translation_model','translategemma:12b'),
             options.get('pii_model','qwen3.5:9b'),options['translation_endpoint'],options['pii_endpoint'],
             visual_analysis=options.get('visual_analysis',False))
-        for event in run_workflow((job/'source').read_bytes(),request['filename'],request['workflow'],**options):
-            terminal=event
-            save(job/'progress.json',{k:event[k] for k in ('stage','status','seconds','error','translation_progress') if k in event})
+        with ocr_session(options['ocr_python'],job) as persistent:
+            for event in run_workflow((job/'source').read_bytes(),request['filename'],request['workflow'],**options):
+                if isinstance(event,dict):event.setdefault('persistent_ocr',persistent)
+                terminal=event
+                save(job/'progress.json',{k:event[k] for k in ('stage','status','seconds','error','translation_progress') if k in event})
         if terminal is None:raise RuntimeError('Server pipeline returned no terminal result.')
     except Exception as error:
         import traceback

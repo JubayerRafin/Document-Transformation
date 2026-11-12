@@ -32,6 +32,21 @@ class PhonePatternTests(unittest.TestCase):
         self.assertEqual(phones('Office 02 1234\n5678'),['02 1234\n5678'])
 
 
+class SentencePunctuationTests(unittest.TestCase):
+    def test_email_before_a_full_stop_is_located_and_removed(self):
+        from transformation.validation.value_redaction import literal_spans
+        text = 'Write to t.vale@corp.example. Thanks'
+        self.assertEqual([text[a:b] for a, b in literal_spans(text, 't.vale@corp.example')], ['t.vale@corp.example'])
+        # Still no match inside a longer address.
+        self.assertEqual(literal_spans('t.vale@corp.example.org', 't.vale@corp.example'), [])
+        with pymupdf.open() as doc:
+            doc.new_page().insert_text((50, 80), text, fontsize=11); data = doc.tobytes()
+        ir, findings = RedactionTests().native_finding(data, 't.vale@corp.example', 'Email addresses')
+        output, _ = redact_pdf(data, ir, findings)
+        with pymupdf.open(stream=output, filetype='pdf') as pdf:
+            self.assertNotIn('t.vale', pdf[0].get_text()); self.assertIn('Thanks', pdf[0].get_text())
+
+
 class SingleModelOcrTests(unittest.TestCase):
     def test_repeat_reads_by_one_model_are_not_independent_agreement(self):
         from tools.ocr.recognize_paddle_boxes import bounded_recognition,independent_literal_evidence

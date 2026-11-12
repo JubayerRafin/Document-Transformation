@@ -39,6 +39,15 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
     data=bytes(data)
     source_extraction_cache=options.pop('source_extraction_cache',None)
     isolated_figure_slots=options.pop('isolated_figure_slots',False)
+    # Engine-internal switches; never forwarded to the PDF/translation runners.
+    privacy_check=options.pop('privacy_verification',True)
+    pii_workers=int(options.pop('pii_workers',8))
+    known_values=list(options.pop('known_pii_values',()) or ())
+    llm_metrics=bool(options.pop('llm_metrics',True))
+    # PII-only jobs need text blocks and table headers, not Docling's table model
+    # (seconds per page on CPU); translation keeps the configured strategy.
+    pii_strategy=options.pop('pii_table_strategy','native')
+    if not translate and pii_strategy in {'auto','native','docling'}:table_strategy=pii_strategy
     figure_engine=options.pop('figure_engine','babeldoc')
     if figure_engine not in {'babeldoc','ocr-slots'}:
         raise ValueError('figure_engine must be babeldoc or ocr-slots.')
@@ -186,7 +195,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             'native_office_reconstruction':'original_ooxml_package',
             'pdf_reconstruction':'babeldoc_with_guarded_ocr_nativeization',
             'office_images':'same_paddle_and_translation_pipeline_when_configured'}
-        safe_data=data; findings=[]
+        safe_data=data; findings=[]; analyzed_texts=[]
         if kind!='pdf' and ir['assets']:
             if options.get('ocr_python') or options.get('ocr_remote'):
                 from transformation.office.office_assets import process
@@ -196,21 +205,27 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             else: info['warnings'].append('Office images require a fresh PaddleOCR mode; image translation and PII coverage are blocked.')
         if redact:
             yield emit('pii_detection')
-            findings=detect(text_regions(ir),pii_categories,pii_endpoint,pii_model,pii_assist)
             if kind=='pdf':
-                from transformation.validation.value_redaction import native_pattern_regions,compact
-                # Native blocks retain real line breaks and style-run boundaries.
-                # They supplement deterministic detection, not translation input.
-                extra=native_pattern_regions(data)
-                categories=[c for c in pii_categories if c in {'Email addresses','Phone numbers'}]
-                additional=detect(extra,categories,pii_endpoint,pii_model,False)
-                known={(f['category'],compact(f['value'])) for f in findings}
-                for finding in additional:
-                    key=(finding['category'],compact(finding['value']))
-                    if key not in known: findings.append(finding);known.add(key)
-                used={f['region_id'] for f in findings}
-                ir['pii_source_regions']=[r for r in extra if r['id'] in used]
+                # Whole native text blocks (with real line breaks), OCR lines, field
+                # labels and a document-wide name pass; see pii_document.py.
+                from transformation.validation.pii_document import detect_document
+                import os
+                # Per-call model timings (tokens, latency) for runtime analysis, scoped to this call.
+                previous_run_dir=os.environ.get('TRANSFORMX_RUN_DIR')
+                if llm_metrics:os.environ['TRANSFORMX_RUN_DIR']=str(run)
+                try:
+                  findings,ir['pii_source_regions'],evidence=detect_document(data,ir,pii_categories,pii_endpoint,pii_model,pii_assist,
+                                                                           workers=pii_workers,known_values=known_values)
+                finally:
+                  if llm_metrics and previous_run_dir is None:os.environ.pop('TRANSFORMX_RUN_DIR',None)
+                  elif llm_metrics:os.environ['TRANSFORMX_RUN_DIR']=previous_run_dir
+                analyzed_texts=evidence.pop('analyzed_texts',[])
+                if evidence.get('unresolved_units'):
+                    info['warnings'].append(f"{len(evidence['unresolved_units'])} text unit(s) were masked whole because the model's answer could not be verified.")
+                save_json(run/'pii-detection-evidence.json',evidence)
                 save_json(run/'source-ir.json',ir)
+            else:
+                findings=detect(text_regions(ir),pii_categories,pii_endpoint,pii_model,pii_assist)
             save_json(run/'pii-findings.json',findings)
             values=[f['value'] for f in findings]
             if kind=='pdf':
@@ -298,7 +313,9 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if any(r['kind']=='figure' for u in ir['units'] if not u.get('ocr_folder') for r in u['regions']):
                 if options.get('ocr_python') or options.get('ocr_remote'):
                     from transformation.ocr.pdf_assets import process
-                    image_options=dict(options,figure_engine=figure_engine,timeout=max(1,int(limit-(time.monotonic()-started))))
+                    image_options=dict(options,figure_engine=figure_engine,timeout=max(1,int(limit-(time.monotonic()-started))),
+                                       # Values selected in this document are masked inside its figures too.
+                                       known_pii_values=[{'value':f['value'],'category':f['category']} for f in findings]+list(known_values))
                     for asset_event in process(processed,ir,run,translate,redact,pii_categories,pii_assist,image_options):
                         if 'result' in asset_event: processed=asset_event['result']; info['image_processing']=asset_event['reports']
                         else:
@@ -405,6 +422,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 independent=inspect_output(artifact,output_kind,all_values,min_font_size=8.0,font_regions=font_regions,intended_overlays=intended_overlays)
             else:
                 independent=inspect_output(artifact,output_kind,all_values,intended_overlays=intended_overlays)
+        if redact and kind=='pdf' and output_kind=='pdf' and not translate:
+            from transformation.validation.output_validation import partial_name_residuals
+            names=[f['value'] for f in findings if f.get('category')=='Names']
+            independent['partial_name_residuals']=partial_name_residuals(data,artifact,names)
+            if independent['partial_name_residuals']:
+                info['warnings'].append('Part of a selected name remains in the output; review the highlighted names.')
         save_json(run/'independent-validation.json',independent)
         if independent['known_sensitive_residuals']:
             info['failure_code']='PRIVACY_CHECK_BLOCKED'
@@ -419,10 +442,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 independent['rendered_layout']=inspect_output(preview,'pdf')
             except (ValueError,RuntimeError,TimeoutError) as exc:
                 independent['office_render_error']=str(exc)
-        if redact and independent['uninspected_content'] and (options.get('ocr_python') or options.get('ocr_remote')):
+        if (redact and independent['uninspected_content'] and (options.get('ocr_python') or options.get('ocr_remote'))
+                and privacy_check):
             from transformation.validation.privacy_verification import verify
             output_language=options.get('target','ko') if translate else options.get('source','en')
-            for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,language=output_language):
+            for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,language=output_language,analyzed_texts=analyzed_texts,
+                                       pages=({c['page'] for c in independent['uninspected_content'] if c.get('page')} if kind=='pdf' and output_kind=='pdf' else None)):
                 if 'reports' in verification: independent['rendered_privacy']=verification
                 else: info['privacy_verification_page']=verification['page']; yield emit('privacy_verification')
             save_json(run/'privacy-verification.json',verification)
@@ -432,7 +457,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if verification['passed']:
                 independent['ocr_checked_content']=[c for c in independent['uninspected_content'] if c['kind'] in {'image','raster'}]
                 independent['uninspected_content']=[c for c in independent['uninspected_content'] if c['kind'] not in {'image','raster'}]
-        independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'])
+        independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'] or independent.get('partial_name_residuals'))
         save_json(run/'independent-validation.json',independent)
         info['warnings']=list(dict.fromkeys(ir['warnings']+info['warnings']))
         info.update(status='generated',output_file=str(destination),

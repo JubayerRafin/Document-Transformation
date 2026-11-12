@@ -6,7 +6,7 @@ export const FAILURE_CODES=['ENGINE_FAILED','ENGINE_TIMEOUT','INPUT_REJECTED','O
  'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED'];
 // Running jobs heartbeat every ~10 s; silence this long means the worker stopped.
 const STALE_SECONDS=900;
-const CHECK_COUNTS=['known_sensitive_residuals','geometry_blockers','layout_review_candidates','uninspected_content','scan_acceptance_blockers','translation_errors'];
+const CHECK_COUNTS=['known_sensitive_residuals','partial_name_residuals','geometry_blockers','layout_review_candidates','uninspected_content','scan_acceptance_blockers','translation_errors'];
 export function checks(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
  const c={acceptable:raw.acceptable===true,

@@ -68,10 +68,21 @@ def run_server_gpu_ocr(source,folder,python,timeout,source_language):
     folder.mkdir(parents=True,exist_ok=True)
     repo=Path(__file__).resolve().parents[2]
     output=folder/'gpu-output'
+    progress_events=None
     if os.environ.get('TRANSFORMX_OCR_SOCKET'):
+        # The session exits after an idle period (e.g. during a long translation). If it
+        # can no longer be reached, use a one-off OCR process for this call instead of
+        # failing the job; nothing has been sent to the session in that case.
         from transformation.ocr.service import request
+        progress_events=request(source,output,source_language,timeout)
+        try:first=next(progress_events)
+        except (ConnectionRefusedError,FileNotFoundError):progress_events=None
+        else:
+            import itertools
+            progress_events=itertools.chain([first],progress_events)
+    if progress_events is not None:
         started=time.monotonic();result=None
-        for progress in request(source,output,source_language,timeout):
+        for progress in progress_events:
             if progress['stage']=='service_completed':result=progress
             else:yield progress
         from transformation.ocr.remote_ocr import unpack

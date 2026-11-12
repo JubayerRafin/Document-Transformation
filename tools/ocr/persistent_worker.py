@@ -27,7 +27,7 @@ def serve(path,root,parent,idle_seconds=300,processor=None):
     last=time.monotonic()
     try:
         with socket.socket(socket.AF_UNIX) as server:
-            server.bind(str(path));os.chmod(path,0o600);server.listen(4);server.settimeout(1)
+            server.bind(str(path));os.chmod(path,0o600);server.listen(64);server.settimeout(1)
             while time.monotonic()-last<idle_seconds:
                 try:connection,_=server.accept()
                 except socket.timeout:continue

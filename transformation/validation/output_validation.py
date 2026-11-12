@@ -11,6 +11,27 @@ def normalized(value):
     return re.sub(r'\s+','',unquote(value)).casefold()
 
 
+def partial_name_residuals(source,output,names):
+    """Words of a selected multi-word name left behind while other words were removed.
+
+    Compares whole-word counts between the source and output text layers: a word whose
+    count did not drop while a sibling word's count did is a likely half-masked name.
+    """
+    def words(data):
+        with pymupdf.open(stream=data,filetype='pdf') as pdf:
+            return re.findall(r'\w+',' '.join(page.get_text() for page in pdf))
+    before,after=words(source),words(output)
+    count=lambda tokens,word:sum(1 for t in tokens if t==word)
+    residual=set()
+    for name in names:
+        parts=[p for p in re.findall(r'\w+',name) if len(p)>=3]
+        if len(parts)<2:continue
+        removed=[p for p in parts if count(after,p)<count(before,p)]
+        kept=[p for p in parts if count(before,p) and count(after,p)==count(before,p)]
+        if removed and kept:residual.update(kept)
+    return sorted(residual)
+
+
 def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intended_overlays=()):
     residual=[]; uninspected=[]; geometry=[]; candidates=[]
     import math

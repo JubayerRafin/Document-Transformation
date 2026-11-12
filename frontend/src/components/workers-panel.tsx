@@ -49,6 +49,9 @@ export function WorkersPanel({
         token: w.token,
         supabase_url: w.supabase_url,
         engine_profile: {
+          // GPU OCR models load once per job instead of once per page/figure.
+          ocr_device: "gpu:0",
+          persistent_ocr: true,
           translation_endpoint: "http://127.0.0.1:11434/v1",
           pii_endpoint: "http://127.0.0.1:11434/v1",
           timeout_seconds: 3600,

@@ -89,7 +89,7 @@ test('result metrics keep only bounded check counts',async()=>{
  assert.equal((await f.worker('/worker/jobs/'+jid+'/result',{body:await resultForm(bytes,metrics)})).status,200);
  const finish=JSON.parse(f.state.calls.find(c=>c[0].includes('/rpc/tx_finish'))[1].body);
  assert.equal(finish.p_metrics.blockers,3);
- assert.deepEqual(finish.p_metrics.checks,{acceptable:true,privacy_verification:'passed',known_sensitive_residuals:0,geometry_blockers:2,
+ assert.deepEqual(finish.p_metrics.checks,{acceptable:true,privacy_verification:'passed',known_sensitive_residuals:0,partial_name_residuals:0,geometry_blockers:2,
   layout_review_candidates:0,uninspected_content:1,scan_acceptance_blockers:0,translation_errors:0});
  assert.doesNotMatch(JSON.stringify(finish),/jane@example/);
 });
