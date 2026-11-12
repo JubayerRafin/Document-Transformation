@@ -30,7 +30,11 @@ if ! command -v ollama >/dev/null; then
   sh /workspace/install-ollama.sh
 fi
 if ! curl -fsS http://127.0.0.1:11434/api/version >/dev/null; then
+  # Parallel requests let concurrent PII detection share the GPU instead of queueing;
+  # flash attention with an 8-bit KV cache keeps that within 24 GB beside PaddleOCR.
   nohup env OLLAMA_HOST=127.0.0.1:11434 OLLAMA_MODELS=/workspace/ollama-models \
+    OLLAMA_NUM_PARALLEL="${TRANSFORMX_OLLAMA_PARALLEL:-8}" OLLAMA_FLASH_ATTENTION=1 \
+    OLLAMA_KV_CACHE_TYPE=q8_0 OLLAMA_KEEP_ALIVE=30m \
     ollama serve > /workspace/ollama.log 2>&1 &
   for attempt in {1..30}; do
     if curl -fsS http://127.0.0.1:11434/api/version >/dev/null; then break; fi

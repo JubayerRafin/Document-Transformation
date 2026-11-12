@@ -24,9 +24,29 @@ def receive(connection):
     return json.loads(bytes(raw).split(b'\n',1)[0])
 
 
+def connect(path,wait=30):
+    """Connect to the serial OCR session, waiting while its accept queue is full.
+
+    A Unix-socket connect with a timeout is non-blocking underneath: when every backlog
+    slot is taken by concurrent page/figure requests it fails at once with EAGAIN instead
+    of queueing. Retry that (and only that) until the deadline.
+    """
+    deadline=time.monotonic()+wait;delay=.02
+    while True:
+        connection=socket.socket(socket.AF_UNIX);connection.settimeout(1)
+        try:
+            connection.connect(str(path));return connection
+        except BlockingIOError:
+            connection.close()
+            if time.monotonic()>=deadline:raise TimeoutError('OCR session accept queue stayed full.')
+            time.sleep(delay);delay=min(delay*2,.5)
+        except BaseException:
+            connection.close();raise
+
+
 def health(path):
-    with socket.socket(socket.AF_UNIX) as connection:
-        connection.settimeout(1);connection.connect(str(path));connection.sendall(encode({'action':'health'}))
+    with connect(path,wait=1) as connection:
+        connection.sendall(encode({'action':'health'}))
         return receive(connection).get('ready') is True
 
 
@@ -82,11 +102,31 @@ def managed_session(python,root,enabled=False):
         else:os.environ['TRANSFORMX_OCR_SERVICE_PID']=previous_pid
 
 
+def prewarm(root,language='en',timeout=120):
+    """Load the session's OCR models in the background with a one-line synthetic page.
+
+    Model loading (seconds) then overlaps extraction and detection instead of delaying
+    the first real OCR call. Failures are ignored: the real call loads models itself.
+    """
+    import threading
+    def run():
+        try:
+            import pymupdf
+            folder=Path(root)/'.ocr-prewarm'/uuid4().hex;folder.mkdir(parents=True)
+            with pymupdf.open() as text,pymupdf.open() as image:
+                page=text.new_page(width=200,height=40);page.insert_text((10,25),'Prewarm 123',fontsize=14)
+                target=image.new_page(width=200,height=40);target.insert_image(target.rect,pixmap=page.get_pixmap(dpi=150))
+                image.save(folder/'source.pdf')
+            for _ in request(folder/'source.pdf',folder/'out',language,timeout):pass
+        except Exception:
+            pass
+    thread=threading.Thread(target=run,daemon=True);thread.start();return thread
+
+
 def request(source,output,language,timeout):
     """Yield progress while one region runs; predictors are never used concurrently."""
     path=os.environ[ENV];started=time.monotonic();raw=bytearray()
-    with socket.socket(socket.AF_UNIX) as connection:
-        connection.settimeout(1);connection.connect(path)
+    with connect(path,wait=max(1,min(timeout,60))) as connection:
         connection.sendall(encode({'action':'ocr','source':str(Path(source).resolve()),
             'output':str(Path(output).resolve()),'language':language,'timeout':timeout}))
         while b'\n' not in raw:

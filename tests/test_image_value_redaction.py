@@ -133,6 +133,67 @@ class ImageRedactionTests(unittest.TestCase):
         self.assertFalse(audit[0]['label_preserved'])
         self.assertGreater(ink(output, pymupdf.Rect(boxes[line]) + (2, 2, -2, -2)), .95)
 
+    def test_rotated_scan_value_is_removed_in_display_coordinates(self):
+        line = 'Reference: RX-55102-T'
+        data, boxes = image_page([(30, 60, line)])
+        with pymupdf.open(stream=data, filetype='pdf') as pdf:
+            pdf[0].set_rotation(90); data = pdf.tobytes()
+            # Display coordinates of the line after rotation.
+            display = pymupdf.Rect(boxes[line]) * pdf[0].rotation_matrix
+            value_display = word_box(line, 'RX-55102-T') * pdf[0].rotation_matrix
+            label_display = word_box(line, 'Reference:') * pdf[0].rotation_matrix
+        region = {'id': 'r', 'kind': 'text', 'text': line, 'bbox': list(display)}
+        ir = {'units': [{'id': 'u', 'number': 1, 'regions': [region]}]}
+        # On a rotated page the line runs vertically, so word gaps are not horizontal:
+        # the splitter must not guess; the value is still removed (whole line) and audited.
+        output, audit = redact_pdf(data, ir, [{'region_id': 'r', 'value': 'RX-55102-T', 'category': 'Identifiers'}])
+        self.assertIn(audit[0]['localization'], {'pixel_word_gaps', 'whole_line_fallback'})
+        with pymupdf.open(stream=output, filetype='pdf') as pdf:
+            self.assertEqual(pdf[0].rotation, 90)
+            pix = pdf[0].get_pixmap(dpi=200, clip=value_display + (1, 1, -1, -1), colorspace=pymupdf.csGRAY)
+            self.assertGreater(float((np.frombuffer(pix.samples, dtype=np.uint8) < 100).mean()), .95)
+
+    def test_upright_text_on_a_rotated_page_is_split_into_words(self):
+        # A scan stored sideways and displayed upright via /Rotate: text is horizontal on screen.
+        line = 'Tenant ref: TN-40917'
+        with pymupdf.open() as drawing:
+            page = drawing.new_page(width=420, height=160)
+            page.insert_text((30, 60), line, fontsize=11)
+            box = page.search_for(line)[0] + (-2, -2, 2, 2)
+            value = page.search_for('TN-40917')[0]
+            png = page.get_pixmap(dpi=200).tobytes('png')
+        with pymupdf.open() as pdf:
+            page = pdf.new_page(width=160, height=420)
+            # Store the scan sideways, then rotate the page so it displays upright.
+            page.insert_image(page.rect, stream=png, rotate=90)
+            page.set_rotation(90)
+            data = pdf.tobytes()
+            self.assertEqual(pdf[0].rect.width, 420)
+        region = {'id': 'r', 'kind': 'text', 'text': line, 'bbox': list(box)}
+        ir = {'units': [{'id': 'u', 'number': 1, 'regions': [region]}]}
+        output, audit = redact_pdf(data, ir, [{'region_id': 'r', 'value': 'TN-40917', 'category': 'Identifiers'}])
+        self.assertEqual(audit[0]['localization'], 'pixel_word_gaps')
+        with pymupdf.open(stream=output, filetype='pdf') as pdf:
+            covered = pdf[0].get_pixmap(dpi=200, clip=value + (1, 1, -1, -1), colorspace=pymupdf.csGRAY)
+            label = pdf[0].get_pixmap(dpi=200, clip=pymupdf.Rect(box.x0 + 2, box.y0, value.x0 - 8, box.y1), colorspace=pymupdf.csGRAY)
+            self.assertGreater(float((np.frombuffer(covered.samples, dtype=np.uint8) < 100).mean()), .95)
+            self.assertLess(float((np.frombuffer(label.samples, dtype=np.uint8) < 100).mean()), .6)
+
+    def test_native_page_ignores_extractor_boxes_in_another_frame(self):
+        # Extractor boxes in media-box coordinates on a page with an offset crop box.
+        with pymupdf.open() as pdf:
+            page = pdf.new_page(width=600, height=800)
+            page.insert_text((140, 160), 'Account: AC-77120-9', fontsize=11)
+            page.set_cropbox(pymupdf.Rect(100, 100, 500, 700))
+            data = pdf.tobytes()
+        region = {'id': 'r', 'kind': 'text', 'text': 'Account: AC-77120-9', 'bbox': [140, 150, 260, 164]}
+        ir = {'units': [{'id': 'u', 'number': 1, 'regions': [region]}]}
+        output, audit = redact_pdf(data, ir, [{'region_id': 'r', 'value': 'AC-77120-9', 'category': 'Identifiers'}])
+        self.assertEqual(audit[0]['method'], 'native_glyph_spans')
+        with pymupdf.open(stream=output, filetype='pdf') as pdf:
+            text = pdf[0].get_text()
+            self.assertIn('Account:', text); self.assertNotIn('AC-77120', text)
+
     def test_line_box_without_any_visible_text_still_fails_closed(self):
         with pymupdf.open() as pdf:
             page = pdf.new_page(width=200, height=100)

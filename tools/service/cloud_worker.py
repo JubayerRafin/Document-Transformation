@@ -113,7 +113,10 @@ def register(args):
     worker=post('/v1/workers',{'name':args.name},account['csrf'])
     config={'url':base,'worker_id':worker['id'],'token':worker['token'],
         'supabase_url':worker['supabase_url'],
+        # A persistent GPU OCR session loads Paddle models once per job instead of
+        # once per page/figure (Linux servers; ignored elsewhere).
         'engine_profile':{'python':sys.executable,'ocr_python':sys.executable,
+          'ocr_device':'gpu:0','persistent_ocr':os.name=='posix',
           'translation_endpoint':'http://127.0.0.1:11434/v1','pii_endpoint':'http://127.0.0.1:11434/v1',
           'timeout_seconds':3600,'engine_options':{'table_strategy':'auto','pdf_page_mode':'document',
           'http_keepalive':True,'nativeized_ir_mode':'reuse','babeldoc_dual_output':False,
@@ -179,6 +182,7 @@ def summarize_checks(result):
     errors=result.get('translation_errors')
     return {'acceptable':independent.get('acceptable') is True,
             'known_sensitive_residuals':count(independent.get('known_sensitive_residuals')),
+            'partial_name_residuals':count(independent.get('partial_name_residuals')),
             'geometry_blockers':count(independent.get('geometry_blockers')),
             'layout_review_candidates':count(independent.get('layout_review_candidates')),
             'uninspected_content':count(independent.get('uninspected_content')),
@@ -323,10 +327,16 @@ def run(args):
     run_limit(profile)
     enabled=profile.get('persistent_ocr',False)
     if type(enabled) is not bool:raise ValueError('persistent_ocr must be boolean.')
+    if enabled and os.name!='posix':
+        print('Persistent OCR needs a Linux server; using one OCR process per call.',flush=True);enabled=False
     if enabled and profile.get('ocr_device')!='gpu:0':raise ValueError('Persistent OCR requires explicit GPU placement.')
     root=Path(args.root).resolve();root.mkdir(parents=True,exist_ok=True)
     from transformation.ocr.service import managed_session
     with managed_session(profile['ocr_python'],root,enabled) as session:
+        if session:
+            # Load OCR models once at worker start, so the first job does not wait for them.
+            from transformation.ocr.service import prewarm
+            prewarm(root/'prewarm')
         _run(args,cfg,root,session)
 
 

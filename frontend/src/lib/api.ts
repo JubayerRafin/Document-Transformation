@@ -45,6 +45,7 @@ export type JobChecks = {
   acceptable: boolean;
   privacy_verification: "passed" | "failed" | "not_run";
   known_sensitive_residuals: number;
+  partial_name_residuals?: number;
   geometry_blockers: number;
   layout_review_candidates: number;
   uninspected_content: number;
@@ -77,6 +78,7 @@ export function failureMessage(code?: string) {
 }
 const CHECK_LABELS: [keyof JobChecks, string][] = [
   ["known_sensitive_residuals", "sensitive values remaining"],
+  ["partial_name_residuals", "partly masked names"],
   ["geometry_blockers", "layout problems"],
   ["layout_review_candidates", "possible overlaps"],
   ["uninspected_content", "images or attachments not checked automatically"],

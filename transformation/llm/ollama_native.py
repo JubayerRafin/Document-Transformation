@@ -48,13 +48,15 @@ def record_progress(event, **details):
         logger.warning("Could not save translation progress", exc_info=True)
 
 
-def chat(endpoint, model, messages, max_output=4096, response_format=None):
+def chat(endpoint, model, messages, max_output=4096, response_format=None, purpose=None):
     parsed = urlparse(endpoint)
     if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or parsed.scheme not in {"http", "https"}:
         raise ValueError("Only a loopback Ollama endpoint is permitted.")
     url = f"{parsed.scheme}://{parsed.netloc}/api/chat"
     payload = {"model": model, "messages": messages, "think": False, "stream": False,
-               "options": {"temperature": 0, "num_ctx": 8192, "num_predict": max_output}}
+               "options": {"temperature": 0, "num_ctx": 8192, "num_predict": max_output},
+               # Keep the model resident between requests and jobs; reloading costs seconds.
+               "keep_alive": os.environ.get("TRANSFORMX_OLLAMA_KEEP_ALIVE", "30m")}
     if model.startswith('translategemma:'): payload.pop('think')
     if response_format is not None: payload['format']=response_format
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
@@ -80,6 +82,7 @@ def chat(endpoint, model, messages, max_output=4096, response_format=None):
     # Ollama durations are nanoseconds. Preserve raw values and measured client
     # wall time; loading, prefill and generation are different bottlenecks.
     record_progress('transport_completed',model=model,seconds=round(time.monotonic()-started,6),
+        **({'purpose':purpose} if purpose else {}),
         **{k:result[k] for k in ('total_duration','load_duration','prompt_eval_duration','eval_duration','prompt_eval_count','eval_count')
            if isinstance(result.get(k),(int,float))})
     return text, result
