@@ -74,7 +74,13 @@ test('wrong PDF hash blocks the editor before any page is rendered',async()=>{
 test('finalization needs review confirmation, a capable server and a saved draft',async()=>{
  const f=await fixture();try{
   f.click('#add');f.click('#finalize');await flush();assert.equal(f.calls.some(([p])=>p.endsWith('/redaction-finalize')),false);
-  f.q('#confirm').checked=true;f.q('#worker').value='worker';f.click('#finalize');for(let n=0;n<6;n++)await flush();
+  f.q('#confirm').checked=true;f.q('#worker').value='worker';
+  // Browser dialogs may be suppressed; the page must not depend on them.
+  f.w.confirm=()=>false;
+  f.click('#finalize');await flush();
+  assert.equal(f.calls.some(([p,i])=>p.endsWith('/redaction-finalize')||i?.method==='PUT'),false,'first click only arms');
+  assert.match(f.q('#finalize').textContent,/again/);
+  f.click('#finalize');for(let n=0;n<6;n++)await flush();
   const mutation=f.calls.find(([p])=>p.endsWith('/redaction-finalize'));assert.ok(mutation);assert.equal(JSON.parse(mutation[1].body).revision,'revision-b');assert.equal(f.q('#editor').hidden,true);
  }finally{f.dom.window.close();}
 });
