@@ -9,7 +9,7 @@ const html=readFileSync(new URL('../ui/redaction-review.html',import.meta.url),'
 const script=readFileSync(new URL('../ui/redaction-review.mjs',import.meta.url),'utf8').replace("import {getDocument,GlobalWorkerOptions} from '/pdfjs/pdf.mjs';",'const {getDocument,GlobalWorkerOptions}=window.fixturePdf;');
 const id='11111111-1111-4111-8111-111111111111';
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
-async function fixture({conflict=false,finalized=false,failed=false,wrongHash=false,worker=true,comparison=false,role='customer'}={}){
+async function fixture({conflict=false,finalized=false,failed=false,wrongHash=false,worker=true,comparison=false,role='customer',queue=null,why=null}={}){
  const dom=new JSDOM(html,{url:'https://test.example/redaction-review.html?job='+id+(comparison?'&compare=1':''),runScripts:'outside-only'}),w=dom.window;
  const data=new TextEncoder().encode('%PDF-synthetic'),hash=Buffer.from(await webcrypto.subtle.digest('SHA-256',data)).toString('hex');
  let draft={job_id:id,status:failed?'failed':finalized?'queued':'uploading',revision:'revision-a',regions:failed?[{page:1,x:.1,y:.2,width:.3,height:.1}]:[],parent_job_id:'parent',parent_artifact_id:'artifact',source_sha256:wrongHash?'0'.repeat(64):hash,filename:'Synthetic.pdf'},calls=[],rendered=[];
@@ -29,7 +29,8 @@ async function fixture({conflict=false,finalized=false,failed=false,wrongHash=fa
    }return make(draft);
   }
   if(path.endsWith('/redaction-finalize'))return make({job_id:id,status:'queued'});
-  return make({id,filename:'Synthetic.pdf',options:{operation:'manual_redaction'},status:failed?'failed':finalized?'succeeded':'uploading',stage:'complete',artifacts:finalized?[{id:'result',kind:'result',sha256:hash},...(comparison?[{id:'source',kind:'source',sha256:hash}]:[])]:[]});
+  if(queue&&path==='/v1/jobs/parent')return make({id:'parent',status:'succeeded',options:{operation:'pii'},artifacts:[],metrics:{review_items:queue}});
+  return make({id,metrics:why?{redaction_map:why}:{},filename:'Synthetic.pdf',options:{operation:'manual_redaction'},status:failed?'failed':finalized?'succeeded':'uploading',stage:'complete',artifacts:finalized?[{id:'result',kind:'result',sha256:hash},...(comparison?[{id:'source',kind:'source',sha256:hash}]:[])]:[]});
  };
  w.eval(script);
  // SHA-256 runs on the crypto thread pool. Waiting a fixed number of event
@@ -106,5 +107,43 @@ test('failed finalization keeps the saved plan and offers recovery without rerun
   assert.match(f.q('#message').textContent,/saved selections are retained/i);
   assert.equal(f.draft().regions.length,1);
   assert.equal(f.calls.some(([,i])=>i.method),false);
+ }finally{f.dom.window.close();}
+});
+test('review queue shows automatic-redaction items and adds possible misses as undoable areas',async()=>{
+ const queue=[{page:1,x:.1,y:.2,width:.3,height:.05,category:'Identifiers',reason:'rule_overruled_model',state:'suggested'},
+  {page:2,x:.4,y:.5,width:.2,height:.04,category:'Unknown',reason:'unreadable_text',state:'suggested'},
+  {page:1,x:.1,y:.6,width:.5,height:.03,category:'Names',reason:'unverified_answer',state:'masked'}];
+ const f=await fixture({queue});try{
+  assert.equal(f.q('#queue').hidden,false);
+  assert.equal(f.q('#queue-items').children.length,3);
+  assert.match(f.q('#queue-summary').textContent,/2 possible misses \(2 not added yet\) · 1 masked as a precaution/);
+  assert.equal(f.w.document.querySelectorAll('.queue-box').length,2,'page 1 shows its two queue boxes');
+  // Precautionary items cannot be added; misses can, one at a time or all together.
+  assert.equal([...f.q('#queue-items').children][2].querySelectorAll('button').length,1);
+  [...f.q('#queue-items').children][0].querySelectorAll('button')[1].click();await flush();
+  assert.equal(f.q('#area-count').textContent,'1 additional area');
+  assert.equal([...f.q('#queue-items').children][0].querySelectorAll('button')[1].textContent,'Added');
+  f.click('#add-suggestions');await flush();
+  assert.equal(f.q('#area-count').textContent,'2 additional areas');
+  assert.equal(f.q('#add-suggestions').disabled,true);
+  f.click('#undo');await flush();assert.equal(f.q('#area-count').textContent,'1 additional area');
+ }finally{f.dom.window.close();}
+});
+test('review queue stays hidden when the automatic redaction reported nothing',async()=>{
+ const f=await fixture();try{assert.equal(f.q('#queue').hidden,true);}finally{f.dom.window.close();}
+});
+test('comparison can show why each automatic box was drawn',async()=>{
+ const why=[{page:1,x:.1,y:.1,width:.2,height:.03,category:'Names',method:'field_label'},
+  {page:1,x:.1,y:.3,width:.2,height:.03,category:'Identifiers',method:'unverifiable_model_answer'},
+  {page:2,x:.1,y:.3,width:.2,height:.03,category:'Names',method:'model_proposal'}];
+ const f=await fixture({comparison:true,finalized:true,why});try{
+  assert.equal(f.q('#why-toggle').hidden,false);
+  assert.equal(f.w.document.querySelectorAll('.why-box:not([style*="static"])').length,0,'off until asked');
+  f.q('#why').checked=true;f.q('#why').dispatchEvent(new f.w.Event('change'));
+  const boxes=[...f.w.document.querySelectorAll('#why-layer .why-box')];
+  assert.equal(boxes.length,2,'only page 1 boxes');
+  assert.match(boxes[0].title,/Names: masked because its field label says it is personal data/);
+  assert.match(boxes[1].title,/precaution/);
+  assert.equal(f.q('#why-legend').hidden,false);
  }finally{f.dom.window.close();}
 });

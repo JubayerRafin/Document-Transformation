@@ -21,6 +21,10 @@ def compact(text):
     return ''.join(c for c in text if not c.isspace() and c != '\u00ad')
 
 
+_NO_SPACE_SCRIPT=re.compile(r'[぀-ヿ㐀-鿿가-힯]')  # Kana, Han, Hangul
+_HAN_KANA=re.compile(r'[぀-ヿ㐀-鿿]')
+
+
 def literal_spans(text, value):
     """Match source literals across layout whitespace, retaining source offsets.
 
@@ -39,7 +43,12 @@ def literal_spans(text, value):
         # the token: a '.', '-' or '+' followed by whitespace or the end of text ends it.
         trailing = b<len(text) and re.match(token_chars,text[b]) and not (
             text[b] in '.-+' and (b+1==len(text) or text[b+1].isspace()))
-        if needle[0].isalnum() and a and re.match(token_chars,text[a-1]): continue
+        # Korean, Japanese and Chinese attach particles and endings without a space
+        # ("정시우에게", "田中さん"), so a following character in those scripts does not
+        # extend the value. Han/Kana text has no spaces at all, so the same holds before.
+        if trailing and _NO_SPACE_SCRIPT.match(needle[-1]) and _NO_SPACE_SCRIPT.match(text[b]): trailing=False
+        leading = a and re.match(token_chars,text[a-1]) and not (_HAN_KANA.match(needle[0]) and _HAN_KANA.match(text[a-1]))
+        if needle[0].isalnum() and leading: continue
         if needle[-1].isalnum() and trailing: continue
         result.append((a,b))
     return result
@@ -267,13 +276,56 @@ def remove_hidden_values(pdf,values):
         pdf.set_toc([[entry[0],'[REDACTED]' if contains(entry[1]) else entry[1],*entry[2:]] for entry in toc])
 
 
-def redact_pdf(data,ir,findings):
+STYLES={'box','label','pseudonym'}
+_LABEL={'Names':'NAME','Email addresses':'EMAIL','Phone numbers':'PHONE','Addresses':'ADDRESS','Identifiers':'ID','Bank accounts':'ACCOUNT','Dates of birth':'BIRTH DATE'}
+_PSEUDO={'Names':'Person','Email addresses':'Email','Phone numbers':'Phone','Addresses':'Address','Identifiers':'ID','Bank accounts':'Account','Dates of birth':'Birth date'}
+
+
+def replacement_labels(findings,style='box'):
+    """value -> text drawn inside its black box. 'label': the category ([NAME]); 'pseudonym': a
+    consistent placeholder per distinct value (Person A, Email 1, ...). A single word of a full
+    name reuses that person's placeholder, so 'Becker' and 'Thomas Becker' read as one person."""
+    if style not in STYLES:raise ValueError('Unknown masking style.')
+    if style=='box':return {}
+    category={}
+    for f in findings:category.setdefault(f['value'],f['category'])
+    if style=='label':return {v:'['+_LABEL.get(c,'REDACTED')+']' for v,c in category.items()}
+    labels,by_key,counters={}, {}, {}
+    def key(v):return compact(v).casefold()
+    names=[v for v,c in category.items() if c=='Names']
+    for v in sorted(names,key=lambda v:(-len(v.split()),names.index(v))):
+        if key(v) in by_key:labels[v]=by_key[key(v)];continue
+        owner=next((labels[o] for o in labels if len(v.split())==1 and len(o.split())>1
+                    and v.casefold() in [w.strip(',.').casefold() for w in o.split()]),None)
+        if owner is None:
+            n=counters.get('Names',0);counters['Names']=n+1
+            owner='Person '+(chr(65+n) if n<26 else chr(65+n//26-1)+chr(65+n%26))
+        by_key[key(v)]=labels[v]=owner
+    for v,c in category.items():
+        if c=='Names':continue
+        if key(v) not in by_key:
+            counters[c]=counters.get(c,0)+1;by_key[key(v)]=f"{_PSEUDO.get(c,'Item')} {counters[c]}"
+        labels[v]=by_key[key(v)]
+    return labels
+
+
+def _label_annotation(text,rect):
+    """Keyword arguments that write text into a black redaction box, if it fits legibly."""
+    if not text:return {}
+    rect=pymupdf.Rect(rect);size=min(rect.height*.72,rect.width/(.56*len(text)+.6),11)
+    if size<3.5:return {}
+    return {'text':text,'fontname':'helv','fontsize':size,'text_color':(1,1,1),'align':pymupdf.TEXT_ALIGN_CENTER,'cross_out':False}
+
+
+def redact_pdf(data,ir,findings,style='box',boxes=None):
+    """boxes: optional list that receives (page number, displayed-page rect, value) per drawn box."""
     from extraction.coordinator import text_regions
     regions={r['id']:r for r in text_regions(ir)+ir.get('pii_source_regions',[])}
     for finding in findings:
         if finding['region_id'] not in regions or not finding.get('value') or finding['value'] not in regions[finding['region_id']]['text']:
             raise ValueError('PII redaction requires an exact source-region finding.')
     values=sorted({f['value'] for f in findings},key=len,reverse=True)
+    labels=replacement_labels(findings,style)
     audit=[]; unselected={}; selected_boxes=[]
     renders={}  # page renders, valid only for this open document
     with pymupdf.open(stream=data,filetype='pdf') as pdf:
@@ -287,7 +339,7 @@ def redact_pdf(data,ir,findings):
         remove_hidden_values(pdf,values)
         for unit in ir['units']:
             index=unit['number']-1;page=pdf[index];blocks=native_blocks(page)
-            native_rects=[]; boxes_by_value={v:[] for v in values}
+            native_rects=[]; native_labels=[]; native_values=[]; boxes_by_value={v:[] for v in values}
             for block in blocks:
                 selected=set()
                 for value in values:
@@ -299,11 +351,14 @@ def redact_pdf(data,ir,findings):
                             if rect.is_empty:continue
                             if char['line'] not in line_boxes:line_boxes[char['line']]=rect
                             else:line_boxes[char['line']] |= rect
-                        native_rects.extend(line_boxes.values())
+                        native_rects.extend(line_boxes.values()); native_labels.extend(labels.get(value,'') for _ in line_boxes)
+                        native_values.extend(value for _ in line_boxes)
                         boxes_by_value[value].extend(line_boxes.values())
                 unselected.setdefault(index,Counter()).update(_glyph_key(c) for i,c in enumerate(block['chars'])
                     if c is not None and not c['c'].isspace() and i not in selected)
-            for rect in native_rects:page.add_redact_annot(rect,fill=(0,0,0))
+            for rect,label,value in zip(native_rects,native_labels,native_values):
+                page.add_redact_annot(rect,fill=(0,0,0),**_label_annotation(label,rect))
+                if boxes is not None:boxes.append((index+1,pymupdf.Rect(rect)*page.rotation_matrix,value))
             selected_boxes.extend((index,rect) for rect in native_rects)
             # A page with a text layer is redacted from its own glyphs: every occurrence of a
             # selected value on the page was located above. Extractor boxes are not used there,
@@ -338,7 +393,8 @@ def redact_pdf(data,ir,findings):
                         # Page coordinates start at the crop box corner; page.cropbox is
                         # measured from the media box, so compare with the crop box size.
                         if not pymupdf.Rect(0,0,page.cropbox.width,page.cropbox.height).contains(rect):raise RedactionLocalizationError([{'region_id':region['id'],'reason':'outside_page'}])
-                        page.add_redact_annot(rect,fill=(0,0,0));selected_boxes.append((index,rect))
+                        page.add_redact_annot(rect,fill=(0,0,0),**_label_annotation(labels.get(selected[0],''),rect));selected_boxes.append((index,rect))
+                        if boxes is not None:boxes.append((index+1,pymupdf.Rect(rect)*page.rotation_matrix,selected[0]))
                     audit.append({'region_id':region['id'],'method':'ocr_value_spans',
                         'selected_value_occurrences':sum(len(literal_spans(region['text'],v)) for v in selected),
                         'propagated_exact_value':not any(f['region_id']==region['id'] for f in findings),'review_required':True,

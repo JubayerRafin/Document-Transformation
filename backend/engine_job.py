@@ -27,6 +27,8 @@ def main():
         target=opts['target_language'],output_kind='pdf',protected_values=opts['protected_values'],
         document_context=opts['document_context'],pii_categories=opts['pii_categories'],
         timeout=cfg.get('timeout_seconds',3600),translation_model='translategemma:12b',pii_model='qwen3.5:9b')
+    for key in ('pii_style','pii_keep'):
+        if opts.get(key):options[key]=opts[key]
     if cfg.get('execution_remote'):options['execution_remote']=cfg['execution_remote']
     else:
         options=local_cache_options(options,cfg,folder)

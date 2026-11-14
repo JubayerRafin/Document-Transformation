@@ -13,7 +13,7 @@ import zipfile
 OPTIONS = {'output_kind','pii_categories','pii_assist','visual_analysis','table_strategy',
     'translation_model','pii_model','source','target','timeout','ignore_cache',
     'protected_values','document_context','terminology','pdf_page_mode',
-    'http_keepalive','nativeized_ir_mode','babeldoc_dual_output','figure_engine','light_pdf_io','ocr_cache_mode','translation_qps','translation_workers','ollama_parallelism','artifact_mode','layout_idle_spinning'}
+    'http_keepalive','nativeized_ir_mode','babeldoc_dual_output','figure_engine','light_pdf_io','ocr_cache_mode','translation_qps','translation_workers','ollama_parallelism','artifact_mode','layout_idle_spinning','pii_style','pii_keep'}
 
 
 def server_options(options, job):

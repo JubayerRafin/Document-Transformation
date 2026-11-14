@@ -11,6 +11,8 @@ import {
 import {
   ApiClient,
   checkFindings,
+  reviewSummary,
+  redactionSummary,
   downloadUrl,
   seconds,
   type Job,
@@ -124,6 +126,25 @@ export function PreviewPanel({
           </p>
           {checkFindings(job.metrics.checks).length > 0 && (
             <p className="mb-0">{checkFindings(job.metrics.checks).join(" · ")}</p>
+          )}
+          {redactionSummary(job.metrics.redaction_map) && (
+            <p className="mb-0" data-testid="redaction-summary">
+              {redactionSummary(job.metrics.redaction_map)}.
+              {source && result && " Open the full-screen comparison and turn on “Show why” to see each one."}
+            </p>
+          )}
+          {reviewSummary(job.metrics.review_items) && (
+            <p className="mb-0" data-testid="review-queue">
+              Review queue: {reviewSummary(job.metrics.review_items)}.{" "}
+              {result && !readOnly && (
+                <a
+                  className="font-medium text-foreground underline"
+                  href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&new=1`}
+                >
+                  Open the review
+                </a>
+              )}
+            </p>
           )}
           {job.options.operation !== "translation" && (
             <p className="mb-0">

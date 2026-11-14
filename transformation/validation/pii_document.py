@@ -18,7 +18,7 @@ prefixes or languages; category meaning lives in privacy.CATEGORY_DEFINITIONS.
 import json
 import re
 
-from transformation.validation.privacy import CATEGORIES, COMPACT_JSON, category_guide, detect, _phone_shape
+from transformation.validation.privacy import CATEGORIES, COMPACT_JSON, category_guide, detect, is_date, offered_categories, _phone_shape
 from transformation.validation.value_redaction import compact, literal_spans, native_pattern_regions
 
 LABEL_MAX_WORDS = 6
@@ -88,21 +88,34 @@ def field_pairs(units, cells, blocks):
     for table_cells in by_table.values():
         columns = {}
         for cell in table_cells: columns.setdefault(cell['metadata']['column'], []).append(cell)
-        # A left-hand label column needs a value column to its right. Whether its cells
-        # really are labels (not, say, a column of names) is left to the classifier.
+        # Columns whose cells (below the first row) all look like labels.
         label_columns = {c for c, items in columns.items() if c + 1 in columns
                          and all(label_like(i['text']) for i in items if i['metadata']['row'] > 0)}
+        # A form table pairs labels with values across each row: "label | value", or
+        # "label | value | label | value" with a label in every even column. Any other table is a
+        # data table (rosters, invoices, schedules): its column headers describe its cells, and its
+        # short text columns (names, departments, tasks) only look like labels.
+        form = len(columns) % 2 == 0 and all(c in label_columns for c in columns if c % 2 == 0)
         for cell in table_cells:
             meta = cell['metadata']; row, col = meta['row'], meta['column']
-            if row == 0: continue
-            header = str(meta.get('column_header') or '')
-            # In a key/value table the value column's header ("Value") is generic; only
-            # row labels describe its cells, even when a row label cell came out empty.
-            if label_like(header) and col - 1 not in label_columns:
-                pairs.append({'label': header.strip(), 'value': cell['text'], 'region_id': cell['id'], 'kind': 'column'})
             values = meta.get('row_values') or []
-            if col >= 1 and col - 1 in label_columns and col - 1 < len(values) and label_like(str(values[col - 1])):
-                pairs.append({'label': str(values[col - 1]).strip(), 'value': cell['text'], 'region_id': cell['id'], 'kind': 'row'})
+            label = str(values[col - 1]).strip() if form and col % 2 == 1 and col - 1 < len(values) else ''
+            if row == 0:
+                # A form may have no header row: its first row is a field too ("Full name | Ann
+                # Moor"). Pair it; the label classifier decides whether the label is personal,
+                # and only then is the cell treated as a value instead of a header.
+                if label and label_like(label):
+                    pairs.append({'label': label, 'value': cell['text'], 'region_id': cell['id'],
+                                  'kind': 'row', 'first_row': True})
+                continue
+            if form:
+                # Label cells are labels themselves; a value column's header ("Value") is generic.
+                if label and label_like(label):
+                    pairs.append({'label': label, 'value': cell['text'], 'region_id': cell['id'], 'kind': 'row'})
+                continue
+            header = str(meta.get('column_header') or '')
+            if label_like(header):
+                pairs.append({'label': header.strip(), 'value': cell['text'], 'region_id': cell['id'], 'kind': 'column'})
     return pairs
 
 
@@ -197,6 +210,110 @@ def name_occurrences(units, names, longer_names=()):
     return found
 
 
+# Titles of address in the supported languages; they are not part of the name itself.
+HONORIFIC = re.compile(r'^(?:(?:Mr|Mrs|Ms|Mx|Dr|Prof|Sr|Sra|Srta|Mme|Mlle|M)\.|(?:Mr|Mrs|Ms|Mx|Dr|Prof|Miss|Sir|Madam|'
+                       r'Herr|Frau|Don|Doña|Dña))\s+(?=\S)')
+CJK = re.compile(r'[⺀-鿿가-힯]')
+
+
+def strip_honorific(value):
+    """'Mr. Becker' -> 'Becker' (a suffix, so it is still an exact substring of the source)."""
+    m = HONORIFIC.match(value)
+    return value[m.end():] if m and re.search(r'[^\W\d_]', value[m.end():]) else value
+
+
+def name_variant_occurrences(units, full_names):
+    """Each word of a detected full name, wherever it stands alone ('Dear Becker,', 'T. Becker').
+
+    A word that also occurs in lowercase in the document ('green', 'rose') is an ordinary word
+    there, so it is only masked as part of the full name. Email/URL tokens are never split.
+    Scripts written without spaces (CJK) are left to the full-name occurrences.
+    """
+    # Lowercase spellings inside email addresses and links say nothing about ordinary words.
+    text_all = re.sub(r'\S*(?:@|://)\S*', ' ', '\n'.join(u.get('text', '') for u in units))
+    words = set()
+    for name in full_names:
+        # A "name" with digits ("USD 1117.00" mislabelled as a name) is not a person's name.
+        if any(c.isdigit() for c in name): continue
+        parts = [p.strip(',.;:') for p in strip_honorific(name).split()]
+        if len(parts) < 2: continue
+        for p in parts:
+            # All-capital words are codes or acronyms (USD, NWBK), never spread on their own.
+            if (re.fullmatch(r"[^\W\d_][^\W\d_'’-]{2,}", p) and p[0].isupper() and not p.isupper()
+                    and not CJK.search(p)):
+                words.add(p)
+    words = {w for w in words if not re.search(r'(?<![\w-])' + re.escape(w.lower()) + r'(?![\w-])', text_all)}
+    found = []
+    for unit in units:
+        text = unit.get('text', '')
+        # Words inside a full-name occurrence (even one wrapped across lines) are covered by it.
+        covered = [s for name in full_names for s in literal_spans(text, name)]
+        for word in words:
+            for m in re.finditer(r'(?<![\w@-])' + re.escape(word) + r'(?![\w@-])', text):
+                if any(a <= m.start() and m.end() <= b for a, b in covered): continue
+                token = re.search(r'\S*$', text[:m.start()]).group() + m.group() + re.match(r'\S*', text[m.end():]).group()
+                if '@' in token or '://' in token: continue
+                found.append((unit, m.start(), m.end()))
+    return found
+
+
+def format_ok(value, category):
+    """A labelled value of a format category must have that format. A garbled table cell
+    (an underscore email extracted as "ann moor@x.example" plus a stray "_") is left to the
+    pattern detector, which reads the real page text."""
+    if category == 'Email addresses': return bool(EMAIL.fullmatch(compact(value)))
+    if category == 'Phone numbers':
+        return bool(re.fullmatch(r'[\d\s()+./-]+', value.strip())) and 8 <= sum(c.isdigit() for c in value) <= 15
+    return True
+
+
+def address_part(text):
+    """A short postal line such as 'Apt 13', '19º A' or 'Springfield, IL 62704'."""
+    from transformation.validation.privacy import is_date
+    text = text.strip()
+    digits = sum(c.isdigit() for c in text)
+    return (2 <= len(text) <= 40 and len(text.split()) <= 6 and 0 < digits < 8 and ':' not in text
+            and '：' not in text and '@' not in text and not is_date(text))
+
+
+def address_block_lines(found, lines):
+    """Lines of a postal block next to a detected address line.
+
+    found: region ids holding an Addresses finding. lines: {region_id: (page, bbox, text)} for
+    single-line regions. Lines directly above/below (same left edge, within about a line
+    height) that look like address parts are part of the same address; the chain stops at
+    anything else, such as the person's name above the address.
+    """
+    by_page = {}
+    for rid, (page, bbox, text) in lines.items(): by_page.setdefault(page, []).append((rid, bbox, text))
+    extra = {}
+    for rid in found:
+        if rid not in lines: continue
+        page, start, _ = lines[rid]
+        for direction in (1, -1):
+            current = start
+            for _ in range(3):
+                height = max(current[3] - current[1], 1)
+                nearest = None
+                for other, bbox, text in by_page.get(page, []):
+                    if other == rid or other in extra or abs(bbox[0] - current[0]) > max(3, .5 * height): continue
+                    gap = bbox[1] - current[3] if direction == 1 else current[1] - bbox[3]
+                    if -.3 * height <= gap <= 1.2 * height and (nearest is None or gap < nearest[0]):
+                        nearest = (gap, other, bbox, text)
+                if not nearest or not address_part(nearest[3]) or nearest[1] in found: break
+                extra[nearest[1]] = nearest[3].strip(); current = nearest[2]
+    return extra
+
+
+def split_kept(findings, keep):
+    """(findings to mask, findings left visible). A finding is kept when its value is part of a
+    keep-visible entry (case and spacing ignored); a keep entry never unmasks a longer value
+    that merely contains it, so 'Northwind' does not expose 'Ann Moor, Northwind'."""
+    keys = [compact(k).casefold() for k in keep if isinstance(k, str) and compact(k)]
+    kept = [f for f in findings if compact(f['value']) and any(compact(f['value']).casefold() in k for k in keys)]
+    return [f for f in findings if f not in kept], kept
+
+
 def ocr_paragraphs(lines, min_words=3):
     """Group consecutive OCR lines of one paragraph into a detection unit.
 
@@ -276,7 +393,7 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
     # When any model category is selected, every category is offered to the model and the
     # user's selection is applied at the end, so a phone number is never reported as an
     # "identifier" just because phones were not selected.
-    offered = CATEGORIES if semantic_selected else list(categories)
+    offered = offered_categories(categories) if semantic_selected else list(categories)
     cells = [r for u in ir['units'] if not u.get('ocr_folder') for r in text_regions({'units': [u]})
              if r.get('metadata', {}).get('table_parent')]
     regions = {r['id']: r for r in units + cells + ocr_lines}
@@ -292,7 +409,7 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
     with ThreadPoolExecutor(max_workers=3) as pool:
         unresolved = []
         detected = pool.submit(detect, units, offered, endpoint, model, assist, workers, unresolved)
-        labelled = pool.submit(classify_labels, labels, CATEGORIES, endpoint, model) if smart and labels else None
+        labelled = pool.submit(classify_labels, labels, offered_categories(categories), endpoint, model) if smart and labels else None
         swept = pool.submit(name_sweep, units, endpoint, model) if smart and 'Names' in categories else None
         findings = detected.result()
         decisions = labelled.result() if labelled else {}
@@ -317,19 +434,32 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
         for key, items in sensitive.items():
             for pair, decision in items:
                 if pair.get('kind') == 'column' and pair['region_id'] in row_labelled: continue
-                if pair['value'].strip():
+                if pair['value'].strip() and format_ok(pair['value'], decision):
                     findings.append({'region_id': pair['region_id'], 'value': pair['value'], 'category': decision,
                                      'method': 'field_label', 'label': pair['label']})
         # A value seen only under non-personal labels is not an identifier/account by model guess.
         only_plain = {k for k in plain if k not in sensitive}
-        findings = [f for f in findings if not (f.get('method') == 'model_proposal'
-                    and f['category'] in {'Identifiers', 'Bank accounts'} and compact(f['value']) in only_plain)]
+        overruled = lambda f: (f.get('method') == 'model_proposal' and f['category'] in {'Identifiers', 'Bank accounts'}
+                               and compact(f['value']) in only_plain)
+        # Kept for the review queue: the model and the column label disagreed, so a person decides.
+        suppressed = [dict(f) for f in findings if overruled(f)]
+        findings = [f for f in findings if not overruled(f)]
         evidence['document_names'] = sorted(names)
         # Names already found by any method count as "longer names" for fragment checks.
         known_names = {f['value'] for f in findings if f.get('category') == 'Names'}
         for unit, a, b in name_occurrences(units, names, known_names):
             findings.append({'region_id': unit['id'], 'value': unit['text'][a:b], 'category': 'Names',
                              'method': 'document_name_sweep'})
+        if 'Names' in categories:
+            # A person named once in full is also masked where only part of the name is used.
+            # Only names the model itself identified as people (name list or its own findings)
+            # are spread; a value that is a "name" only because of its field label may be a
+            # mislabelled cell (an amount, another label) and must not spread.
+            full_names = {f['value'] for f in findings if f.get('category') == 'Names'
+                          and f.get('method') in ('model_proposal', 'document_name_sweep')} | set(names)
+            for unit, a, b in name_variant_occurrences(units, full_names):
+                findings.append({'region_id': unit['id'], 'value': unit['text'][a:b], 'category': 'Names',
+                                 'method': 'name_variant'})
     # Fail-safe: a unit whose model answer could not be verified even line by line is
     # masked as a whole (recorded in evidence) instead of failing the job or leaving it.
     fallback = next((c for c in ('Identifiers', 'Names', 'Addresses', 'Bank accounts') if c in categories), None)
@@ -349,22 +479,58 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
             for a, b in literal_spans(unit.get('text', ''), value):
                 findings.append({'region_id': unit['id'], 'value': unit['text'][a:b], 'category': category,
                                  'method': 'document_consistency'})
+    # Postal blocks: unit and city lines next to a detected address line are the same address.
+    if 'Addresses' in categories:
+        page_of = {r['id']: u['number'] for u in ir['units'] for r in text_regions({'units': [u]})}
+        page_of.update({b['id']: b['metadata']['pii_native_page'] for b in native_blocks})
+        single = {rid: (page_of[rid], r['bbox'], r['text']) for rid, r in regions.items()
+                  if rid in page_of and r.get('bbox') and r.get('text', '').strip() and '\n' not in r['text'].strip()}
+        members = {u['id']: [line['id'] for line, _ in u['members']] for u in units if u.get('members')}
+        located = set()
+        for f in findings:
+            if f['category'] == 'Addresses':
+                located |= set(members.get(f['region_id'], [f['region_id']]))
+        for rid, text in address_block_lines(located, single).items():
+            findings.append({'region_id': rid, 'value': text, 'category': 'Addresses', 'method': 'address_block'})
     # Findings on joined OCR paragraphs go back to the OCR lines that carry geometry.
     paragraphs = {u['id']: u for u in units if u.get('members')}
     findings = [part for f in findings for part in (member_findings(f, paragraphs[f['region_id']])
                 if f['region_id'] in paragraphs else [f])]
-    # Table header cells are labels, never values.
-    headers = {compact(c['text']) for c in cells if c['metadata']['row'] == 0}
+    if smart:
+        evidence['suppressed'] = [{'region_id': p['region_id'], 'value': p['value'], 'category': p['category'],
+                                   'reason': 'column_label_not_personal'}
+                                  for f in suppressed if f['category'] in categories
+                                  for p in (member_findings(f, paragraphs[f['region_id']]) if f['region_id'] in paragraphs else [f])]
+    # Table header cells are labels, never values, except a first row that the label
+    # classifier confirmed is a personal field (a key/value table without a header row).
+    first_row_values = {compact(p['value']) for p in pairs if p.get('first_row')
+                        and evidence['field_labels'].get(p['label']) not in (None, 'none')}
+    headers = {compact(c['text']) for c in cells if c['metadata']['row'] == 0} - first_row_values
     findings = [f for f in findings if compact(f['value']) not in headers]
     # A model-proposed identifier/account looks like one: it has a digit or an ID symbol.
     # Plain words ("API key", "Device Console") are labels or headings, not values.
     findings = [f for f in findings if not (f.get('method') == 'model_proposal'
                 and f['category'] in {'Identifiers', 'Bank accounts'}
                 and not re.search(r'[\d_@.:/#\-]', f['value']))]
+    # "minjun.kim" is a user handle, not a written name. Where it only appears inside email
+    # addresses (already masked) it is dropped; elsewhere it is a user name (an identifier).
+    handle = re.compile(r'[a-z0-9]+(?:[._][a-z0-9]+)+')
+    outside_emails = re.sub(r'\S*@\S*', ' ', '\n'.join(u.get('text', '') for u in units))
+    kept = []
+    for f in findings:
+        if f['category'] == 'Names' and handle.fullmatch(f['value'].strip()):
+            if not re.search(r'(?<![\w.@])' + re.escape(f['value'].strip()) + r'(?![\w@])', outside_emails): continue
+            f = dict(f, category='Identifiers')
+        kept.append(f)
+    findings = kept
     result, seen = [], set()
     for finding in findings:
         category = normalize_category(finding['value'], finding['category'])
         if category not in categories: continue
+        # Category policy: a plain date is personal only as a date of birth, whatever found it
+        # (a due-date column labelled as an identifier is still a due date).
+        if category != 'Dates of birth' and is_date(finding['value']): continue
+        if category == 'Names': finding = dict(finding, value=strip_honorific(finding['value']))
         region = regions.get(finding['region_id'])
         if region is None or finding['value'] not in region['text']: continue
         key = (finding['region_id'], finding['value'], category)

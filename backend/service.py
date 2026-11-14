@@ -9,7 +9,7 @@ class Problem(Exception):
 
 def sha(data):return hashlib.sha256(data).hexdigest()
 def canonical(obj):return json.dumps(obj,sort_keys=True,separators=(',',':'),ensure_ascii=False)
-PII={'Email addresses','Phone numbers','Names','Addresses','Identifiers','Bank accounts'}
+PII={'Email addresses','Phone numbers','Names','Addresses','Identifiers','Bank accounts','Dates of birth'}
 
 def options(raw):
     if not isinstance(raw,dict) or set(raw)-{'operation','source_language','target_language','output_format','protected_values','document_context','pii_categories'}:raise Problem('INVALID_OPTIONS')

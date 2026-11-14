@@ -259,3 +259,93 @@ it("registers a private server without displaying the secret token", async () =>
   ).toBeVisible();
   expect(screen.queryByText("never-show-this-secret")).not.toBeInTheDocument();
 });
+it("sends the chosen masking style and keep-visible values with a PII job", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
+  upload(api);
+  await u.click(screen.getByRole("tab", { name: "PII redaction" }));
+  await u.upload(
+    screen.getByLabelText("Choose a PDF"),
+    new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
+  );
+  await screen.findByText("test.pdf");
+  await u.selectOptions(screen.getByLabelText("How removed text looks"), "pseudonym");
+  await u.type(screen.getByLabelText("Keep visible, one per line"), "Northwind Supply{enter}  {enter}Head office");
+  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
+  await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
+  await u.click(screen.getByRole("button", { name: /Start/i }));
+  await waitFor(() => expect(submit).toHaveBeenCalled());
+  expect(submit.mock.calls[0][1]).toMatchObject({
+    operation: "pii",
+    pii_style: "pseudonym",
+    pii_keep: ["Northwind Supply", "Head office"],
+  });
+});
+it("translation jobs do not send PII masking options", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
+  upload(api);
+  await u.upload(
+    screen.getByLabelText("Choose a PDF"),
+    new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
+  );
+  await screen.findByText("test.pdf");
+  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
+  await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
+  await u.click(screen.getByRole("button", { name: /Start transformation/i }));
+  await waitFor(() => expect(submit).toHaveBeenCalled());
+  expect(submit.mock.calls[0][1]).not.toHaveProperty("pii_style");
+  expect(submit.mock.calls[0][1]).not.toHaveProperty("pii_keep");
+});
+it("summarizes the review queue and links to the review editor", async () => {
+  const api = new ApiClient();
+  vi.spyOn(api, "preview").mockResolvedValue({ url: "https://test.supabase.co/x" });
+  const box = { page: 1, x: 0.1, y: 0.1, width: 0.2, height: 0.05, category: "Names" };
+  const queued = {
+    ...job,
+    options: { ...job.options, operation: "pii" as const },
+    metrics: {
+      ...job.metrics,
+      checks: { acceptable: true, privacy_verification: "passed" as const, known_sensitive_residuals: 0, geometry_blockers: 0,
+        layout_review_candidates: 0, uninspected_content: 0, scan_acceptance_blockers: 0, translation_errors: 0 },
+      review_items: [
+        { ...box, reason: "rule_overruled_model" as const, state: "suggested" as const },
+        { ...box, reason: "unreadable_text" as const, state: "suggested" as const },
+        { ...box, reason: "whole_line" as const, state: "masked" as const },
+      ],
+    },
+  };
+  render(<PreviewPanel job={queued} api={api} onError={vi.fn()} />);
+  const note = await screen.findByTestId("review-queue");
+  expect(note).toHaveTextContent("2 possible misses to check · 1 area masked as a precaution");
+  expect(screen.getByRole("link", { name: "Open the review" })).toHaveAttribute(
+    "href",
+    `/redaction-review.html?job=${queued.id}&new=1`,
+  );
+});
+it("summarizes what was masked and how it was found", async () => {
+  const api = new ApiClient();
+  vi.spyOn(api, "preview").mockResolvedValue({ url: "https://test.supabase.co/x" });
+  const box = { page: 1, x: 0.1, y: 0.1, width: 0.2, height: 0.05 };
+  const masked = {
+    ...job,
+    options: { ...job.options, operation: "pii" as const },
+    metrics: {
+      ...job.metrics,
+      checks: { acceptable: true, privacy_verification: "passed" as const, known_sensitive_residuals: 0, geometry_blockers: 0,
+        layout_review_candidates: 0, uninspected_content: 0, scan_acceptance_blockers: 0, translation_errors: 0 },
+      redaction_map: [
+        { ...box, category: "Names", method: "field_label" },
+        { ...box, category: "Names", method: "name_variant" },
+        { ...box, category: "Email addresses", method: "pattern" },
+        { ...box, category: "Identifiers", method: "model_proposal" },
+      ],
+    },
+  };
+  render(<PreviewPanel job={masked} api={api} onError={vi.fn()} />);
+  expect(await screen.findByTestId("redaction-summary")).toHaveTextContent(
+    "4 areas masked: 2 Names, 1 Email addresses, 1 Identifiers · found by: field label or format 2, language model 1, name list or consistency 1",
+  );
+});

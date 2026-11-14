@@ -34,12 +34,65 @@ export type Job = {
     acceptance_checked?: boolean;
     gpu_verified?: boolean;
     checks?: JobChecks;
+    review_items?: ReviewItem[];
+    redaction_map?: RedactionBox[];
   };
   source_sha256: string;
   assigned_worker_id?: string;
   artifacts: Artifact[];
   error_code?: string;
 };
+/** A place in the redacted PDF a person should look at; a box only, never text. */
+export type ReviewItem = {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  category: string;
+  reason: "unverified_answer" | "whole_line" | "rule_overruled_model" | "unreadable_text" | "final_check";
+  state: "masked" | "suggested";
+};
+/** One automatically drawn box: where it is, what type it was and how it was found. */
+export type RedactionBox = {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  category: string;
+  method: string;
+};
+const METHOD_GROUPS: [string, string[]][] = [
+  ["field label or format", ["field_label", "pattern", "credential_label_pattern", "address_block"]],
+  ["language model", ["model_proposal"]],
+  ["name list or consistency", ["document_name_sweep", "name_variant", "document_consistency"]],
+  ["precaution or final check", ["unverifiable_model_answer", "final_check"]],
+];
+/** "14 areas masked: 6 Names, 4 Identifiers · found by: language model 8, ..." or "". */
+export function redactionSummary(boxes?: RedactionBox[]) {
+  if (!boxes?.length) return "";
+  const count = (keys: string[]) => boxes.filter((b) => keys.includes(b.method)).length;
+  const byCategory = new Map<string, number>();
+  for (const b of boxes) byCategory.set(b.category, (byCategory.get(b.category) || 0) + 1);
+  const categories = [...byCategory].sort((a, b) => b[1] - a[1]).map(([c, n]) => `${n} ${c}`);
+  const methods = METHOD_GROUPS.map(([label, keys]) => [label, count(keys)] as const)
+    .filter(([, n]) => n > 0)
+    .map(([label, n]) => `${label} ${n}`);
+  return `${boxes.length} area${boxes.length > 1 ? "s" : ""} masked: ${categories.join(", ")} · found by: ${methods.join(", ")}`;
+}
+/** One-line summary of the review queue, or "" when it is empty. */
+export function reviewSummary(items?: ReviewItem[]) {
+  if (!items?.length) return "";
+  const suggested = items.filter((i) => i.state === "suggested").length;
+  const masked = items.length - suggested;
+  return [
+    suggested && `${suggested} possible miss${suggested > 1 ? "es" : ""} to check`,
+    masked && `${masked} area${masked > 1 ? "s" : ""} masked as a precaution`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
 /** Counts of automated-check findings reported by the worker; no document content. */
 export type JobChecks = {
   acceptable: boolean;
@@ -114,7 +167,12 @@ export type TransformOptions = {
   document_context: string;
   pii_categories: string[];
   worker_id: string;
+  /** How removed text looks: black box, box with the type ([NAME]) or a consistent placeholder. */
+  pii_style?: PiiStyle;
+  /** Detected values that should stay visible (e.g. the customer's own company name). */
+  pii_keep?: string[];
 };
+export type PiiStyle = "box" | "label" | "pseudonym";
 export const PII_CATEGORIES = [
   "Names",
   "Email addresses",
@@ -122,6 +180,7 @@ export const PII_CATEGORIES = [
   "Addresses",
   "Identifiers",
   "Bank accounts",
+  "Dates of birth",
 ] as const;
 
 const MESSAGES: Record<string, string> = {
@@ -130,6 +189,9 @@ const MESSAGES: Record<string, string> = {
     "Your account needs an invitation. Contact your workspace administrator.",
   SIGN_IN_REQUIRED: "Your session has expired. Sign in again to continue.",
   SELECT_GPU_WORKER: "Choose a processing server before submitting.",
+  INVALID_PII_STYLE: "Choose how removed text should look.",
+  INVALID_PII_KEEP:
+    "Use up to 100 keep-visible values, each no longer than 200 characters.",
   WORKER_NOT_OWNED_OR_DISABLED:
     "That server is no longer available to your account. Choose another server.",
   HOSTED_BACKEND_NOT_CONFIGURED:
