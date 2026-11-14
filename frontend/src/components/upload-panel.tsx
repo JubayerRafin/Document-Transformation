@@ -17,6 +17,7 @@ import {
 import {
   ApiClient,
   PII_CATEGORIES,
+  type PiiStyle,
   validatePdf,
   type Operation,
   type TransformOptions,
@@ -59,6 +60,8 @@ export function UploadPanel({
       "Email addresses",
       "Phone numbers",
     ]),
+    [piiStyle, setPiiStyle] = useState<PiiStyle>("box"),
+    [keepVisible, setKeepVisible] = useState(""),
     [consent, setConsent] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null),
     selection = useRef(0),
@@ -126,6 +129,18 @@ export function UploadPanel({
       document_context: context,
       pii_categories: mode === "translation" ? [] : categories,
     };
+    if (mode !== "translation") {
+      options.pii_style = piiStyle;
+      const keep = keepVisible
+        .split("\n")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      if (keep.length > 100 || keep.some((v) => v.length > 200)) {
+        setError("Use up to 100 keep-visible values, each no longer than 200 characters.");
+        return;
+      }
+      if (keep.length) options.pii_keep = keep;
+    }
     if (
       options.protected_values.length > 200 ||
       options.protected_values.some((v) => v.length > 500)
@@ -362,6 +377,31 @@ export function UploadPanel({
                       {c}
                     </Label>
                   ))}
+                </div>
+                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <div className="field">
+                    <Label htmlFor="pii-style">How removed text looks</Label>
+                    <select
+                      id="pii-style"
+                      className="select-input"
+                      value={piiStyle}
+                      onChange={(e) => setPiiStyle(e.target.value as PiiStyle)}
+                    >
+                      <option value="box">Black box</option>
+                      <option value="label">Black box with type, e.g. [NAME]</option>
+                      <option value="pseudonym">Consistent placeholder, e.g. Person A</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <Label htmlFor="pii-keep">Keep visible, one per line</Label>
+                    <Textarea
+                      id="pii-keep"
+                      rows={2}
+                      value={keepVisible}
+                      onChange={(e) => setKeepVisible(e.target.value)}
+                      placeholder="Your company name, public office address"
+                    />
+                  </div>
                 </div>
                 <p className="mb-0 mt-3 text-xs leading-5 text-muted-foreground">
                   PII evaluation is still pending. Review for missed sensitive

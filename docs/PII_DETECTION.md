@@ -28,6 +28,39 @@ layouts taken from particular test files.
 5. **Category check.** Format validators override the model's category
    (email syntax, IPv4, phone shapes), then only the user-selected categories are
    kept. Selecting only "Identifiers" no longer removes phone numbers.
+6. **Format checks** (`privacy.format_values`) add deterministic evidence next to
+   the model: IBANs with a valid mod-97 checksum and Luhn-valid card numbers
+   (Bank accounts), IPv4 addresses (Identifiers). They never remove a model finding.
+7. **Name consistency.** Each word of a detected full name is also masked where it
+   stands alone ("Dear Becker,", "T. Becker"), unless the same word appears in
+   lowercase elsewhere in the document (then it is an ordinary word such as
+   "green"). Titles (Mr., Ms., Dr., Herr, Frau, Mme, Sr., ...) are not part of the
+   masked name. Email/URL tokens are never split.
+
+## Job options
+
+- `pii_style`: `box` (default), `label` (`[NAME]`, `[EMAIL]`, ... written in the
+  box) or `pseudonym` (one placeholder per distinct value: Person A, Email 1;
+  a surname alone reuses its person's letter). A label that does not fit legibly is
+  left out; the value is removed either way.
+- `pii_keep`: values to leave visible (e.g. the customer's own company). A finding is
+  kept only when its value is part of a keep entry, so a keep entry never exposes a
+  longer value that contains it.
+- `Dates of birth` is an opt-in category: it is offered to the model and the label
+  classifier only when the job selects it, so default prompts are unchanged.
+
+## Review queue and audit map
+
+Released PII jobs carry two lists in their metrics, with page, box (fractions of
+the displayed page), category and a reason or method only, never document text:
+
+- `review_items`: `masked` areas removed as a precaution (unverifiable model answer,
+  whole-line OCR fallback) and `suggested` possible misses (the model flagged a value
+  that its column label overruled; unreadable scanned text). The review editor lists
+  them; possible misses can be added as manual-redaction areas.
+- `redaction_map`: every automatic box with the method that selected it (field
+  label, format, model, name list, name part, same value elsewhere, precaution). The
+  job page summarizes it and the comparison view can overlay it ("Show why").
 
 ## Policy
 

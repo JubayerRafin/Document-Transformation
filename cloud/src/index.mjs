@@ -14,20 +14,51 @@ export function checks(raw){
  for(const k of CHECK_COUNTS)c[k]=Number.isInteger(raw[k])&&raw[k]>=0&&raw[k]<=1_000_000?raw[k]:0;
  return c;
 }
+const REVIEW_CATEGORIES=['Names','Email addresses','Phone numbers','Addresses','Identifiers','Bank accounts','Dates of birth','Unknown'];
+const REVIEW_REASONS=['unverified_answer','whole_line','rule_overruled_model','unreadable_text','final_check'];
+// Review-queue items: page, box (fractions of the displayed page), category, reason, state. Never text.
+export function reviewItems(raw,pages){
+ if(!Array.isArray(raw))return [];
+ const out=[];
+ for(const r of raw.slice(0,200)){
+  if(!r||typeof r!=='object'||Array.isArray(r))continue;
+  const box=['x','y','width','height'].map(k=>r[k]);
+  if(!Number.isInteger(r.page)||r.page<1||r.page>Math.max(1,pages||1)||!box.every(v=>typeof v==='number'&&Number.isFinite(v)))continue;
+  const [x,y,width,height]=box;
+  if(x<0||y<0||width<=0||height<=0||x+width>1.0001||y+height>1.0001)continue;
+  if(!REVIEW_CATEGORIES.includes(r.category)||!REVIEW_REASONS.includes(r.reason)||!['masked','suggested'].includes(r.state))continue;
+  out.push({page:r.page,x,y,width,height,category:r.category,reason:r.reason,state:r.state});
+ }
+ return out;
+}
+const REDACTION_METHODS=['field_label','pattern','credential_label_pattern','address_block','model_proposal','document_name_sweep','name_variant','document_consistency','unverifiable_model_answer','final_check'];
+// Why each box was drawn: page, box, category and detection method. Never text.
+export function redactionMap(raw,pages){
+ if(!Array.isArray(raw))return [];
+ const out=[];
+ for(const r of raw.slice(0,400)){
+  if(!r||typeof r!=='object'||!REDACTION_METHODS.includes(r.method))continue;
+  const [box]=reviewItems([{...r,reason:'whole_line',state:'masked'}],pages);
+  if(box)out.push({page:box.page,x:box.x,y:box.y,width:box.width,height:box.height,category:box.category,method:r.method});
+ }
+ return out;
+}
 export class Fault extends Error { constructor(code,status=400){super(code);this.status=status;} }
 const json=(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
 export const sha=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 export function options(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Fault('INVALID_OPTIONS');
- const allowed=['operation','source_language','target_language','output_format','protected_values','document_context','pii_categories','worker_id'];
+ const allowed=['operation','source_language','target_language','output_format','protected_values','document_context','pii_categories','worker_id','pii_style','pii_keep'];
  if(Object.keys(raw).some(k=>!allowed.includes(k)))throw new Fault('UNKNOWN_OPTION');
  const o={operation:'translation',source_language:'en',target_language:'ko',output_format:'pdf',protected_values:[],document_context:'',pii_categories:[],...raw};
  if(!['translation','pii','combined'].includes(o.operation)||o.output_format!=='pdf')throw new Fault('INVALID_OPERATION');
  if(![o.source_language,o.target_language].every(v=>typeof v==='string'&&/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(v)))throw new Fault('INVALID_LANGUAGE');
  if(typeof o.document_context!=='string'||o.document_context.length>8000)throw new Fault('INVALID_CONTEXT');
  if(!Array.isArray(o.protected_values)||o.protected_values.length>200||o.protected_values.some(v=>typeof v!=='string'||v.length>500))throw new Fault('INVALID_PROTECTED_VALUES');
- const categories=['Names','Email addresses','Phone numbers','Addresses','Identifiers','Bank accounts'];
+ const categories=['Names','Email addresses','Phone numbers','Addresses','Identifiers','Bank accounts','Dates of birth'];
  if(!Array.isArray(o.pii_categories)||o.pii_categories.some(v=>!categories.includes(v))||(o.operation!=='translation'&&!o.pii_categories.length))throw new Fault('INVALID_PII_CATEGORIES');
+ if(o.pii_style!==undefined&&!['box','label','pseudonym'].includes(o.pii_style))throw new Fault('INVALID_PII_STYLE');
+ if(o.pii_keep!==undefined&&(!Array.isArray(o.pii_keep)||o.pii_keep.length>100||o.pii_keep.some(v=>typeof v!=='string'||!v.trim()||v.length>200)))throw new Fault('INVALID_PII_KEEP');
  return o;
 }
 const cookie=(r,name)=>r.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(name+'='))?.slice(name.length+1)||'';
@@ -174,6 +205,8 @@ export function createHandler(transport=fetch){
    for(const k of ['server_seconds','total_seconds','pages','blockers'])if(typeof metrics[k]==='number'&&Number.isFinite(metrics[k])&&metrics[k]>=0)measured[k]=metrics[k];
    measured.gpu_verified=metrics.gpu_verified===true;
    const c=checks(metrics.checks);if(c)measured.checks=c;
+   const items=reviewItems(metrics.review_items,measured.pages);if(items.length)measured.review_items=items;
+   const drawn=redactionMap(metrics.redaction_map,measured.pages);if(drawn.length)measured.redaction_map=drawn;
    if(j.options.operation==='manual_redaction'){
     measured.manual_redaction_verified=true;measured.manual_regions=j.options.regions.length;
    }

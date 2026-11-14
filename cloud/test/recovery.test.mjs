@@ -93,6 +93,31 @@ test('result metrics keep only bounded check counts',async()=>{
   layout_review_candidates:0,uninspected_content:1,scan_acceptance_blockers:0,translation_errors:0});
  assert.doesNotMatch(JSON.stringify(finish),/jane@example/);
 });
+test('review-queue items keep only page, box, category, reason and state',async()=>{
+ const bytes=new TextEncoder().encode('%PDF-result');
+ const f=await fixture({jobs:[running()]});
+ const good={page:1,x:.1,y:.2,width:.3,height:.05,category:'Identifiers',reason:'rule_overruled_model',state:'suggested'};
+ const metrics={source_sha256:'a'.repeat(64),pages:2,review_items:[
+  {...good,value:'jane@example.com'},                       // extra text field is dropped
+  {...good,page:3},                                         // beyond the page count
+  {...good,x:.9,width:.3},                                  // outside the page
+  {...good,reason:'free text'},{...good,category:'Secrets'},{...good,state:'done'},'junk',
+  {...good,page:2,state:'masked',reason:'whole_line',category:'Unknown'}]};
+ assert.equal((await f.worker('/worker/jobs/'+jid+'/result',{body:await resultForm(bytes,metrics)})).status,200);
+ const finish=JSON.parse(f.state.calls.find(c=>c[0].includes('/rpc/tx_finish'))[1].body);
+ assert.deepEqual(finish.p_metrics.review_items,[good,{...good,page:2,state:'masked',reason:'whole_line',category:'Unknown'}]);
+ assert.doesNotMatch(JSON.stringify(finish),/jane@example/);
+});
+test('redaction map keeps only page, box, category and a known method',async()=>{
+ const bytes=new TextEncoder().encode('%PDF-result');
+ const f=await fixture({jobs:[running()]});
+ const good={page:1,x:.1,y:.2,width:.3,height:.05,category:'Names',method:'field_label'};
+ const metrics={source_sha256:'a'.repeat(64),pages:1,redaction_map:[{...good,value:'Ann Moor'},{...good,method:'guess'},{...good,page:4},good]};
+ assert.equal((await f.worker('/worker/jobs/'+jid+'/result',{body:await resultForm(bytes,metrics)})).status,200);
+ const finish=JSON.parse(f.state.calls.find(c=>c[0].includes('/rpc/tx_finish'))[1].body);
+ assert.deepEqual(finish.p_metrics.redaction_map,[good,good]);
+ assert.doesNotMatch(JSON.stringify(finish),/Ann Moor/);
+});
 test('a claimed job without a stored source fails instead of blocking the worker',async()=>{
  const f=await fixture({jobs:[running()],claim:[running()]});
  const r=await f.worker('/worker/claim');assert.deepEqual(await r.json(),{job:null});

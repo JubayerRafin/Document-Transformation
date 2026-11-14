@@ -3,7 +3,14 @@ import json
 import re
 from datetime import datetime
 
-CATEGORIES=['Email addresses','Phone numbers','Names','Addresses','Identifiers','Bank accounts']
+CATEGORIES=['Email addresses','Phone numbers','Names','Addresses','Identifiers','Bank accounts','Dates of birth']
+# Offered to the model only when a job selects them, so the default prompts (and their measured
+# quality) are unchanged for jobs that do not ask for them.
+OPT_IN_CATEGORIES={'Dates of birth'}
+
+
+def offered_categories(selected):
+    return [c for c in CATEGORIES if c not in OPT_IN_CATEGORIES or c in selected]
 # Category policy, shared by every model prompt. Change policy here, not in code paths.
 CATEGORY_DEFINITIONS={
     'Names':'names of people (full names, given names or surnames), not organizations, products or places',
@@ -15,7 +22,43 @@ CATEGORY_DEFINITIONS={
                    'user names, device names, IP addresses; passwords, API keys, access tokens and secrets. '
                    'Not product codes, SKUs, model numbers, prices, amounts, quantities or dates'),
     'Bank accounts':'bank account, IBAN, card and routing/sort-code numbers',
+    'Dates of birth':"a person's date of birth; not other dates such as invoice, due, start or appointment dates",
 }
+
+
+# Format checks: deterministic evidence alongside the model, never a replacement for it.
+IBAN=re.compile(r'(?<![A-Za-z0-9])[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){2,7}(?: ?[A-Z0-9]{1,3})?(?![A-Za-z0-9])')
+CARD=re.compile(r'(?<![\d-])(?:\d{4}[ -]){3}\d{4}(?![\d-])|(?<![\d-])\d{4}[ -]\d{6}[ -]\d{5}(?![\d-])')
+IPV4=re.compile(r'(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])')
+
+
+def iban_valid(value):
+    raw=re.sub(r'\s','',value)
+    if not 15<=len(raw)<=34 or not re.fullmatch(r'[A-Z]{2}\d{2}[A-Z0-9]+',raw):return False
+    return int(''.join(str(int(c,36)) for c in raw[4:]+raw[:4]))%97==1
+
+
+def luhn_valid(value):
+    digits=[int(d) for d in re.sub(r'\D','',value)]
+    if len(set(digits))<2:return False
+    total=sum(d if i%2==0 else (d*2-9 if d*2>9 else d*2) for i,d in enumerate(reversed(digits)))
+    return total%10==0
+
+
+def format_values(text,categories):
+    """(value, category, 'pattern') for checksum-valid IBANs and card numbers and for IPv4 addresses."""
+    found=[]
+    if 'Bank accounts' in categories:
+        for m in IBAN.finditer(text):
+            value=m.group()
+            # A greedy match may run into a following code; drop trailing groups until the checksum holds.
+            while value and not iban_valid(value) and ' ' in value:value=value.rsplit(' ',1)[0]
+            if iban_valid(value):found.append((value,'Bank accounts','pattern'))
+        found+=[(m.group(),'Bank accounts','pattern') for m in CARD.finditer(text) if luhn_valid(m.group())]
+    if 'Identifiers' in categories:
+        found+=[(m.group(),'Identifiers','pattern') for m in IPV4.finditer(text) if all(int(p)<=255 for p in m.group().split('.'))]
+    return found
+
 
 
 # Minified JSON halves generated tokens (pretty-printing is mostly indentation); the
@@ -49,6 +92,24 @@ def _timestamp_spans(text):
     return spans
 
 
+DATE=re.compile(r'(?<!\d)(?:\d{4}[-./]\d{1,2}[-./]\d{1,2}|\d{1,2}[-./]\d{1,2}[-./]\d{4})(?!\d)')
+
+
+def is_date(value):
+    """A value that is only a calendar date (2025-03-16, 16.03.2025, 3/16/2025)."""
+    return bool(DATE.fullmatch(value.strip().rstrip('.')))
+
+
+def _not_phone_spans(text):
+    """Spans a phone pattern must not claim: calendar dates and checksum-valid IBANs."""
+    spans=[m.span() for m in DATE.finditer(text)]
+    for m in IBAN.finditer(text):
+        value=m.group()
+        while value and not iban_valid(value) and ' ' in value:value=value.rsplit(' ',1)[0]
+        if iban_valid(value):spans.append((m.start(),m.start()+len(value)))
+    return spans
+
+
 def _phone_shape(value):
     """Reject number columns that only resemble a phone after joining lines.
 
@@ -66,7 +127,13 @@ def _phone_shape(value):
     return True
 
 
-def _validated_proposals(response,text,categories):
+def _validated_proposals(response,text,categories,context=''):
+    """context: the serialized extraction context sent with the request. A value copied from it
+    (a neighbouring cell) that is not in text is dropped, because that cell gets its own request,
+    but only when the same answer also found values in text. An answer made only of context
+    values shows the model looked at the wrong field, so it is rejected and retried without
+    context (it may have missed what is in text)."""
+    echoed=False
     payload=json.loads(response)
     if not isinstance(payload,dict) or not isinstance(payload.get('findings'),list):
         raise ValueError('Invalid PII detection response.')
@@ -84,6 +151,8 @@ def _validated_proposals(response,text,categories):
             flat=lambda s:re.sub(r'[ \t\r\n]+','',s)
             for a,b in literal_spans(text,value):
                 if flat(text[a:b])==flat(value):value=text[a:b];break
+        if isinstance(value,str) and value.strip() and value not in text and context and value.strip() in context:
+            echoed=True;continue
         if not isinstance(value,str) or not value.strip() or value not in text:
             raise ValueError('PII response is not supported by an exact source span.')
         # A proposal that is exactly a field label ("API key" in "API key: ...") is
@@ -98,7 +167,11 @@ def _validated_proposals(response,text,categories):
             prefix=label.group(1)
             if value.startswith(prefix) and text.find(value,label.start())==label.start(1):
                 raise ValueError('PII proposal includes a field label; return its value only.')
+        # Category policy excludes dates everywhere except dates of birth.
+        if is_date(value) and finding['category']!='Dates of birth':continue
         proposals.append((value,finding['category'],'model_proposal'))
+    if echoed and not proposals:
+        raise ValueError('PII response only repeated context values; recheck text without context.')
     return proposals
 
 
@@ -130,7 +203,7 @@ def _semantic_proposals(region,text,categories,endpoint,model):
             {'role':'user','content':json.dumps(request)}],max_output=768,response_format=schema,
             purpose='pii_unit_retry' if attempt else 'pii_unit')
         try:
-            return _validated_proposals(response,text,categories)
+            return _validated_proposals(response,text,categories,'' if attempt else json.dumps(context,ensure_ascii=False))
         except ValueError as exc:
             if attempt:
                 # Never accept a partial proposal list or silently downgrade to patterns.
@@ -196,12 +269,13 @@ def detect(regions,categories,endpoint,model,assist=True,workers=8,unresolved=No
             email=r'[\w.+-]+@'+gap+label+r'(?:'+gap+r'\.'+gap+label+r')*'+gap+r'\.'+gap+r'[A-Za-z]{2,}'
             values.extend((m.group(),'Email addresses','pattern') for m in re.finditer(email,text))
         if 'Phone numbers' in categories:
-            timestamps=_timestamp_spans(text)
+            timestamps=_timestamp_spans(text)+_not_phone_spans(text)
             for m in re.finditer(r'(?<!\w)(?:\+\d[\d ()\t\r\n-]{7,}\d|\d{2,4}[- \t\r\n]+\d{2,4}[- \t\r\n]+\d{4})(?!\w)',text):
                 if any(m.start()<end and m.end()>start for start,end in timestamps):continue
                 if not _phone_shape(m.group()):continue
                 if 8<=len(re.sub(r'\D','',m.group()))<=15:
                     values.append((m.group(),'Phone numbers','pattern'))
+        values.extend(format_values(text,categories))
         values.extend(proposals.get(id(region),[]))
         for value,category,method in set(values):
             findings.append({'region_id':region['id'],'value':value,'category':category,'method':method,

@@ -27,6 +27,44 @@ def _run_figure(payload, run, translate, redact, categories, assist, suboptions)
             time.sleep(.5)
 
 
+def overlaps_text(word,box,share=.3):
+    """True when more than `share` of a word's box lies inside the figure box."""
+    area=word.get_area()
+    return area>0 and (word&box).get_area()>share*area
+
+
+def merge_overlapping(regions,page_rect):
+    """Figure candidates whose areas overlap become one candidate covering their union.
+
+    Two pictures that touch or overlap (badges, stacked screenshots) used to leave all but
+    the first unprocessed, so their pixels kept any text. One crop of the union is OCR'd and
+    written back as a whole; the union is still refused where it overlaps native text.
+    """
+    groups=[]
+    for region in regions:
+        box=pymupdf.Rect(region['bbox'])&page_rect
+        if box.is_empty:
+            groups.append({'box':box,'regions':[region]});continue
+        joined=[g for g in groups if not g['box'].is_empty and (g['box']&box).get_area()>0]
+        for g in joined:
+            groups.remove(g);box|=g['box']
+        groups.append({'box':box,'regions':[r for g in joined for r in g['regions']]+[region]})
+        # A union can now reach a group it did not overlap before: merge until stable.
+        changed=True
+        while changed:
+            changed=False
+            last=groups[-1]
+            for g in groups[:-1]:
+                if not g['box'].is_empty and (g['box']&last['box']).get_area()>0:
+                    groups.remove(g);last['box']|=g['box'];last['regions']=g['regions']+last['regions'];changed=True;break
+    merged=[]
+    for g in groups:
+        first=g['regions'][0]
+        if len(g['regions'])==1:merged.append(first);continue
+        merged.append(dict(first,bbox=list(g['box']),merged_region_ids=[r['id'] for r in g['regions']]))
+    return merged
+
+
 def process(data,ir,run,translate,redact,categories,assist,options):
     reports=[]
     started=time.monotonic()
@@ -35,17 +73,16 @@ def process(data,ir,run,translate,redact,categories,assist,options):
         for unit in ir['units']:
             if unit.get('ocr_folder'): continue
             page=pdf[unit['number']-1]
-            candidates=[r for r in unit['regions'] if r['kind']=='figure']
-            visited=[]
+            candidates=merge_overlapping([r for r in unit['regions'] if r['kind']=='figure'],page.rect)
             for region in candidates:
                 box=pymupdf.Rect(region['bbox']) & page.rect
                 if box.is_empty:
                     reports.append({'region_id':region['id'],'status':'blocked','source_preserved':True,
                                     'reason':'Figure has no visible area inside the page.'}); continue
-                if any((box & b).get_area()>0 for b in visited):
-                    reports.append({'region_id':region['id'],'status':'blocked','reason':'Overlapping figure candidates require disambiguation.'}); continue
-                visited.append(box)
-                if any((pymupdf.Rect(w[:4]) & box).get_area()>0 for w in page.get_text('words')):
+                # A word box includes empty space above its letters, so a caption just below a
+                # picture can touch its edge. Only text meaningfully inside the figure (more
+                # than 30% of the word's box) means the figure overlaps native text.
+                if any(overlaps_text(pymupdf.Rect(w[:4]),box) for w in page.get_text('words')):
                     reports.append({'region_id':region['id'],'status':'blocked','reason':'Figure overlaps native text; preserve original geometry.'}); continue
                 from tools.ocr.raster_policy import render_page
                 pixels,raster=render_page(page,box)

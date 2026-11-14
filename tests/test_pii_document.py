@@ -187,6 +187,75 @@ class DetectDocumentTests(unittest.TestCase):
         self.assertEqual(len(evidence['unresolved_units']), 1)
         self.assertNotIn('TOKEN=tk_9f8e7d6c5b', ' '.join(evidence['analyzed_texts']))
 
+    def test_parts_of_a_full_name_are_masked_where_used_alone(self):
+        data = pdf([(20, 40, 'Tenant: Nadia Okonkwo'), (20, 80, 'Dear Ms. Okonkwo, thank you.'),
+                    (20, 120, 'N. Okonkwo signed; contact Nadia via n.okonkwo@post.example')])
+        findings, _, _ = self.run_detect(data, {'units': [{'number': 1, 'regions': []}]}, ['Names'],
+                                         stub(names=['Nadia Okonkwo']))
+        values = sorted(f['value'] for f in findings)
+        self.assertIn('Nadia Okonkwo', values)
+        self.assertGreaterEqual(values.count('Okonkwo'), 2)   # salutation and initial form
+        self.assertIn('Nadia', values)                          # given name alone
+        self.assertFalse(any('@' in v or v.startswith('Ms') for v in values))  # no email split, no honorific
+
+    def test_a_name_word_used_as_an_ordinary_word_is_not_masked_alone(self):
+        data = pdf([(20, 40, 'Owner: Rose Green'), (20, 80, 'Green Street depot; paint the gate green.')])
+        findings, _, _ = self.run_detect(data, {'units': [{'number': 1, 'regions': []}]}, ['Names'], stub(names=['Rose Green']))
+        self.assertEqual(sorted(f['value'] for f in findings), ['Rose Green'])
+
+    def test_a_mislabelled_amount_or_acronym_never_spreads_as_a_name_part(self):
+        from transformation.validation.pii_document import name_variant_occurrences
+        units = [{'id': 'u', 'text': 'Transfer Owen Moss USD 1117.00\nGrocer USD 635.00\nRef NWBK Lane'}]
+        found = [units[0]['text'][a:b] for _, a, b in name_variant_occurrences(units, {'USD 1117.00', 'NWBK Lane', 'Owen Moss'})]
+        self.assertNotIn('USD', found); self.assertNotIn('NWBK', found)
+        self.assertEqual(found, [])  # 'Owen'/'Moss' only occur inside the full name here
+
+    def test_a_name_known_only_from_a_field_label_does_not_spread(self):
+        data = pdf([(20, 40, 'Employee Personal Data Sheet'), (20, 80, 'Holder: Employee Records'), (20, 120, 'Tenant: Nadia Okonkwo'),
+                    (20, 160, 'Dear Okonkwo, welcome.')])
+        findings, _, _ = self.run_detect(data, {'units': [{'number': 1, 'regions': []}]}, ['Names'],
+                                         stub(labels={'Holder': 'Names', 'Tenant': 'Names'}, names=['Nadia Okonkwo']))
+        values = [f['value'] for f in findings]
+        self.assertNotIn('Employee', values)          # from a label-only "name"
+        self.assertIn('Okonkwo', values)              # from a model-identified person
+
+    def test_a_key_value_table_without_a_header_row_keeps_its_first_field(self):
+        rows = [['Full name', 'Mei Okonkwo'], ['Employee ID', 'E-71965'], ['Department', 'Logistics'], ['Line manager', 'Owen Lind']]
+        ir = {'units': [{'number': 1, 'regions': [{'id': 't', 'kind': 'table', 'text': '', 'bbox': [0, 0, 400, 120], 'cells': rows}]}]}
+        data = pdf([(20, 40 + 20 * i, f'{a}   {b}') for i, (a, b) in enumerate(rows)])
+        findings, _, _ = self.run_detect(data, ir, ['Names', 'Identifiers'],
+                                         stub(labels={'Full name': 'Names', 'Employee ID': 'Identifiers', 'Department': 'none', 'Line manager': 'Names'}))
+        values = {(f['value'], f['category']) for f in findings}
+        self.assertIn(('Mei Okonkwo', 'Names'), values)      # first row is a field, not a header
+        self.assertIn(('Owen Lind', 'Names'), values); self.assertIn(('E-71965', 'Identifiers'), values)
+        self.assertFalse({'Employee ID', 'Department', 'Line manager', 'Logistics'} & {v for v, _ in values})  # labels never masked
+
+    def test_a_wide_data_table_keeps_its_header_row_and_name_column(self):
+        rows = [['Employee ID', 'Name', 'Department', 'Shift'], ['PI-23447', 'Amara Delgado', 'Finance', 'A'],
+                ['G-88964', 'Ravi Moss', 'Support', 'B']]
+        ir = {'units': [{'number': 1, 'regions': [{'id': 't', 'kind': 'table', 'text': '', 'bbox': [0, 0, 500, 90], 'cells': rows}]}]}
+        data = pdf([(20, 40 + 20 * i, '   '.join(r)) for i, r in enumerate(rows)])
+        findings, _, _ = self.run_detect(data, ir, ['Names', 'Identifiers'],
+                                         stub(labels={'Employee ID': 'Identifiers', 'Name': 'Names', 'Department': 'none', 'Shift': 'none'}))
+        values = {(f['value'], f['category']) for f in findings}
+        self.assertIn(('Amara Delgado', 'Names'), values); self.assertIn(('Ravi Moss', 'Names'), values)
+        self.assertIn(('PI-23447', 'Identifiers'), values)
+        self.assertFalse({'Department', 'Name', 'Finance', 'Shift'} & {v for v, _ in values})
+
+    def test_a_real_header_row_is_still_never_a_value(self):
+        rows = [['Field', 'Value'], ['Holder', 'Ann Moor'], ['Branch', 'Leeds']]
+        ir = {'units': [{'number': 1, 'regions': [{'id': 't', 'kind': 'table', 'text': '', 'bbox': [0, 0, 400, 90], 'cells': rows}]}]}
+        data = pdf([(20, 40 + 20 * i, f'{a}   {b}') for i, (a, b) in enumerate(rows)])
+        findings, _, _ = self.run_detect(data, ir, ['Names'], stub(labels={'Field': 'none', 'Holder': 'Names', 'Branch': 'none'}))
+        self.assertEqual({f['value'] for f in findings}, {'Ann Moor'})
+
+    def test_honorific_is_not_part_of_the_masked_name(self):
+        data = pdf([(20, 40, 'Signed by Mr. Thomas Becker')])
+        region = lambda text: [{'value': 'Mr. Thomas Becker', 'category': 'Names'}] if 'Becker' in text else []
+        findings, _, _ = self.run_detect(data, {'units': [{'number': 1, 'regions': []}]}, ['Names'], stub(region=region))
+        self.assertIn('Thomas Becker', {f['value'] for f in findings})
+        self.assertNotIn('Mr. Thomas Becker', {f['value'] for f in findings})
+
     def test_unselected_categories_are_dropped_after_relabeling(self):
         data = pdf([(20, 40, 'Mobile: +44 20 7946 0958'), (20, 60, 'Member: MB-90211')])
         region = lambda text: [{'value': v, 'category': 'Identifiers'} for v in ('+44 20 7946 0958', 'MB-90211') if v in text]

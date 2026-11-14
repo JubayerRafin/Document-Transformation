@@ -6,6 +6,71 @@ let csrf='',draft,doc,originalDoc,originalRenderTask,page=1,marks=[],selected=-1
 // window.confirm, which silently cancelled finalization.
 const ARM_MS=15000,FINALIZE_LABEL='Apply redactions to a new copy';
 function disarm(){armed=0;$('#finalize').textContent=FINALIZE_LABEL;}
+// Review queue from the automatic redaction: boxes only (no text), as fractions of the page.
+let queue=[],queueFocus=-1;
+const REASONS={unverified_answer:'Masked whole: the detector could not verify its answer for this text.',
+ whole_line:'Masked as a whole line: the value could not be separated from its label.',
+ rule_overruled_model:'Not masked: the model flagged this, but its column label says it is not personal data.',
+ unreadable_text:'Not masked: this scanned text could not be read automatically.',
+ final_check:'Masked by the final privacy check: the detector missed it, so check the whole area.'};
+const sameBox=(a,b)=>a.page===b.page&&['x','y','width','height'].every(k=>Math.abs(a[k]-b[k])<.002);
+const added=q=>marks.some(m=>sameBox(m,q));
+function addSuggestions(list){
+ const fresh=list.filter(q=>q.state==='suggested'&&!added(q)).slice(0,MAX-marks.length);
+ if(!editable()||!fresh.length)return;
+ remember();for(const q of fresh)marks.push({page:q.page,x:q.x,y:q.y,width:q.width,height:q.height});changed();
+}
+function drawQueue(){
+ if(!queue.length)return;
+ const misses=queue.filter(q=>q.state==='suggested'),open=misses.filter(q=>!added(q)).length;
+ $('#queue-summary').textContent=`${misses.length} possible miss${misses.length===1?'':'es'} (${open} not added yet) · ${queue.length-misses.length} masked as a precaution`;
+ $('#add-suggestions').hidden=!misses.length;$('#add-suggestions').disabled=!open||!editable();
+ const list=$('#queue-items');list.replaceChildren();
+ queue.forEach((q,i)=>{
+  const li=document.createElement('li'),title=document.createElement('strong'),why=document.createElement('span'),row=document.createElement('span');
+  title.textContent=`Page ${q.page} · ${q.state==='suggested'?'Possible miss':'Masked as a precaution'} · ${q.category==='Unknown'?'unknown type':q.category}`;
+  why.className='why';why.textContent=REASONS[q.reason]||'';row.className='row';
+  const show=document.createElement('button');show.type='button';show.textContent='Show';
+  show.onclick=()=>{queueFocus=i;if(page!==q.page){page=q.page;selected=-1;void renderPage().catch(error);}else draw();};row.append(show);
+  if(q.state==='suggested'){const add=document.createElement('button');add.type='button';const done=added(q);add.textContent=done?'Added':'Add as area';add.disabled=done||!editable();add.onclick=()=>addSuggestions([q]);row.append(add);}
+  li.append(title,why,row);list.append(li);
+  if(q.page!==page)return;
+  const box=document.createElement('div');box.className=`queue-box ${q.state}${i===queueFocus?' current':''}`;box.setAttribute('aria-hidden','true');
+  Object.assign(box.style,{left:q.x*100+'%',top:q.y*100+'%',width:q.width*100+'%',height:q.height*100+'%'});$('#overlay').append(box);
+ });
+}
+async function loadQueue(){
+ for(const id of [draft.parent_job_id,draft.original_job_id]){
+  if(!id)continue;
+  try{const j=await api('/v1/jobs/'+id),items=j.metrics?.review_items;if(!whyMap.length)setWhy(j.metrics?.redaction_map);if(Array.isArray(items)&&items.length){queue=items.filter(q=>q.page<=doc.numPages);break;}}catch{}
+ }
+ $('#queue').hidden=!queue.length;
+}
+$('#add-suggestions').onclick=()=>addSuggestions(queue);
+// Why each automatic box was drawn (category and method; never the text).
+let whyMap=[];
+const METHOD_TEXT={field_label:'its field label says it is personal data',pattern:'it has the format of this data type',
+ credential_label_pattern:'it looks like a password, key or token',address_block:'it is part of a postal address block',model_proposal:'the language model identified it',
+ document_name_sweep:'it is on the document’s list of person names',name_variant:'it is part of a person name found elsewhere',
+ document_consistency:'the same value was found elsewhere in the document',unverifiable_model_answer:'precaution: the model answer could not be verified',
+ final_check:'the final privacy check found it after redaction'};
+const LEGEND=[['m-field_label','Field label or format'],['m-model_proposal','Language model'],['m-name_variant','Name list or consistency'],['m-unverifiable_model_answer','Precaution or final check']];
+function drawWhy(){
+ const layer=$('#why-layer');if(!layer)return;layer.replaceChildren();
+ if(!$('#why').checked)return;
+ for(const b of whyMap){
+  if(b.page!==page)continue;
+  const el=document.createElement('div');el.className='why-box m-'+b.method;
+  el.title=`${b.category}: masked because ${METHOD_TEXT[b.method]||'it was detected'}.`;
+  Object.assign(el.style,{left:b.x*100+'%',top:b.y*100+'%',width:b.width*100+'%',height:b.height*100+'%'});layer.append(el);
+ }
+}
+function setWhy(map){
+ whyMap=Array.isArray(map)?map:[];$('#why-toggle').hidden=!whyMap.length;
+ const legend=$('#why-legend');legend.replaceChildren();
+ for(const [cls,text] of LEGEND){const s=document.createElement('span'),i=document.createElement('i');i.className='why-box '+cls;i.style.position='static';s.append(i,text);legend.append(s);}
+}
+$('#why').onchange=()=>{$('#why-legend').hidden=!$('#why').checked;drawWhy();};
 const comparison=new URLSearchParams(location.search).get('compare')==='1';
 $('#fullscreen').onclick=async()=>{
  try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.classList.contains('expanded'))document.documentElement.classList.remove('expanded');else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else document.documentElement.classList.add('expanded');}
@@ -41,6 +106,7 @@ function draw(){
  $('#save').disabled=!editable();$('#finalize').disabled=!editable()||!marks.length;
  $('#previous').disabled=page<=1;$('#next').disabled=page>=doc?.numPages;
  $('#pages').querySelectorAll('button').forEach(b=>b.setAttribute('aria-current',Number(b.dataset.page)===page?'page':'false'));
+ drawQueue();drawWhy();
 }
 async function renderPage(){
  const generation=++renderGeneration;if(renderTask){renderTask.cancel();try{await renderTask.promise;}catch{}}if(originalRenderTask){originalRenderTask.cancel();try{await originalRenderTask.promise;}catch{}}
@@ -140,7 +206,7 @@ async function init(){
  const job=await api('/v1/jobs/'+id);
  if(comparison){
   const result=job.artifacts.find(a=>a.kind==='result');if(job.status!=='succeeded'||!result)throw new Error('This job has no completed PDF to compare.');
-  draft={job_id:id,status:'readonly',filename:job.filename};doc=await loadPdf(id,result.id,result.sha256);
+  draft={job_id:id,status:'readonly',filename:job.filename};doc=await loadPdf(id,result.id,result.sha256);setWhy(job.metrics?.redaction_map);
   await loadOriginal(job.options.original_job_id||id);document.body.classList.add('comparison');$('#review-title').textContent='Document comparison';
   for(const selector of ['#undo','#redo','#delete','#save'])$(selector).hidden=true;
   $('#start-editing').href='/redaction-review.html?job='+id+'&new=1';$('#start-editing').hidden=me.role==='viewer';
@@ -157,6 +223,7 @@ async function init(){
  doc=await loadPdf(draft.parent_job_id,draft.parent_artifact_id,draft.source_sha256);
  await loadOriginal(draft.original_job_id||draft.parent_job_id);
  marks=copy(draft.regions);
+ await loadQueue();
  }
  $('#filename').textContent=draft.filename;
  if(doc.numPages>200)throw new Error('This editor supports up to 200 pages.');

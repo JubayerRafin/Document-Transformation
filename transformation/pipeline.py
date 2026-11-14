@@ -18,9 +18,9 @@ def save_json(path,value):
     Path(path).write_text(json.dumps(value,ensure_ascii=False,indent=2),encoding='utf-8')
 
 
-def redact_pdf(data,ir,findings):
+def redact_pdf(data,ir,findings,style='box',boxes=None):
     from transformation.validation.value_redaction import redact_pdf as precise_redact
-    return precise_redact(data,ir,findings)
+    return precise_redact(data,ir,findings,style=style,boxes=boxes)
 
 
 def failure_code(exc):
@@ -44,6 +44,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
     pii_workers=int(options.pop('pii_workers',8))
     known_values=list(options.pop('known_pii_values',()) or ())
     llm_metrics=bool(options.pop('llm_metrics',True))
+    # Per-job masking style and values the customer wants kept visible. Read with get(), not pop(),
+    # so figure sub-runs (which copy these options) apply the same policy.
+    pii_style=options.get('pii_style') or 'box'
+    from transformation.validation.value_redaction import STYLES as _styles
+    if pii_style not in _styles:raise ValueError('Unknown masking style.')
+    pii_keep=[k for k in (options.get('pii_keep') or ()) if isinstance(k,str) and k.strip()]
     # PII-only jobs need text blocks and table headers, not Docling's table model
     # (seconds per page on CPU); translation keeps the configured strategy.
     pii_strategy=options.pop('pii_table_strategy','native')
@@ -220,6 +226,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                   if llm_metrics and previous_run_dir is None:os.environ.pop('TRANSFORMX_RUN_DIR',None)
                   elif llm_metrics:os.environ['TRANSFORMX_RUN_DIR']=previous_run_dir
                 analyzed_texts=evidence.pop('analyzed_texts',[])
+                if pii_keep:
+                    from transformation.validation.pii_document import split_kept
+                    findings,kept=split_kept(findings,pii_keep)
+                    if kept:
+                        evidence['kept_by_customer_exception']=len(kept)
+                        info['warnings'].append(f"{len(kept)} detected value(s) were left visible because they match the job's keep-visible list.")
                 if evidence.get('unresolved_units'):
                     info['warnings'].append(f"{len(evidence['unresolved_units'])} text unit(s) were masked whole because the model's answer could not be verified.")
                 save_json(run/'pii-detection-evidence.json',evidence)
@@ -231,12 +243,20 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if kind=='pdf':
                 from transformation.validation.value_redaction import RedactionLocalizationError
                 try:
-                    safe_data,redaction_audit=redact_pdf(data,ir,findings)
+                    drawn=[];safe_data,redaction_audit=redact_pdf(data,ir,findings,style=pii_style,boxes=drawn)
                 except RedactionLocalizationError as exc:
                     save_json(run/'redaction-review-required.json',{'regions':exc.regions,'output_released':False})
                     info['redaction_review_required']=True
                     raise
                 save_json(run/'redaction-audit.json',redaction_audit)
+                # Review queue for a person: page, box, category and reason only (never the text).
+                from transformation.validation.review_items import build as build_review_items
+                info['review_items']=build_review_items(data,ir,findings,evidence,redaction_audit)
+                # Why each box was drawn: category and detection method per box (never the text).
+                from transformation.validation.review_items import redaction_map
+                info['redaction_map']=redaction_map(data,findings,drawn)
+                save_json(run/'redaction-map.json',info['redaction_map'])
+                save_json(run/'review-items.json',info['review_items'])
                 fallbacks=sum(1 for a in redaction_audit if a.get('localization')=='whole_line_fallback')
                 if fallbacks:
                     info['redaction_whole_line_fallbacks']=fallbacks
@@ -445,8 +465,10 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
         if (redact and independent['uninspected_content'] and (options.get('ocr_python') or options.get('ocr_remote'))
                 and privacy_check):
             from transformation.validation.privacy_verification import verify
+            from transformation.validation.value_redaction import replacement_labels
             output_language=options.get('target','ko') if translate else options.get('source','en')
             for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,language=output_language,analyzed_texts=analyzed_texts,
+                                       ignore=set(replacement_labels(findings,pii_style).values()),
                                        pages=({c['page'] for c in independent['uninspected_content'] if c.get('page')} if kind=='pdf' and output_kind=='pdf' else None)):
                 if 'reports' in verification: independent['rendered_privacy']=verification
                 else: info['privacy_verification_page']=verification['page']; yield emit('privacy_verification')
@@ -454,6 +476,28 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if any(p['known_residual_values'] for p in verification['reports']):
                 info['failure_code']='PRIVACY_CHECK_BLOCKED'
                 raise ValueError('Fresh output OCR found a selected sensitive value; the result is blocked.')
+            # Safety net: personal data the detector missed but the final check found (for example
+            # in a picture that could not be processed) is masked before release, listed for review,
+            # and the same pages are checked again. Anything still readable then blocks the result.
+            from transformation.validation.review_items import final_check_regions
+            found=final_check_regions(verification['reports'],pii_keep) if output_kind=='pdf' else []
+            if found:
+                from transformation.validation.manual_redaction import redact_regions
+                masked=run/'output'/'result-final-check.pdf'
+                redact_regions(destination,masked,[f['region'] for f in found],hashlib.sha256(artifact).hexdigest())
+                artifact=masked.read_bytes();destination.write_bytes(artifact)
+                info.setdefault('review_items',[]).extend(f['item'] for f in found)
+                info.setdefault('redaction_map',[]).extend(f['box'] for f in found)
+                info['final_check_masked']=len(found)
+                info['warnings'].append(f'{len(found)} line(s) with personal data found by the final privacy check were masked before release; review them.')
+                for verification in verify(artifact,output_kind,run/'final-check-recheck',all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,
+                                           language=output_language,analyzed_texts=analyzed_texts,
+                                           ignore=set(replacement_labels(findings,pii_style).values()),pages={f['region']['page'] for f in found}):
+                    if 'reports' in verification: independent['rendered_privacy']=verification
+                save_json(run/'privacy-verification-after-masking.json',verification)
+                if any(p['known_residual_values'] or p['detected_pii'] for p in verification['reports']):
+                    info['failure_code']='PRIVACY_CHECK_BLOCKED'
+                    raise ValueError('Personal data was still readable after final-check masking; the result is blocked.')
             if verification['passed']:
                 independent['ocr_checked_content']=[c for c in independent['uninspected_content'] if c['kind'] in {'image','raster'}]
                 independent['uninspected_content']=[c for c in independent['uninspected_content'] if c['kind'] not in {'image','raster'}]

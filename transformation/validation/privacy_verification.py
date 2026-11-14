@@ -33,7 +33,7 @@ def _could_hide_selected_value(region,values,page):
     return bool(re.search(r'[\w.+-]+@[\w-]+\.|\+\d[\d ()-]{7,}\d|(?<!\d)\d{2,4}[- ]\d{2,4}[- ]\d{4}(?!\d)',text))
 
 
-def verify(data,kind,run,values,categories,endpoint,model,assist,options,language=None,analyzed_texts=(),pages=None):
+def verify(data,kind,run,values,categories,endpoint,model,assist,options,language=None,analyzed_texts=(),pages=None,ignore=()):
     """language is the output's text language: the target if translated, else the source.
 
     analyzed_texts: source texts the detector already sent to the model. An output line
@@ -81,12 +81,20 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options,languag
             repeated=[r for r in regions if analysed(r)]
             unanswered=[]
             detected=detect(fresh,categories,endpoint,model,assist,unresolved=unanswered)+detect(repeated,categories,endpoint,model,False)
+            # Replacement text the redaction itself wrote ([NAME], Person A) is not personal data.
+            placeholders={_compact(i).casefold() for i in ignore if i}
+            detected=[d for d in detected if not any(_compact(d.get('value','')).casefold() in p for p in placeholders)]
             flagged=[r for r in regions if r.get('metadata',{}).get('requires_review')]
             with pymupdf.open(folder/'source.pdf') as rendered:
                 uncertain=[r['id'] for r in flagged if _could_hide_selected_value(r,values,rendered[0])]
             # A line the model could not answer verifiably is unchecked, not a crash.
             uncertain+=[i for i in unanswered if i not in uncertain]
-            reports.append({'page':index+1,'known_residual_values':residual,'detected_pii':detected,'uncertain_regions':uncertain,
+            # Where each finding is (rendered-page coordinates = the displayed page), so a
+            # caller can remove what the check found.
+            boxes={r['id']:r.get('bbox') for r in regions}
+            detected=[dict(d,bbox=boxes.get(d.get('region_id'))) for d in detected]
+            reports.append({'page':index+1,'page_size':[page.rect.width,page.rect.height],
+                            'known_residual_values':residual,'detected_pii':detected,'uncertain_regions':uncertain,
                             'uncertain_regions_ignored':len(flagged)-len(uncertain)})
     yield {'reports':reports,'passed':not any(p['known_residual_values'] or p['detected_pii'] or p['uncertain_regions'] for p in reports),
            'limitations':'Fresh OCR can still miss content. This is an acceptance check, not a privacy guarantee.'}

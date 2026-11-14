@@ -173,6 +173,43 @@ def failure_code(result):
     code=result.get('failure_code')
     return code if code in FAILURE_CODES else 'ENGINE_FAILED'
 
+REVIEW_CATEGORIES={'Names','Email addresses','Phone numbers','Addresses','Identifiers','Bank accounts','Dates of birth','Unknown'}
+REVIEW_REASONS={'unverified_answer','whole_line','rule_overruled_model','unreadable_text','final_check'}
+
+def review_items(raw,pages,limit=200):
+    """Review-queue items for the hosted API: page, box, category, reason and state only.
+    Anything else (such as text) is dropped, so no document content leaves this server."""
+    items=[]
+    for r in raw if isinstance(raw,list) else []:
+        if not isinstance(r,dict):continue
+        page=r.get('page');box=[r.get(k) for k in ('x','y','width','height')]
+        if type(page) is not int or not 1<=page<=pages:continue
+        if not all(type(v) in (int,float) for v in box):continue
+        x,y,w,h=(float(v) for v in box)
+        if not (0<=x<1 and 0<=y<1 and 0<w and 0<h and x+w<=1.0001 and y+h<=1.0001):continue
+        if r.get('category') not in REVIEW_CATEGORIES or r.get('reason') not in REVIEW_REASONS or r.get('state') not in ('masked','suggested'):continue
+        items.append({'page':page,'x':round(x,4),'y':round(y,4),'width':round(w,4),'height':round(h,4),
+                      'category':r['category'],'reason':r['reason'],'state':r['state']})
+        if len(items)>=limit:break
+    return items
+
+
+REDACTION_METHODS={'field_label','pattern','credential_label_pattern','address_block','model_proposal','document_name_sweep',
+                   'name_variant','document_consistency','unverifiable_model_answer','final_check'}
+
+def redaction_map(raw,pages,limit=400):
+    """Why each box was drawn, for the hosted API: page, box, category and method only."""
+    items=[]
+    for r in raw if isinstance(raw,list) else []:
+        if not isinstance(r,dict) or r.get('method') not in REDACTION_METHODS:continue
+        kept=review_items([dict(r,reason='whole_line',state='masked')],pages)
+        if not kept:continue
+        item={k:kept[0][k] for k in ('page','x','y','width','height','category')};item['method']=r['method']
+        items.append(item)
+        if len(items)>=limit:break
+    return items
+
+
 def summarize_checks(result):
     """Counts of automated-check findings; contents stay on the private worker."""
     validation=result.get('validation') if isinstance(result.get('validation'),dict) else {}
@@ -283,6 +320,8 @@ def execute(cfg,j,root):
         'gpu_verified':result.get('gpu_verified') is True,'checks':checks,
         'blockers':sum(v for k,v in checks.items() if type(v) is int)}
     if isinstance(result.get('seconds'),(int,float)):metrics['server_seconds']=result['seconds']
+    metrics['review_items']=review_items(result.get('review_items'),pages)
+    metrics['redaction_map']=redaction_map(result.get('redaction_map'),pages)
     deliver(cfg,j,output.read_bytes(),metrics)
 
 def _run(args,cfg,root,ocr_session=None):
