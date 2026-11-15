@@ -67,6 +67,36 @@ class ReviewQueueTests(unittest.TestCase):
         evidence = {'suppressed': [{'region_id': block['id'], 'value': 'K-100', 'category': 'Identifiers'}]}
         self.assertEqual(build(data, {'units': [{'number': 1, 'regions': []}]}, findings, evidence, []), [])
 
+    def _ocr_items(self, text, readings):
+        """Review items for one flagged scanned line with the given OCR readings (model, text, score)."""
+        region = {'id': 'line-1', 'text': text, 'bbox': [20, 30, 200, 45],
+                  'metadata': {'requires_review': True, 'recognition_score': .99,
+                               'candidates': [{'model': m, 'text': t, 'score': s, 'variant': f'v{i}'}
+                                              for i, (m, t, s) in enumerate(readings)]}}
+        ir = {'units': [{'number': 1, 'ocr_folder': 'ocr', 'regions': [region]}]}
+        return build(pdf([(20, 300, 'Unrelated native line')]), ir, [], {}, [])
+
+    def test_scanned_line_read_alike_by_both_models_is_not_called_unreadable(self):
+        # Two recognizers agree on every character; one dropped a space, another changed case.
+        for readings in ([('mobile', 'Model 840 Pro', .99), ('server', 'Model840 Pro', .93)],
+                         [('mobile', 'Model 840 Pro', .97), ('server', 'model 840 pro', .95)]):
+            self.assertEqual(self._ocr_items('Model 840 Pro', readings), [])
+
+    def test_scanned_line_with_any_character_doubt_stays_in_the_queue(self):
+        cases = [
+            [('mobile', 'Ref 840-Q7', .99), ('server', 'Ref 840-O7', .93)],      # a character differs
+            [('mobile', 'Ref 840-Q7', .99), ('mobile', 'Ref 840-Q7', .98)],      # one model only
+            [('mobile', 'Ref 840-Q7', .99), ('server', 'Ref 840-Q7', .93), ('server', 'Ref 84O-Q7', .88)],
+            [],                                                                  # no readings recorded
+        ]
+        for readings in cases:
+            items = self._ocr_items('Ref 840-Q7', readings)
+            self.assertEqual([(i['state'], i['reason']) for i in items], [('suggested', 'unreadable_text')], readings)
+
+    def test_weak_disagreeing_reading_does_not_outvote_two_confident_models(self):
+        readings = [('mobile', 'Ref 840-Q7', .99), ('server', 'Ref 840-Q7', .95), ('server', 'Rf84-Q', .60)]
+        self.assertEqual(self._ocr_items('Ref 840-Q7', readings), [])
+
     def test_worker_sends_only_valid_bounded_items(self):
         good = {'page': 1, 'x': .1, 'y': .2, 'width': .3, 'height': .05, 'category': 'Names', 'reason': 'whole_line', 'state': 'masked'}
         raw = [dict(good, value='Ann Moor'), dict(good, page=5), dict(good, x=.9, width=.5), dict(good, reason='x'), 'junk', good]

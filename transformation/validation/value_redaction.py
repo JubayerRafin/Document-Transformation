@@ -403,7 +403,12 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
                 selected=[v for v in values if literal_spans(region['text'],v)]
                 if not selected:continue
                 region_box=pymupdf.Rect(region['bbox'])*page.derotation_matrix
-                native_covered=all(any((region_box & rect).get_area()>0 for rect in boxes_by_value[v]) for v in selected)
+                # A value is covered where it, or a longer selected value containing it, was boxed.
+                # A table cell can clip a value that overflows it ("ann@host.exa" of
+                # "ann@host.example"); the clipped text is not a word on the page, but the whole
+                # value it belongs to is removed there.
+                native_covered=all(any((region_box & rect).get_area()>0 for w in values if v in w for rect in boxes_by_value[w])
+                                   for v in selected)
                 if not ocr_page and not native_covered:
                     missing=[v for v in selected if not boxes_by_value[v]]
                     if missing:

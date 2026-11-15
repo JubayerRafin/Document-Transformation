@@ -139,6 +139,14 @@ def _phone_shape(value):
     return True
 
 
+WHOLE_EMAIL=re.compile(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}')
+
+
+def _address_with_other_words(value):
+    words=value.split()
+    return len(words)>1 and any(WHOLE_EMAIL.fullmatch(word) for word in words)
+
+
 def _validated_proposals(response,text,categories,context=''):
     """context: the serialized extraction context sent with the request. A value copied from it
     (a neighbouring cell) that is not in text is dropped, because that cell gets its own request,
@@ -184,6 +192,12 @@ def _validated_proposals(response,text,categories,context=''):
         # A person's name never contains digits: such an answer joins a name with a number,
         # and each part is found on its own (name list, phone/ID patterns and labels).
         if finding['category']=='Names' and any(c.isdigit() for c in value):continue
+        # Likewise an answer made of a complete email address plus another word (a neighbouring
+        # cell, "Logistics user@..." in a table row), whatever category the model gave it, joins the
+        # address with text that is not part of it; the address is found by the email pattern.
+        # (Without spaces the joined text looks like one address and would be relabelled as one.)
+        # A wrapped address, whose parts are each incomplete, is kept.
+        if _address_with_other_words(value):continue
         proposals.append((value,finding['category'],'model_proposal'))
     if echoed and not proposals:
         raise ValueError('PII response only repeated context values; recheck text without context.')

@@ -75,6 +75,31 @@ class ValueRedactionTests(unittest.TestCase):
             units=[{'number':i+1,'regions':[]} for i in range(len(pdf))]
         return redact_pdf(data,{'units':units,'pii_source_regions':regions},[finding])[0]
 
+    def test_table_cell_clipping_an_overflowing_value_is_covered_by_the_whole_value(self):
+        value='kim.lee@harbor-post.example'
+        data=self.source([(30,40,'Owner'),(120,40,value),(30,80,'Keep this line')])
+        with pymupdf.open(stream=data,filetype='pdf') as pdf:
+            hit=pdf[0].search_for(value)[0]
+        # The extractor's cell ends inside the address and holds only its first part.
+        cell={'id':'t:cell-1-1','text':'kim.lee@harbor-post.exa','bbox':[hit.x0-2,hit.y0,hit.x0+(hit.width*.8),hit.y1]}
+        native=next(r for r in native_pattern_regions(data) if literal_spans(r['text'],value))
+        findings=[{'region_id':cell['id'],'value':cell['text'],'category':'Email addresses'},
+                  {'region_id':native['id'],'value':value,'category':'Email addresses'}]
+        ir={'units':[{'number':1,'regions':[cell]}],'pii_source_regions':[native]}
+        output=redact_pdf(data,ir,findings)[0]
+        with pymupdf.open(stream=output,filetype='pdf') as pdf:
+            text=pdf[0].get_text()
+        self.assertNotIn('harbor',text); self.assertIn('Owner',text); self.assertIn('Keep this line',text)
+
+    def test_clipped_cell_value_without_a_whole_value_still_requires_review(self):
+        value='kim.lee@harbor-post.example'
+        data=self.source([(120,40,value)])
+        with pymupdf.open(stream=data,filetype='pdf') as pdf:
+            hit=pdf[0].search_for(value)[0]
+        cell={'id':'t:cell-1-1','text':'kim.lee@harbor-post.exa','bbox':[hit.x0-2,hit.y0,hit.x0+(hit.width*.8),hit.y1]}
+        with self.assertRaises(RedactionLocalizationError):
+            redact_pdf(data,{'units':[{'number':1,'regions':[cell]}]},[{'region_id':cell['id'],'value':cell['text'],'category':'Email addresses'}])
+
     def test_wrapped_email_repeated_in_table_style_block_is_fully_removed(self):
         value='alex.river@example-corp.test'
         data=self.source([(30,35,'Contact: '+value),(30,90,'Email:'),
