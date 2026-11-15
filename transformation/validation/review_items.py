@@ -30,6 +30,27 @@ def _locations(data, ir):
     return places
 
 
+def _characters(text):
+    return ''.join(text.split()).casefold()
+
+
+def _read_alike(region):
+    """True when OCR flagged a line only over spacing or letter case: two recognition models
+    each read the line's characters confidently and every confident reading agrees with them.
+
+    OCR keeps such lines uncertain (an identifier's word boundaries matter for its own rules),
+    but PII detection already saw the right characters, so "unreadable" would be a false alarm.
+    A line with no text, no recorded readings or any differing character stays in the queue."""
+    meta = region.get('metadata', {})
+    key = _characters(region.get('text', ''))
+    if not key or meta.get('ocr_unreadable'): return False
+    readings = [c for c in meta.get('candidates', []) if isinstance(c, dict) and c.get('purpose') != 'redaction_geometry_only'
+                and isinstance(c.get('text'), str) and c['text'].strip() and isinstance(c.get('score'), (int, float))]
+    confident = [c for c in readings if c['score'] >= .85]
+    if any(_characters(c['text']) != key for c in confident): return False
+    return len({c.get('model') for c in confident if c.get('model')}) >= 2
+
+
 def _value_boxes(page, region_bbox, value):
     """Boxes of a value inside a native region, in displayed coordinates; the region box if not found."""
     clip = pymupdf.Rect(region_bbox) * page.derotation_matrix
@@ -57,7 +78,7 @@ def build(data, ir, findings, evidence, audit):
     for unit in ir.get('units', []):
         if not unit.get('ocr_folder'): continue
         for region in unit.get('regions', []):
-            if region.get('metadata', {}).get('requires_review') and region['id'] not in masked_regions:
+            if region.get('metadata', {}).get('requires_review') and region['id'] not in masked_regions and not _read_alike(region):
                 raw.append(('suggested', 'unreadable_text', 'Unknown', region['id'], None))
     items, seen = [], set()
     with pymupdf.open(stream=data, filetype='pdf') as pdf:

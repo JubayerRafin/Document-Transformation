@@ -256,3 +256,32 @@ class SoftWrapTests(unittest.TestCase):
             found = _semantic_proposals({'id': 'a', 'text': text}, text, ['Names'], 'e', 'm')
         self.assertNotIn('\n', seen[0]); self.assertEqual(len(seen[0]), len(text))
         self.assertEqual(found, [('Ann \nmoor-Lindt', 'Names', 'model_proposal')])
+
+
+class EmailWithNeighbourLineTests(unittest.TestCase):
+    def validated(self, value, text, category='Email addresses'):
+        from transformation.validation.privacy import _validated_proposals
+        answer = json.dumps({'findings': [{'value': value, 'category': category}]})
+        return [v for v, _, _ in _validated_proposals(answer, text, [category])]
+
+    def test_joined_address_answered_as_another_category_is_dropped(self):
+        # Without its space the joined text looks like one address and would be relabelled as one.
+        row = '17 Warehouse kim.lee@harbor-post.example B'
+        self.assertEqual(self.validated('Warehouse kim.lee@harbor-post.example', row, 'Identifiers'), [])
+        self.assertEqual(self.validated('ID 17', 'ID 17 Warehouse', 'Identifiers'), ['ID 17'])
+
+    def test_address_joined_with_a_neighbouring_cell_is_dropped(self):
+        text = 'Warehouse\nkim.lee@harbor-post.example'
+        self.assertEqual(self.validated(text, text), [])
+        self.assertEqual(self.validated('kim.lee@harbor-post.example\nRoom 4', 'kim.lee@harbor-post.example\nRoom 4'), [])
+        row = '17 Warehouse kim.lee@harbor-post.example B'  # a table row joined with spaces
+        self.assertEqual(self.validated('Warehouse kim.lee@harbor-post.example', row), [])
+
+    def test_the_address_itself_is_still_found_by_the_pattern(self):
+        text = 'Warehouse\nkim.lee@harbor-post.example'
+        found = {f['value'] for f in detect([{'id': 'r', 'text': text}], ['Email addresses'], 'x', 'm', assist=False)}
+        self.assertEqual(found, {'kim.lee@harbor-post.example'})
+
+    def test_a_wrapped_address_is_kept(self):
+        for text in ('kim.lee@harbor-\npost.example', 'kim.lee@harbor-post.\nexample', 'kim.lee@harbor-post.example'):
+            self.assertEqual(self.validated(text, text), [text])

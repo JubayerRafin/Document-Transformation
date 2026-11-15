@@ -58,7 +58,10 @@ else
     >/dev/null && echo "Model $model loaded and warm." || echo "Model warm-up failed; the first job will load it."
 fi
 
-if pgrep -f "tools/service/cloud_worker.py run" >/dev/null; then
+# Match the worker process itself (an interpreter running the script), not another command
+# that only mentions it, such as a remote shell started to run this script.
+worker_pattern='^[^ ]*python[0-9.]* (-u )?tools/service/cloud_worker[.]py run'
+if pgrep -f "$worker_pattern" >/dev/null; then
   echo "Worker already running (log: $log)."
   exit 0
 fi
@@ -66,7 +69,7 @@ cd "$app"
 PYTHONPATH="$app" nohup "$python" -u tools/service/cloud_worker.py run --config "$config" > "$log" 2>&1 &
 for _ in $(seq 1 90); do
   grep -q "Worker ready for" "$log" 2>/dev/null && { tail -1 "$log"; echo "Log: $log"; exit 0; }
-  if ! pgrep -f "tools/service/cloud_worker.py run" >/dev/null; then echo "Worker stopped; last lines:"; tail -5 "$log"; exit 1; fi
+  if ! pgrep -f "$worker_pattern" >/dev/null; then echo "Worker stopped; last lines:"; tail -5 "$log"; exit 1; fi
   sleep 2
 done
 echo "Worker started but has not reported ready yet; check $log."
