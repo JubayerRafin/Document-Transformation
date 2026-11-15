@@ -44,8 +44,9 @@ def connect(path,wait=30):
             connection.close();raise
 
 
-def health(path):
+def health(path,timeout=1):
     with connect(path,wait=1) as connection:
+        connection.settimeout(timeout)
         connection.sendall(encode({'action':'health'}))
         return receive(connection).get('ready') is True
 
@@ -56,12 +57,16 @@ class Session:
         self.folder=self.root/('.ocr-service-'+uuid4().hex[:8]);self.folder.mkdir(mode=0o700)
         self.path=self.folder/'worker.sock';self.process=None
 
-    def ensure(self):
+    def ensure(self,busy_wait=180):
         if self.process and self.process.poll() is None:
+            # The service is serial: the probe waits behind a running request, such as the
+            # background prewarm loading models. A request that overruns its deadline ends the
+            # service itself, so waiting while the process is alive is bounded.
             try:
-                if health(self.path):return
+                if health(self.path,timeout=busy_wait):return
             except (OSError,RuntimeError,ValueError):pass
-            raise RuntimeError('OCR session unresponsive; inspect it before restarting a job.')
+            if self.process.poll() is None:
+                raise RuntimeError('OCR session unresponsive; inspect it before restarting a job.')
         self.path.unlink(missing_ok=True)
         with (self.folder/'service.log').open('ab') as log:
             self.process=subprocess.Popen([self.python,'-u','-m','tools.ocr.persistent_worker',

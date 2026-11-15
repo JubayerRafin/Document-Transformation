@@ -115,11 +115,13 @@ class ImageRedactionTests(unittest.TestCase):
         self.assertGreater(ink(output, word_box(line, '172.16.5.114') + (1, 1, -1, -1)), .95)
         self.assertLess(ink(output, word_box(line, 'login')), .6)
 
-    def test_value_inside_a_word_covers_that_whole_word(self):
+    def test_value_fused_with_its_label_covers_the_value_and_keeps_the_label(self):
+        # OCR reads "Device:WPX-0042" as one word; only the value part is covered.
         line = 'Device:WPX-0042 Owner'
         _, output, audit = self.redact(line, 'WPX-0042')
         self.assertEqual(audit[0]['localization'], 'pixel_word_gaps')
-        self.assertGreater(ink(output, word_box(line, 'Device:WPX-0042') + (1, 1, -1, -1)), .95)
+        self.assertGreater(ink(output, word_box(line, 'WPX-0042') + (1, 1, -1, -1)), .95)   # value fully covered
+        self.assertLess(ink(output, word_box(line, 'Devic')), .6)                          # label readable
         self.assertLess(ink(output, word_box(line, 'Owner')), .6)
 
     def test_unsplittable_line_falls_back_to_the_whole_line_and_says_so(self):

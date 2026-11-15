@@ -34,6 +34,9 @@ def label_like(text):
     words = text.split()
     # A trailing period is an abbreviation ("No.") unless the text reads as a sentence.
     sentence = text.endswith(('!', '?')) or (text.endswith('.') and len(words[-1] if words else '') > 4)
+    # A label is a complete phrase: an unbalanced bracket ("this)", "(Employee ID") means the
+    # words are a fragment of a sentence that happens to precede a colon.
+    if text.count('(') != text.count(')') or text.count('[') != text.count(']'): return False
     return (0 < len(text) <= LABEL_MAX_CHARS and len(words) <= LABEL_MAX_WORDS
             and any(c.isalpha() for c in text) and not any(c.isdigit() for c in text) and not sentence
             and '@' not in text and '://' not in text and '/' not in text)
@@ -119,6 +122,63 @@ def field_pairs(units, cells, blocks):
     return pairs
 
 
+def ocr_column_pairs(lines):
+    """Column-header pairs for a table on a scanned page, from OCR line geometry.
+
+    A scan has no table structure, so a cell such as "BE-16608" reaches the model alone and
+    its column ("Employee ID") is lost. A header row is two or more label-like lines side by
+    side; each header owns the band halfway to its neighbours. Lines below it, row by row,
+    belong to the column whose band holds their centre. The table ends at a gap of more than
+    three line heights, at a row with fewer than two cells, at a line spanning several columns
+    (prose), at a "Label: value" line (a form, not a cell) or at another header row. A form laid
+    out as "label | value" columns (every other column all labels, as in field_pairs) is not a
+    data table: its first row would otherwise be read as headers over the other labels.
+    lines: [{'id','text','bbox'}] of one page, bbox (x0, y0, x1, y1) with y growing downward.
+    Returns pairs like field_pairs with kind 'ocr_column'.
+    """
+    items = [l for l in lines if l.get('text', '').strip() and l.get('bbox')]
+    mid = lambda b: ((b[0] + b[2]) / 2, (b[1] + b[3]) / 2)
+    height = lambda b: max(b[3] - b[1], 1)
+    def rows_of(entries):
+        rows = []
+        for entry in sorted(entries, key=lambda l: mid(l['bbox'])[1]):
+            if rows and abs(mid(entry['bbox'])[1] - mid(rows[-1][0]['bbox'])[1]) <= .5 * height(rows[-1][0]['bbox']):
+                rows[-1].append(entry)
+            else: rows.append([entry])
+        return rows
+    def header_row(row):
+        return len(row) >= 2 and all(label_like(l['text']) for l in row)
+    rows = rows_of(items)
+    pairs, used = [], set()
+    for index, row in enumerate(rows):
+        if index in used or not header_row(row): continue
+        headers = sorted(row, key=lambda l: mid(l['bbox'])[0])
+        centres = [mid(h['bbox'])[0] for h in headers]
+        spacing = min(b - a for a, b in zip(centres, centres[1:]))
+        bounds = ([headers[0]['bbox'][0] - spacing / 2] + [(a + b) / 2 for a, b in zip(centres, centres[1:])]
+                  + [headers[-1]['bbox'][2] + spacing / 2])
+        column = lambda x: next((j for j in range(len(headers)) if bounds[j] <= x < bounds[j + 1]), None)
+        spans = lambda b: sum(b[0] <= c <= b[2] for c in centres)
+        previous = max((h['bbox'] for h in headers), key=lambda b: b[3]); table = []
+        for later in range(index + 1, len(rows)):
+            cells = rows[later]; top = min(c['bbox'][1] for c in cells)
+            if top - previous[3] > 3 * height(previous) or header_row(cells) or len(cells) < 2: break
+            if any(spans(c['bbox']) >= 2 or re.search(r'\S[:：]\s', c['text']) for c in cells): break
+            inside = [(c, column(mid(c['bbox'])[0])) for c in cells]
+            if any(j is None for _, j in inside) or len({j for _, j in inside}) < len(inside): break
+            table.append(inside); used.add(later); previous = max((c['bbox'] for c in cells), key=lambda b: b[3])
+        if len(table) < 2: continue  # One line under a heading row is not a table.
+        label_cols = {j for j in range(len(headers))
+                      if all(label_like(c['text']) for inside in table for c, k in inside if k == j)
+                      and any(k == j for inside in table for _, k in inside)}
+        if len(headers) % 2 == 0 and all(j in label_cols for j in range(0, len(headers), 2)): continue
+        for inside in table:
+            for cell, j in inside:
+                pairs.append({'label': headers[j]['text'].strip().rstrip(':：').strip(), 'value': cell['text'].strip(),
+                              'region_id': cell['id'], 'kind': 'ocr_column'})
+    return pairs
+
+
 # A shorter answer format (only sensitive labels) was evaluated on 2026-11-12 and
 # dropped labels such as "Document ID" and misread value cells as labels; keep the
 # full per-label answer.
@@ -166,7 +226,10 @@ def classify_labels(labels, categories, endpoint, model, batch_size=12):
 def name_sweep(units, endpoint, model, chunk=6000):
     """Ask once per chunk of the whole document for every person name, verbatim."""
     from transformation.llm.ollama_native import chat
-    text = '\n'.join(u.get('text', '') for u in units if u.get('text', '').strip())
+    from transformation.validation.privacy import soft_wraps_as_spaces
+    # Line wraps inside sentences hide lone surnames from the model (see soft_wraps_as_spaces);
+    # names are matched back to the units across whitespace by name_occurrences.
+    text = '\n'.join(soft_wraps_as_spaces(u.get('text', '')) for u in units if u.get('text', '').strip())
     schema = {'type': 'object', 'properties': {'names': {'type': 'array', 'items': {'type': 'string'}}},
               'required': ['names'], 'additionalProperties': False}
     system = ('List every person name that appears in the document text: full names, given names alone and '
@@ -402,6 +465,9 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
                 'analyzed_texts': [u['text'] for u in units] if assist else []}
     smart = assist and semantic_selected
     pairs = field_pairs(units, cells, native_blocks) if smart else []
+    if smart:
+        for unit in ir['units']:
+            if unit.get('ocr_folder'): pairs += ocr_column_pairs(text_regions({'units': [unit]}))
     labels = {}
     for pair in pairs: labels.setdefault(pair['label'], pair['value'])
     # The three model passes are independent: run them at the same time.
@@ -531,6 +597,12 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
         # (a due-date column labelled as an identifier is still a due date).
         if category != 'Dates of birth' and is_date(finding['value']): continue
         if category == 'Names': finding = dict(finding, value=strip_honorific(finding['value']))
+        # A person's name never contains digits: "Lee Soo-jin, 010-9876-5432" is a name and a phone
+        # joined by the model; the name list and the phone pattern mask the two parts separately.
+        if category == 'Names' and any(c.isdigit() for c in finding['value']): continue
+        # Sentence punctuation after a value is not part of it ("REDACT_ME.", "1******.").
+        trimmed = finding['value'].rstrip('.,;:')
+        if trimmed != finding['value'] and len(compact(trimmed)) >= 2: finding = dict(finding, value=trimmed)
         region = regions.get(finding['region_id'])
         if region is None or finding['value'] not in region['text']: continue
         key = (finding['region_id'], finding['value'], category)

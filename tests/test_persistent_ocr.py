@@ -58,6 +58,31 @@ class PersistentOCRTests(unittest.TestCase):
             session=Session(sys.executable,root);session.process=Mock();session.process.poll.return_value=None
             session.close();session.process.terminate.assert_called_once();session.process.wait.assert_called_once()
 
+    def test_busy_session_is_waited_for_not_reported_unresponsive(self):
+        with temporary_workspace() as root:
+            session=Session(sys.executable,root);session.process=Mock();session.process.poll.return_value=None
+            with patch('transformation.ocr.service.health',return_value=True) as probe,\
+                 patch('transformation.ocr.service.subprocess.Popen') as launch:
+                session.ensure()
+            self.assertGreaterEqual(probe.call_args.kwargs['timeout'],60);launch.assert_not_called()
+
+    def test_live_session_that_never_answers_is_not_restarted(self):
+        with temporary_workspace() as root:
+            session=Session(sys.executable,root);session.process=Mock();session.process.poll.return_value=None
+            with patch('transformation.ocr.service.health',side_effect=socket.timeout()),\
+                 patch('transformation.ocr.service.subprocess.Popen') as launch:
+                with self.assertRaisesRegex(RuntimeError,'unresponsive'):session.ensure()
+            launch.assert_not_called()
+
+    def test_session_that_exits_while_busy_is_started_again(self):
+        with temporary_workspace() as root:
+            session=Session(sys.executable,root);old=Mock();old.poll.side_effect=[None,124];session.process=old
+            fresh=Mock();fresh.poll.return_value=None
+            with patch('transformation.ocr.service.health',side_effect=[RuntimeError('disconnected'),True]),\
+                 patch('transformation.ocr.service.subprocess.Popen',return_value=fresh) as launch:
+                session.ensure()
+            launch.assert_called_once();self.assertIs(session.process,fresh)
+
     def test_client_failure_never_replays_or_returns_success(self):
         connection=Mock();connection.__enter__=Mock(return_value=connection);connection.__exit__=Mock(return_value=False)
         connection.recv.return_value=b'{"status":"failed","error_type":"ValueError"}\n'

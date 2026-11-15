@@ -291,3 +291,80 @@ class OcrParagraphTests(unittest.TestCase):
         units = ocr_paragraphs(self.lines([(50, 100, 'The tenancy was approved for Mr. Lars'), (50, 114, 'Holmberg after the review of')]))
         parts = member_findings({'region_id': units[0]['id'], 'value': 'Lars Holmberg', 'category': 'Names'}, units[0])
         self.assertEqual([(p['region_id'], p['value']) for p in parts], [('l0', 'Lars'), ('l1', 'Holmberg')])
+
+
+class OcrColumnPairTests(unittest.TestCase):
+    """Scanned tables: a cell is paired with the header above its column, from geometry only."""
+    def line(self, i, x, y, text, w=70):
+        return {'id': f'l{i}', 'text': text, 'bbox': [x, y, x + w, y + 10]}
+
+    def roster(self):
+        rows = [('Full name', 'Employee ID', 'Department'), ('Mira Holt', 'BE-16608', 'Finance'),
+                ('Ola Berg', '20-947', 'Support'), ('Ann Moor', 'QM-07563', 'Logistics')]
+        return [self.line(f'{r}{c}', 50 + 120 * c, 100 + 18 * r, t) for r, row in enumerate(rows) for c, t in enumerate(row)]
+
+    def test_cells_pair_with_their_column_header(self):
+        from transformation.validation.pii_document import ocr_column_pairs
+        pairs = {(p['label'], p['value']) for p in ocr_column_pairs(self.roster())}
+        self.assertIn(('Employee ID', 'BE-16608'), pairs)
+        self.assertIn(('Employee ID', '20-947'), pairs)
+        self.assertIn(('Full name', 'Ola Berg'), pairs)
+        self.assertNotIn(('Employee ID', 'Finance'), pairs)
+        self.assertTrue(all(p['kind'] == 'ocr_column' for p in ocr_column_pairs(self.roster())))
+
+    def test_table_ends_at_a_gap_or_a_prose_line(self):
+        from transformation.validation.pii_document import ocr_column_pairs
+        lines = self.roster() + [self.line('p', 50, 180, 'The roster above was approved by the board last week.', w=360),
+                                 self.line('q', 170, 198, 'XK-1')]
+        self.assertNotIn('XK-1', {p['value'] for p in ocr_column_pairs(lines)})
+        far = self.roster() + [self.line('f', 170, 300, 'ZZ-9')]
+        self.assertNotIn('ZZ-9', {p['value'] for p in ocr_column_pairs(far)})
+
+    def test_headings_and_single_lines_are_not_tables(self):
+        from transformation.validation.pii_document import ocr_column_pairs
+        heading = [self.line(0, 50, 100, 'Meeting notes', w=120), self.line(1, 50, 118, 'BE-16608')]
+        self.assertEqual(ocr_column_pairs(heading), [])               # one label is not a header row
+        one_row = [self.line(0, 50, 100, 'Name'), self.line(1, 170, 100, 'Code'), self.line(2, 50, 118, 'X'), self.line(3, 170, 118, 'Y')]
+        self.assertEqual(ocr_column_pairs(one_row), [])               # a single row under labels is not a table
+
+    def test_scanned_roster_column_label_masks_ids_the_model_missed(self):
+        from transformation.validation import pii_document
+        lines = self.roster()
+        ir = {'units': [{'number': 1, 'ocr_folder': 'x', 'regions': lines}]}
+        with patch('extraction.coordinator.text_regions', side_effect=lambda ir: ir['units'][0]['regions']), \
+             patch.object(pii_document, 'native_pattern_regions', return_value=[]), \
+             patch('transformation.llm.ollama_native.chat', side_effect=stub(labels={'Employee ID': 'Identifiers', 'Full name': 'Names'})):
+            findings = pii_document.detect_document(b'', ir, ['Names', 'Identifiers'], 'e', 'm')[0]
+        found = {(f['value'], f['category']) for f in findings}
+        self.assertIn(('BE-16608', 'Identifiers'), found)
+        self.assertIn(('20-947', 'Identifiers'), found)
+        self.assertNotIn('Finance', {f['value'] for f in findings})
+
+    def test_label_value_form_and_side_by_side_titles_are_not_tables(self):
+        from transformation.validation.pii_document import ocr_column_pairs
+        form = [('Full name', 'Isaac Okonkwo'), ('Employee ID', 'GOY-531250'), ('Date of birth', '1992-03-01'), ('Email', 'i.o@x.example')]
+        lines = [self.line(f'{r}{c}', 50 + 150 * c, 100 + 18 * r, t) for r, row in enumerate(form) for c, t in enumerate(row)]
+        self.assertEqual(ocr_column_pairs(lines), [])
+        panels = [('Device Console', 'STAFF BADGE'), ('Device: WP-0042', 'Kim Min-jun'), ('Owner: minjun', 'ID: EMP-2024-8831')]
+        lines = [self.line(f'{r}{c}', 50 + 200 * c, 100 + 18 * r, t, w=120) for r, row in enumerate(panels) for c, t in enumerate(row)]
+        self.assertEqual(ocr_column_pairs(lines), [])
+
+    def test_wide_cells_in_their_own_column_do_not_end_the_table(self):
+        from transformation.validation.pii_document import ocr_column_pairs
+        rows = [('Full name', 'Employee ID', 'Email'), ('Mira Holt', 'BE-16608', 'mira.holt@kestrelfreight.example'),
+                ('Ola Berg', '20-947', 'ola.berg@kestrelfreight.example')]
+        lines = [self.line(f'{r}{c}', 50 + 100 * c, 100 + 18 * r, t, w=150 if c == 2 and r else 60)
+                 for r, row in enumerate(rows) for c, t in enumerate(row)]
+        self.assertIn(('Employee ID', '20-947'), {(p['label'], p['value']) for p in ocr_column_pairs(lines)})
+
+
+class NameSweepWrapTests(unittest.TestCase):
+    def test_name_list_reads_sentences_without_soft_wraps(self):
+        from transformation.validation.pii_document import name_sweep
+        seen = []
+        def chat(endpoint, model, messages, max_output=0, response_format=None, purpose=None):
+            seen.append(json.loads(messages[1]['content'])['text']); return json.dumps({'names': ['Witkoff']}), {}
+        units = [{'id': 'a', 'text': 'Witkoff insisted progress had \nbeen made.'}, {'id': 'b', 'text': 'Full name: Ann\nEmail: a@b.example'}]
+        with patch('transformation.llm.ollama_native.chat', side_effect=chat):
+            self.assertEqual(name_sweep(units, 'e', 'm'), {'Witkoff'})
+        self.assertEqual(seen[0], 'Witkoff insisted progress had  been made.\nFull name: Ann\nEmail: a@b.example')

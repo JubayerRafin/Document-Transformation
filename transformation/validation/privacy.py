@@ -15,7 +15,7 @@ def offered_categories(selected):
 CATEGORY_DEFINITIONS={
     'Names':'names of people (full names, given names or surnames), not organizations, products or places',
     'Email addresses':'email addresses',
-    'Phone numbers':'telephone, mobile and fax numbers',
+    'Phone numbers':'telephone, mobile and fax numbers, including extensions',
     'Addresses':'postal or street addresses',
     'Identifiers':('identifiers linked to a person, account or record: national/personal ID numbers; employee, staff, '
                    'member, customer, patient, account, policy, case, tenant, document, record and invoice numbers; '
@@ -100,6 +100,18 @@ def is_date(value):
     return bool(DATE.fullmatch(value.strip().rstrip('.')))
 
 
+def plausible(value,category):
+    """The shape rules every finding must pass, at detection and at the final check alike:
+    an identifier or account has a digit or an ID symbol (plain words such as 'API Key' are
+    labels), a person's name has no digits, and a plain date is personal only as a birth date."""
+    v=value.strip().rstrip('.,;:')
+    if not v:return False
+    if category in {'Identifiers','Bank accounts'} and not re.search(r'[\d_@.:/#\-]',v):return False
+    if category=='Names' and any(c.isdigit() for c in v):return False
+    if category!='Dates of birth' and is_date(v):return False
+    return True
+
+
 def _not_phone_spans(text):
     """Spans a phone pattern must not claim: calendar dates and checksum-valid IBANs."""
     spans=[m.span() for m in DATE.finditer(text)]
@@ -169,10 +181,23 @@ def _validated_proposals(response,text,categories,context=''):
                 raise ValueError('PII proposal includes a field label; return its value only.')
         # Category policy excludes dates everywhere except dates of birth.
         if is_date(value) and finding['category']!='Dates of birth':continue
+        # A person's name never contains digits: such an answer joins a name with a number,
+        # and each part is found on its own (name list, phone/ID patterns and labels).
+        if finding['category']=='Names' and any(c.isdigit() for c in value):continue
         proposals.append((value,finding['category'],'model_proposal'))
     if echoed and not proposals:
         raise ValueError('PII response only repeated context values; recheck text without context.')
     return proposals
+
+
+def soft_wraps_as_spaces(text):
+    """The text with each line break inside a sentence (the next line starts in lower case,
+    as in "progress had\\nbeen made") replaced by a space, so the length and every offset stay
+    the same. A wrap is layout, but the model reads it as a break: on 2026-11-15 a sentence
+    starting with a lone surname was recognised 10 of 10 times without its wraps and 0 of 10
+    with them. Breaks before an upper-case or uncased line (a new field, label or name) stay.
+    Proposals are still validated against the original text, which maps them back."""
+    return re.sub(r'\n(?=[ \t]*([^\W\d_]))',lambda m:' ' if m.group(1).islower() else '\n',text)
 
 
 def _semantic_proposals(region,text,categories,endpoint,model):
@@ -193,8 +218,9 @@ def _semantic_proposals(region,text,categories,endpoint,model):
     )
     metadata=region.get('metadata',{})
     context=metadata.get('row_context',{k:metadata.get(k) for k in ('column_header','row_values')})
+    shown=soft_wraps_as_spaces(text)
     for attempt in range(2):
-        request={'text':text,'categories':categories}
+        request={'text':shown,'categories':categories}
         if not attempt:request['extraction_context']=context
         system=instruction
         if attempt:
@@ -270,7 +296,8 @@ def detect(regions,categories,endpoint,model,assist=True,workers=8,unresolved=No
             values.extend((m.group(),'Email addresses','pattern') for m in re.finditer(email,text))
         if 'Phone numbers' in categories:
             timestamps=_timestamp_spans(text)+_not_phone_spans(text)
-            for m in re.finditer(r'(?<!\w)(?:\+\d[\d ()\t\r\n-]{7,}\d|\d{2,4}[- \t\r\n]+\d{2,4}[- \t\r\n]+\d{4})(?!\w)',text):
+            # A bracketed area code ("(312) 555-0147") is the usual North American layout.
+            for m in re.finditer(r'(?<!\w)(?:\+\d[\d ()\t\r\n-]{7,}\d|(?:\(\d{2,4}\)|\d{2,4})[- \t\r\n]+\d{2,4}[- \t\r\n]+\d{4})(?!\w)',text):
                 if any(m.start()<end and m.end()>start for start,end in timestamps):continue
                 if not _phone_shape(m.group()):continue
                 if 8<=len(re.sub(r'\D','',m.group()))<=15:

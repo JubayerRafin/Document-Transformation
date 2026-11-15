@@ -24,13 +24,18 @@ def check_models(workflow,translation_model=DEFAULT_TRANSLATION_MODEL,pii_model=
         parsed=urlparse(endpoint)
         if parsed.hostname not in {'localhost','127.0.0.1','::1'} or parsed.scheme not in {'http','https'}:
             raise ValueError('Use a loopback Ollama endpoint or SSH tunnel.')
-        url=f'{parsed.scheme}://{parsed.netloc}/api/tags'
+        from transformation.llm.ollama_native import server_kind
+        base=f'{parsed.scheme}://{parsed.netloc}';kind=server_kind(base)
+        url=base+('/v1/models' if kind=='openai' else '/api/tags')
         if url not in seen:
             try:
-                with urllib.request.urlopen(url,timeout=5) as response: seen[url]={m['name'] for m in json.load(response)['models']}
-            except (OSError,ValueError,KeyError) as exc:
-                raise ValueError('Cannot reach the '+role+' Ollama server; check its endpoint or tunnel.') from exc
+                with urllib.request.urlopen(url,timeout=5) as response:
+                    listing=json.load(response)
+                    seen[url]={m['id'] for m in listing['data']} if kind=='openai' else {m['name'] for m in listing['models']}
+            except (OSError,ValueError,KeyError,TypeError) as exc:
+                raise ValueError('Cannot reach the '+role+' model server; check its endpoint or tunnel.') from exc
         if model not in seen[url] and model+':latest' not in seen[url]:
+            if kind=='openai':raise ValueError(f'{role} model {model} is not served at {base}.')
             raise ValueError(f'{role} model is not installed yet: {model}. Complete ollama pull {model} on that server first.')
 
 

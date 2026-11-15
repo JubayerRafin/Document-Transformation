@@ -48,11 +48,49 @@ def record_progress(event, **details):
         logger.warning("Could not save translation progress", exc_info=True)
 
 
+OPENAI_SERVERS_ENV = "TRANSFORMX_OPENAI_COMPATIBLE"
+
+
+def server_kind(base):
+    """'openai' for loopback servers listed in TRANSFORMX_OPENAI_COMPATIBLE (vLLM, SGLang,
+    llama.cpp server; comma-separated scheme://host:port), else 'ollama'."""
+    listed = {item.strip().rstrip('/') for item in os.environ.get(OPENAI_SERVERS_ENV, '').split(',') if item.strip()}
+    return "openai" if base in listed else "ollama"
+
+
+def _openai_chat(base, model, messages, max_output, response_format, purpose):
+    """Same contract as the Ollama path: deterministic, no thinking, schema-constrained JSON."""
+    payload = {"model": model, "messages": messages, "temperature": 0, "max_tokens": max_output,
+               "chat_template_kwargs": {"enable_thinking": False}}
+    if response_format is not None:
+        payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "answer", "schema": response_format}}
+    started = time.monotonic()
+    request = urllib.request.Request(base + "/v1/chat/completions", data=json.dumps(payload).encode(),
+                                     headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=600) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as exc:
+        raise ValueError(f'Model server rejected model {model} (HTTP {exc.code}): {exc.read(4096).decode("utf-8", errors="replace")}') from exc
+    choice = (result.get("choices") or [{}])[0] if isinstance(result, dict) else {}
+    content = (choice.get("message") or {}).get("content")
+    if not isinstance(content, str) or not content.strip() or choice.get("finish_reason") != "stop":
+        raise ValueError("Model server returned an empty, incomplete, or truncated answer.")
+    usage = result.get("usage") or {}
+    stats = {"prompt_eval_count": usage.get("prompt_tokens", 0), "eval_count": usage.get("completion_tokens", 0)}
+    record_progress('transport_completed', model=model, seconds=round(time.monotonic() - started, 6),
+                    **({'purpose': purpose} if purpose else {}), **stats)
+    return content.strip(), {**result, **stats, "done": True}
+
+
 def chat(endpoint, model, messages, max_output=4096, response_format=None, purpose=None):
     parsed = urlparse(endpoint)
     if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or parsed.scheme not in {"http", "https"}:
         raise ValueError("Only a loopback Ollama endpoint is permitted.")
-    url = f"{parsed.scheme}://{parsed.netloc}/api/chat"
+    base = f"{parsed.scheme}://{parsed.netloc}"
+    if server_kind(base) == "openai":
+        return _openai_chat(base, model, messages, max_output, response_format, purpose)
+    url = f"{base}/api/chat"
     payload = {"model": model, "messages": messages, "think": False, "stream": False,
                "options": {"temperature": 0, "num_ctx": 8192, "num_predict": max_output},
                # Keep the model resident between requests and jobs; reloading costs seconds.

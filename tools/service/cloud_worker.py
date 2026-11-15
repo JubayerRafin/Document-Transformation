@@ -227,6 +227,32 @@ def summarize_checks(result):
             'translation_errors':errors if type(errors) is int and errors>=0 else 0,
             'privacy_verification':'not_run' if not isinstance(privacy,dict) else 'passed' if privacy.get('passed') is True else 'failed'}
 
+PII_OVERRIDES=(('pii_endpoint','TRANSFORMX_PII_ENDPOINT'),('pii_model','TRANSFORMX_PII_MODEL'))
+
+
+def apply_pii_overrides(profile):
+    """Let the start script point PII at another loopback model server (vLLM) without
+    editing the config downloaded from the site."""
+    for key,name in PII_OVERRIDES:
+        if os.environ.get(name):profile[key]=os.environ[name]
+    return profile
+
+
+def pii_ready(profile,ollama_base=None,ollama_names=()):
+    """The configured PII model is served at the PII endpoint (Ollama or OpenAI-compatible).
+    ollama_base/ollama_names: the Ollama server preflight already listed, reused when PII is there."""
+    model=profile.get('pii_model','qwen3.5:9b')
+    endpoint=profile.get('pii_endpoint','http://127.0.0.1:11434/v1').rstrip('/')
+    base=endpoint[:-3] if endpoint.endswith('/v1') else endpoint
+    if base==ollama_base:return model in ollama_names or model+':latest' in ollama_names
+    try:
+        from transformation.workflows import check_models
+        check_models('PII only',pii_model=model,pii_endpoint=endpoint)
+        return True
+    except Exception:
+        return False
+
+
 def preflight(cfg):
     """Advertise installed prerequisites, not a claim that inference was GPU-verified."""
     capabilities={'ready':False,'operations':[],'gpu':'','models':[],'note':''}
@@ -243,7 +269,7 @@ def preflight(cfg):
             names=[m['name'] for m in json.load(response).get('models',[])]
         capabilities['models']=names[:20]
         if 'translategemma:12b' in names:capabilities['operations'].append('translation')
-        if 'qwen3.5:9b' in names:capabilities['operations'].append('pii')
+        if pii_ready(cfg['engine_profile'],endpoint,names):capabilities['operations'].append('pii')
         if len(capabilities['operations'])==2:capabilities['operations'].append('combined')
         if capabilities['operations']:capabilities['operations'].append('manual_redaction')
         capabilities['ready']=bool(capabilities['operations'])
@@ -324,6 +350,23 @@ def execute(cfg,j,root):
     metrics['redaction_map']=redaction_map(result.get('redaction_map'),pages)
     deliver(cfg,j,output.read_bytes(),metrics)
 
+def keep_ocr_warm(session):
+    """Between jobs, keep the persistent OCR service and its models loaded.
+
+    The service exits after idle_seconds without a request, and the next job would then
+    wait for its models to load (seconds per job with any OCR). A health request counts as
+    activity, so a periodic check keeps it alive; a service that did exit is started again
+    and warmed before the next job arrives.
+    """
+    if not session:return
+    pid=session.process.pid if session.process else None
+    try:session.ensure(busy_wait=30)
+    except Exception:
+        print('OCR session check failed; the next job reports the problem.',flush=True);return
+    if session.process and session.process.pid!=pid:
+        from transformation.ocr.service import prewarm
+        prewarm(session.root/'prewarm')
+
 def _run(args,cfg,root,ocr_session=None):
     lock=(root/'worker.lock').open('a+b');lock.write(b'0');lock.flush();lock.seek(0)
     if os.name=='nt':
@@ -335,6 +378,7 @@ def _run(args,cfg,root,ocr_session=None):
     while True:
         try:
             if time.monotonic()-last_check>45:
+                keep_ocr_warm(ocr_session)
                 state=preflight(cfg);rpc(cfg,'/worker/status',{'capabilities':state});last_check=time.monotonic()
                 print('Worker ready for: '+(', '.join(state['operations']) or 'none; prerequisites missing'),flush=True)
             j=rpc(cfg,'/worker/claim').get('job')
@@ -361,7 +405,7 @@ def _run(args,cfg,root,ocr_session=None):
 
 def run(args):
     cfg=json.loads(Path(args.config).read_text(encoding='utf8'));origin(cfg['url'])
-    profile=cfg.setdefault('engine_profile',{})
+    profile=apply_pii_overrides(cfg.setdefault('engine_profile',{}))
     for key in ('python','ocr_python'):profile.setdefault(key,sys.executable)
     run_limit(profile)
     enabled=profile.get('persistent_ocr',False)

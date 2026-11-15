@@ -199,3 +199,55 @@ class ReportingTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class KeepOcrWarmTests(unittest.TestCase):
+    def session(self, pids):
+        from unittest.mock import Mock
+        s = Mock(); s.root = __import__('pathlib').Path('root'); s.process = Mock(pid=pids[0])
+        def ensure(busy_wait=180): s.process = Mock(pid=pids[1])
+        s.ensure.side_effect = ensure
+        return s
+
+    def test_live_service_is_only_checked(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import keep_ocr_warm
+        s = self.session([7, 7])
+        with patch('transformation.ocr.service.prewarm') as warm: keep_ocr_warm(s)
+        s.ensure.assert_called_once(); warm.assert_not_called()
+
+    def test_restarted_service_is_warmed_before_the_next_job(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import keep_ocr_warm
+        s = self.session([7, 8])
+        with patch('transformation.ocr.service.prewarm') as warm: keep_ocr_warm(s)
+        warm.assert_called_once()
+
+    def test_a_failed_check_does_not_stop_the_worker(self):
+        from unittest.mock import Mock, patch
+        from tools.service.cloud_worker import keep_ocr_warm
+        s = Mock(); s.ensure.side_effect = RuntimeError('unresponsive')
+        with patch('transformation.ocr.service.prewarm') as warm: keep_ocr_warm(s)
+        warm.assert_not_called(); keep_ocr_warm(None)
+
+
+class PiiServerTests(unittest.TestCase):
+    def test_environment_points_pii_at_another_server_without_editing_the_config(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import apply_pii_overrides
+        profile = {'pii_endpoint': 'http://127.0.0.1:11434/v1'}
+        with patch.dict(os.environ, {'TRANSFORMX_PII_ENDPOINT': 'http://127.0.0.1:8000/v1', 'TRANSFORMX_PII_MODEL': 'm-fp8'}):
+            self.assertEqual(apply_pii_overrides(profile), {'pii_endpoint': 'http://127.0.0.1:8000/v1', 'pii_model': 'm-fp8'})
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(apply_pii_overrides({'pii_endpoint': 'x'}), {'pii_endpoint': 'x'})
+
+    def test_pii_is_ready_only_when_its_server_serves_the_model(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import pii_ready
+        listing = io.BytesIO(json.dumps({'data': [{'id': 'm-fp8'}]}).encode())
+        with patch.dict(os.environ, {'TRANSFORMX_OPENAI_COMPATIBLE': 'http://127.0.0.1:8000'}), \
+             patch('urllib.request.urlopen', return_value=listing) as call:
+            self.assertTrue(pii_ready({'pii_endpoint': 'http://127.0.0.1:8000/v1', 'pii_model': 'm-fp8'}))
+        self.assertTrue(call.call_args.args[0].endswith('/v1/models'))
+        with patch('urllib.request.urlopen', side_effect=OSError('down')):
+            self.assertFalse(pii_ready({'pii_endpoint': 'http://127.0.0.1:8000/v1', 'pii_model': 'm-fp8'}))

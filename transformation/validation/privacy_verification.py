@@ -84,6 +84,10 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options,languag
             # Replacement text the redaction itself wrote ([NAME], Person A) is not personal data.
             placeholders={_compact(i).casefold() for i in ignore if i}
             detected=[d for d in detected if not any(_compact(d.get('value','')).casefold() in p for p in placeholders)]
+            # The same shape rules as detection: a label next to a removed value ("API Key.")
+            # is not an identifier and must not trigger masking or a second check.
+            from transformation.validation.privacy import plausible
+            detected=[d for d in detected if plausible(d.get('value',''),d.get('category',''))]
             flagged=[r for r in regions if r.get('metadata',{}).get('requires_review')]
             with pymupdf.open(folder/'source.pdf') as rendered:
                 uncertain=[r['id'] for r in flagged if _could_hide_selected_value(r,values,rendered[0])]

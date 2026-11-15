@@ -221,10 +221,12 @@ def _ocr_rectangles(region, values, page=None, localization=None, renders=None):
     if boxes:
         tokens=list(re.finditer(r'\S+',text));result=[]
         for a,b in matches:
-            chosen=[box for token,box in zip(tokens,boxes) if token.start()<b and token.end()>a]
+            chosen=[(token,box) for token,box in zip(tokens,boxes) if token.start()<b and token.end()>a]
             if chosen:
-                union=chosen[0]
-                for box in chosen[1:]:union|=box
+                union=None
+                for token,box in chosen:
+                    box=_trim_to_span(box,token,a,b)
+                    union=box if union is None else union|box
                 result.append(union+(-.75,-.5,.75,.5))
         if len(result)==len(matches):
             record['localization']='pixel_word_gaps';return result
@@ -233,6 +235,38 @@ def _ocr_rectangles(region, values, page=None, localization=None, renders=None):
         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
     record['localization']='whole_line_fallback';record['label_preserved']=False
     return [pymupdf.Rect(region['bbox'])+(-1,-1,1,1)]
+
+
+def _clip_padding(base,padded,neighbours):
+    """Keep a padded OCR box out of the text lines directly above and below it.
+
+    The padding covers descenders and accents of the value's own line; on closely spaced
+    lines it would otherwise black out the bottom or top of a neighbouring line. Only the
+    padding is limited: the box never becomes smaller than the value's own line box.
+    """
+    padded=pymupdf.Rect(padded)
+    for n in neighbours:
+        n=pymupdf.Rect(n)
+        if n.is_empty or n.x1<=base.x0 or n.x0>=base.x1:continue
+        if n.y1<=base.y0+.25*base.height:padded.y0=max(padded.y0,min(base.y0,n.y1))
+        elif n.y0>=base.y1-.25*base.height:padded.y1=min(padded.y1,max(base.y1,n.y0))
+    return padded
+
+
+def _trim_to_span(box,token,a,b,margin=.75):
+    """Narrow a word box to the part of the word inside [a, b).
+
+    OCR may read a label and its value as one word ("Device:WP-0042"). The box then
+    covers only the value's characters, estimated from character positions and widened
+    by `margin` characters toward the rest of the word, so no part of the value stays
+    visible while most of the label does.
+    """
+    box=pymupdf.Rect(box);length=token.end()-token.start()
+    if length<=0 or (a<=token.start() and b>=token.end()):return box
+    step=box.width/length
+    left=box.x0+max(0,a-token.start()-margin)*step if a>token.start() else box.x0
+    right=box.x0+min(length,b-token.start()+margin)*step if b<token.end() else box.x1
+    return pymupdf.Rect(left,box.y0,max(right,left+step),box.y1)
 
 
 def _verified_word_rectangles(region,text,matches,words):
@@ -388,7 +422,8 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
                             # OCR boxes are tight to the text body; pad so descenders/accents
                             # inside the cleared image area are removed too (kept on the page).
                             pad=max(.5,.12*min(rect.height,rect.width))
-                            rect=(pymupdf.Rect(rect)+(-.5,-pad,.5,pad))&page.rect
+                            rect=_clip_padding(pymupdf.Rect(rect),(pymupdf.Rect(rect)+(-.5,-pad,.5,pad))&page.rect,
+                                               [r['bbox'] for r in text_regions({'units':[unit]}) if r['id']!=region['id'] and r.get('bbox')])
                         rect=rect*page.derotation_matrix
                         # Page coordinates start at the crop box corner; page.cropbox is
                         # measured from the media box, so compare with the crop box size.
