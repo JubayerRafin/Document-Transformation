@@ -145,3 +145,114 @@ class LabelledFormatTests(unittest.TestCase):
         self.assertTrue(all(format_ok(v, 'Phone numbers') for v in ('(365) 555-1153', '+44 20 7946 0321', '010-5550-9235')))
         self.assertFalse(format_ok('Nadia Kowalski, +44 20 7946 1226', 'Phone numbers'))
         self.assertTrue(format_ok('Ann Moor', 'Names'))
+
+
+class SentenceFragmentLabelTests(unittest.TestCase):
+    def test_a_sentence_fragment_before_a_colon_is_not_a_field_label(self):
+        from transformation.validation.pii_document import field_pairs, label_like
+        self.assertFalse(label_like('this)')); self.assertFalse(label_like('(Employee ID'))
+        self.assertTrue(label_like('Bank account (IBAN)')); self.assertTrue(label_like('Employee ID'))
+        units = [{'id': 'u', 'text': 'the engine SHOULD catch\nthis): employee Kim Min-jun, ID EMP-2024-8831, email k@x.example'}]
+        self.assertEqual(field_pairs(units, [], []), [])
+        units = [{'id': 'v', 'text': 'Bank account (IBAN): DE89 3704 0044 0532 0130 00'}]
+        self.assertEqual([(p['label'], p['value']) for p in field_pairs(units, [], [])], [('Bank account (IBAN)', 'DE89 3704 0044 0532 0130 00')])
+
+
+class FusedWordTests(unittest.TestCase):
+    def test_a_value_fused_with_its_label_gets_a_box_over_the_value_only(self):
+        import re
+        import pymupdf
+        from transformation.validation.value_redaction import _trim_to_span
+        text = 'Device:WP-0042 Owner'
+        token = next(re.finditer(r'\S+', text)); box = pymupdf.Rect(0, 0, 140, 10)   # 14 characters, 10 pt each
+        a = text.index('WP-0042'); trimmed = _trim_to_span(box, token, a, a + len('WP-0042'))
+        self.assertAlmostEqual(trimmed.x0, (7 - .75) * 10); self.assertEqual(trimmed.x1, 140)   # covers the value, not 'Device'
+        self.assertEqual(_trim_to_span(box, token, 0, 14), box)                                  # whole word stays whole
+        prefix = _trim_to_span(box, token, 0, 7)                                                  # value at the start of a word
+        self.assertEqual(prefix.x0, 0); self.assertAlmostEqual(prefix.x1, (7 + .75) * 10)
+
+    def test_redacting_a_fused_label_and_value_keeps_the_label_readable(self):
+        import pymupdf
+        from transformation.validation.value_redaction import redact_pdf
+        with pymupdf.open() as doc:
+            p = doc.new_page(width=300, height=80); p.insert_text((20, 40), 'Device:WP-0042', fontsize=14, fontname='cour')
+            png = p.get_pixmap(dpi=200).tobytes('png')
+        with pymupdf.open() as doc:
+            page = doc.new_page(width=300, height=80); page.insert_image(page.rect, stream=png); data = doc.tobytes()
+        region = {'id': 'u1:r1', 'kind': 'text', 'text': 'Device:WP-0042', 'bbox': [19, 28, 140, 44]}
+        ir = {'units': [{'id': 'u1', 'number': 1, 'regions': [region], 'ocr_folder': 'x'}]}
+        output, audit = redact_pdf(data, ir, [{'region_id': 'u1:r1', 'value': 'WP-0042', 'category': 'Identifiers'}])
+        self.assertEqual(audit[0]['localization'], 'pixel_word_gaps')
+        with pymupdf.open(stream=output, filetype='pdf') as doc:
+            label = doc[0].get_pixmap(clip=pymupdf.Rect(20, 30, 60, 42))     # 'Devic' area keeps its ink and paper
+            value = doc[0].get_pixmap(clip=pymupdf.Rect(90, 32, 135, 42))    # value area is black
+        self.assertGreater(max(label.samples), 200); self.assertLessEqual(max(value.samples), 12)
+
+
+class PaddingTests(unittest.TestCase):
+    def test_padding_stops_at_neighbouring_lines_but_never_shrinks_the_value(self):
+        import pymupdf
+        from transformation.validation.value_redaction import _clip_padding
+        base = pymupdf.Rect(10, 50, 100, 60); padded = base + (-.5, -2, .5, 2)
+        above, below, beside = [10, 39, 80, 49.2], [10, 60.8, 80, 70], [200, 48, 260, 62]
+        clipped = _clip_padding(base, padded, [above, below, beside])
+        self.assertEqual((clipped.y0, clipped.y1), (49.2, 60.8))          # padding limited by the lines above/below
+        self.assertEqual(_clip_padding(base, padded, [beside]), padded)   # a line beside it does not matter
+        tight = _clip_padding(base, padded, [[10, 40, 80, 52]])           # a neighbour overlapping the value's own box
+        self.assertLessEqual(tight.y0, base.y0)                           # the value's box is never cut
+
+
+class NameAndPunctuationTests(unittest.TestCase):
+    def test_a_name_with_digits_is_dropped_and_trailing_punctuation_trimmed(self):
+        data = pdf([(20, 40, 'Emergency contact: Lee Soo-jin, 010-9876-5432.'), (20, 80, 'Key on file: sk_live_4f9a-REDACT_ME.')])
+        region = lambda text: ([{'value': 'Lee Soo-jin, 010-9876-5432.', 'category': 'Names'}] if 'Lee' in text else []) + \
+                              ([{'value': 'sk_live_4f9a-REDACT_ME.', 'category': 'Identifiers'}] if 'sk_live' in text else [])
+        with patch('transformation.llm.ollama_native.chat', side_effect=stub(region=region, names=['Lee Soo-jin'])):
+            findings, _, _ = detect_document(data, {'units': [{'number': 1, 'regions': []}]}, ['Names', 'Phone numbers', 'Identifiers'],
+                                             'http://127.0.0.1:1/v1', 'm', True, workers=2)
+        values = {(f['value'], f['category']) for f in findings}
+        self.assertIn(('Lee Soo-jin', 'Names'), values); self.assertIn(('010-9876-5432', 'Phone numbers'), values)
+        self.assertNotIn(('Lee Soo-jin, 010-9876-5432.', 'Names'), values)
+        self.assertIn(('sk_live_4f9a-REDACT_ME', 'Identifiers'), values)
+        self.assertFalse(any(v.endswith('.') for v, _ in values))
+
+
+class FinalCheckShapeTests(unittest.TestCase):
+    def test_labels_and_dates_are_not_findings_at_the_final_check(self):
+        from transformation.validation.privacy import plausible
+        self.assertFalse(plausible('API Key.', 'Identifiers'))      # the label beside a removed key
+        self.assertFalse(plausible('Owner', 'Identifiers'))
+        self.assertFalse(plausible('2024-03-20', 'Identifiers'))
+        self.assertFalse(plausible('Kim 2', 'Names'))
+        self.assertTrue(plausible('sk_live_4f9a-REDACT_ME', 'Identifiers'))
+        self.assertTrue(plausible('172.16.5.114', 'Identifiers'))
+        self.assertTrue(plausible('Kim Min-jun', 'Names'))
+        self.assertTrue(plausible('1984-03-12', 'Dates of birth'))
+
+
+class BracketedAreaCodeTests(unittest.TestCase):
+    def test_bracketed_area_code_is_a_phone_pattern_without_the_model(self):
+        found = lambda t: [f['value'] for f in detect([{'id': 'a', 'text': t}], ['Phone numbers'], 'e', 'm', assist=False)]
+        self.assertEqual(found('reach me on (911) 555-5880. Thanks'), ['(911) 555-5880'])
+        self.assertEqual(found('(+1 312 555 0147)'), ['+1 312 555 0147'])
+        self.assertEqual(found('Invoice (2024) total 1,200'), [])
+        self.assertEqual(found('ref (A1) 555-5880'), [])
+
+
+class SoftWrapTests(unittest.TestCase):
+    def test_wraps_inside_a_sentence_become_spaces_and_fields_keep_their_breaks(self):
+        from transformation.validation.privacy import soft_wraps_as_spaces as flat
+        self.assertEqual(flat('Witkoff insisted progress had \nbeen made'), 'Witkoff insisted progress had  been made')
+        for kept in ('Full name: Ann Moor\nEmail: a@b.example', 'Jonathan \nPowell said', '정시우\n담당자'):
+            self.assertEqual(flat(kept), kept)
+
+    def test_model_sees_flat_text_and_findings_map_back_to_the_wrapped_source(self):
+        text = 'The case was argued by Ms. Ann \nmoor-Lindt, who said the review \nwas done.'
+        seen = []
+        def chat(endpoint, model, messages, max_output=0, response_format=None, purpose=None):
+            seen.append(json.loads(messages[1]['content'])['text'])
+            return json.dumps({'findings': [{'value': 'Ann moor-Lindt', 'category': 'Names'}]}), {}
+        with patch('transformation.llm.ollama_native.chat', side_effect=chat):
+            found = _semantic_proposals({'id': 'a', 'text': text}, text, ['Names'], 'e', 'm')
+        self.assertNotIn('\n', seen[0]); self.assertEqual(len(seen[0]), len(text))
+        self.assertEqual(found, [('Ann \nmoor-Lindt', 'Names', 'model_proposal')])

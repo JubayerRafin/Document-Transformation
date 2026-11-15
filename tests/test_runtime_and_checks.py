@@ -109,10 +109,10 @@ class DetectionConcurrencyTests(unittest.TestCase):
             with lock: active['now'] -= 1
             return json.dumps({'findings': [{'value': text.split()[-1], 'category': 'Names'}]}), {}
         # Long units are sent one per request, so these run concurrently.
-        regions = [{'id': f'r{i}', 'text': 'x ' * 600 + f'Signed by Person{i}'} for i in range(8)]
+        regions = [{'id': f'r{i}', 'text': 'x ' * 600 + f'Signed by Person{chr(65 + i)}'} for i in range(8)]
         with patch('transformation.llm.ollama_native.chat', side_effect=chat):
             findings = detect(regions, ['Names'], 'http://127.0.0.1:1/v1', 'm', True, workers=4)
-        self.assertEqual([f['value'] for f in findings], [f'Person{i}' for i in range(8)])
+        self.assertEqual([f['value'] for f in findings], [f'Person{chr(65 + i)}' for i in range(8)])
         self.assertGreater(active['max'], 1)
 
 

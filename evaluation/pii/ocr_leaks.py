@@ -35,12 +35,13 @@ def main():
     from transformation.remote_pipeline import connection
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('set_dir'); ap.add_argument('label'); ap.add_argument('names', nargs='*')
-    ap.add_argument('--host', required=True); ap.add_argument('--port', type=int, required=True)
+    ap.add_argument('--host'); ap.add_argument('--port', type=int)
     ap.add_argument('--key', default='~/.ssh/id_ed25519')
+    ap.add_argument('--local', action='store_true', help='run on the GPU server itself (no SSH)')
     args = ap.parse_args()
     set_dir = Path(args.set_dir).resolve()
     key = json.loads((set_dir / 'answer_key.json').read_text(encoding='utf-8'))
-    ssh, scp, target = connection({'host': args.host, 'port': args.port, 'key': args.key})
+    if not args.local: ssh, scp, target = connection({'host': args.host, 'port': args.port, 'key': args.key})
     with tempfile.TemporaryDirectory(prefix='pii-ocr-') as temp:
         temp = Path(temp); pages = temp / 'pages'; pages.mkdir(); docs = {}
         for name, spec in key.items():
@@ -56,15 +57,21 @@ def main():
                 docs[name] = len(pdf)
         if not docs: print('nothing to check'); return
         (pages / 'run_ocr.py').write_text(POD_SCRIPT, encoding='utf-8')
-        with tarfile.open(temp / 'pages.tar', 'w') as tar: tar.add(pages, arcname='pages')
-        remote = '/workspace/eval-ocr/' + uuid.uuid4().hex
-        subprocess.run([*ssh, f'mkdir -p {remote}'], check=True)
-        subprocess.run([*scp, str(temp / 'pages.tar'), f'{target}:{remote}/pages.tar'], check=True)
-        subprocess.run([*ssh, f'cd {remote} && tar -xf pages.tar && /workspace/paddle-env/bin/python pages/run_ocr.py pages'],
-                       check=True, timeout=3600)
-        subprocess.run([*scp, f'{target}:{remote}/pages/ocr.json', str(temp / 'ocr.json')], check=True)
-        subprocess.run([*ssh, f'rm -rf {remote}'], check=False)
-        texts = json.loads((temp / 'ocr.json').read_text(encoding='utf-8'))
+        if args.local:
+            subprocess.run(['/workspace/paddle-env/bin/python', str(pages / 'run_ocr.py'), str(pages)], check=True, timeout=3600)
+            texts = json.loads((pages / 'ocr.json').read_text(encoding='utf-8'))
+        else:
+            texts = None
+        if texts is None:
+            with tarfile.open(temp / 'pages.tar', 'w') as tar: tar.add(pages, arcname='pages')
+            remote = '/workspace/eval-ocr/' + uuid.uuid4().hex
+            subprocess.run([*ssh, f'mkdir -p {remote}'], check=True)
+            subprocess.run([*scp, str(temp / 'pages.tar'), f'{target}:{remote}/pages.tar'], check=True)
+            subprocess.run([*ssh, f'cd {remote} && tar -xf pages.tar && /workspace/paddle-env/bin/python pages/run_ocr.py pages'],
+                           check=True, timeout=3600)
+            subprocess.run([*scp, f'{target}:{remote}/pages/ocr.json', str(temp / 'ocr.json')], check=True)
+            subprocess.run([*ssh, f'rm -rf {remote}'], check=False)
+            texts = json.loads((temp / 'ocr.json').read_text(encoding='utf-8'))
     for name, count in docs.items():
         result = {'pages': {str(n): texts.get(f'{name}__{n}', '') for n in range(1, count + 1)}}
         (set_dir / 'runs' / args.label / name / 'output-ocr.json').write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding='utf-8')

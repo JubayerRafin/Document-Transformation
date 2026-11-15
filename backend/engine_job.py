@@ -32,7 +32,7 @@ def main():
     if cfg.get('execution_remote'):options['execution_remote']=cfg['execution_remote']
     else:
         options=local_cache_options(options,cfg,folder)
-        for key in ('python','ocr_python','translation_endpoint','pii_endpoint'):
+        for key in ('python','ocr_python','translation_endpoint','pii_endpoint','pii_model'):
             if key in cfg:options[key]=cfg[key]
     probe=options.pop('performance_probe',False)
     if type(probe) is not bool:raise ValueError('performance_probe must be boolean.')

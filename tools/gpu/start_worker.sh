@@ -24,6 +24,40 @@ if ! curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
 fi
 curl -fsS http://127.0.0.1:11434/api/version >/dev/null || { echo "Ollama did not start; see /workspace/ollama.log."; exit 1; }
 
+# A dedicated GPU keeps the model loaded: every engine request sends this keep-alive, so the
+# default 30 minutes would unload it after a quiet period and the next job would wait ~90 s.
+export TRANSFORMX_OLLAMA_KEEP_ALIVE="${TRANSFORMX_OLLAMA_KEEP_ALIVE:--1h}"
+
+# PII on vLLM when it is installed (tools/gpu/setup_vllm.sh): the same Qwen3.5-9B model in FP8,
+# with parallel decoding about ten times faster than Ollama for this model (measured 2026-11-15:
+# 2.8 s/page instead of 12.6 s on the 52-document set). TRANSFORMX_PII_SERVER=ollama keeps Ollama.
+vllm="${TRANSFORMX_VLLM:-/workspace/vllm-env/bin/vllm}"
+vllm_model="${TRANSFORMX_VLLM_MODEL:-/workspace/models/qwen3.5-9b-fp8}"
+vllm_name=qwen3.5-9b-fp8
+if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$vllm_model/config.json" ]; then
+  if ! curl -fsS http://127.0.0.1:8000/v1/models >/dev/null 2>&1; then
+    # Loopback only. The share of GPU memory leaves room for PaddleOCR; MTP drafts tokens ahead
+    # (lossless with greedy decoding) for about 1.5x faster answers.
+    nohup env PATH="$(dirname "$vllm"):$PATH" "$vllm" serve "$vllm_model" --served-model-name "$vllm_name" \
+      --host 127.0.0.1 --port 8000 --max-model-len 8192 --max-num-seqs 32 --enable-prefix-caching \
+      --gpu-memory-utilization "${TRANSFORMX_VLLM_GPU_SHARE:-0.68}" --limit-mm-per-prompt '{"image":0,"video":0}' \
+      --speculative-config '{"method":"mtp","num_speculative_tokens":2}' > /workspace/vllm.log 2>&1 &
+    echo "Starting vLLM (first start compiles kernels, about 2 minutes)..."
+    for _ in $(seq 1 150); do curl -fsS http://127.0.0.1:8000/v1/models >/dev/null 2>&1 && break; sleep 2; done
+  fi
+  curl -fsS http://127.0.0.1:8000/v1/models >/dev/null || { echo "vLLM did not start; see /workspace/vllm.log."; exit 1; }
+  export TRANSFORMX_OPENAI_COMPATIBLE=http://127.0.0.1:8000
+  export TRANSFORMX_PII_ENDPOINT=http://127.0.0.1:8000/v1 TRANSFORMX_PII_MODEL="$vllm_name"
+  echo "PII model $vllm_name served by vLLM."
+else
+  model="${TRANSFORMX_PII_MODEL:-qwen3.5:9b}"
+  # Load and warm the model now, with the engine's exact context size (a different size reloads it),
+  # so the first customer job does not pay the model load and first-use GPU setup.
+  curl -fsS --max-time 300 http://127.0.0.1:11434/api/generate \
+    -d "{\"model\":\"$model\",\"prompt\":\"ok\",\"stream\":false,\"keep_alive\":\"$TRANSFORMX_OLLAMA_KEEP_ALIVE\",\"options\":{\"temperature\":0,\"num_ctx\":8192,\"num_predict\":1}}" \
+    >/dev/null && echo "Model $model loaded and warm." || echo "Model warm-up failed; the first job will load it."
+fi
+
 if pgrep -f "tools/service/cloud_worker.py run" >/dev/null; then
   echo "Worker already running (log: $log)."
   exit 0
