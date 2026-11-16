@@ -11,7 +11,7 @@ from transformation.remote_worker import server_options
 
 class PacingTests(unittest.TestCase):
     def test_invalid_rates_rejected_before_processing(self):
-        for value in (True,0,17,1.5,'8'):
+        for value in (True,0,65,1.5,'8'):
             with self.assertRaisesRegex(ValueError,'translation_qps'):
                 list(run_pdf(b'not a PDF','unseen.pdf',python=sys.executable,model='translategemma:12b',translation_qps=value))
 
@@ -73,6 +73,31 @@ class PacingTests(unittest.TestCase):
         module.onnxruntime.InferenceSession(b'model',sess_options=explicit)
         self.assertIs(runtime.InferenceSession.call_args.kwargs['sess_options'],explicit)
         self.assertEqual(runtime.SessionOptions.call_count,1)
+
+    def test_layout_model_moves_to_the_gpu_only_when_asked_and_available(self):
+        from types import SimpleNamespace
+        from transformation.pdf.layout_device import install
+        def module(providers):
+            runtime=MagicMock();runtime._transformx_layout_device=None
+            runtime.get_available_providers.return_value=providers
+            runtime.preload_dlls=MagicMock()
+            return SimpleNamespace(onnxruntime=runtime),runtime
+        gpu,runtime=module(['CUDAExecutionProvider','CPUExecutionProvider'])
+        with patch.dict('os.environ',{},clear=True):
+            self.assertIsNone(install(gpu))                      # not asked
+        with patch.dict('os.environ',{'TRANSFORMX_LAYOUT_DEVICE':'cuda'}):
+            cpu_only,_=module(['CPUExecutionProvider'])
+            self.assertIsNone(install(cpu_only))                 # no CUDA build installed
+            expected=[('CUDAExecutionProvider',{'cudnn_conv_algo_search':'HEURISTIC'}),'CPUExecutionProvider']
+            self.assertEqual(install(gpu),expected)
+            self.assertEqual(install(gpu),expected)  # once
+        gpu.onnxruntime.InferenceSession(b'model',providers=['CPUExecutionProvider'])
+        runtime.InferenceSession.assert_called_once_with(b'model',providers=expected)
+        # No room on the GPU: the session is built on the CPU instead of failing the job.
+        runtime.InferenceSession.reset_mock()
+        runtime.InferenceSession.side_effect=[RuntimeError('bfc_arena: Failed to allocate memory'),'cpu session']
+        self.assertEqual(gpu.onnxruntime.InferenceSession(b'model'),'cpu session')
+        self.assertEqual(runtime.InferenceSession.call_args.kwargs['providers'],['CPUExecutionProvider'])
 
     def test_review_archive_omits_only_work_files_and_preserves_server_data(self):
         import json,zipfile

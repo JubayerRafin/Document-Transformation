@@ -16,6 +16,17 @@ def checked_paths(message,root):
     return source,output
 
 
+def release_gpu_cache():
+    """Return Paddle's cached GPU blocks after each request. The loaded models stay; the cache grew
+    to 4.4 GB on a two-page document and stayed claimed while the translation model needed the GPU
+    (2026-11-16, combined jobs on a 24 GB card: the translation server ran out of memory)."""
+    import sys
+    paddle=sys.modules.get('paddle')
+    if paddle is None:return
+    try:paddle.device.cuda.empty_cache()
+    except Exception:pass  # a CPU-only build or an unavailable device has nothing to release
+
+
 def serve(path,root,parent,idle_seconds=300,processor=None):
     path=Path(path);root=Path(root).resolve();pool=ModelPool()
     if path.parent.stat().st_mode & 0o077:raise ValueError('OCR socket directory must be private.')
@@ -65,6 +76,7 @@ def serve(path,root,parent,idle_seconds=300,processor=None):
                         except OSError:pass
                     finally:
                         if timer:timer.cancel()
+                        release_gpu_cache()
                         last=time.monotonic()
     finally:
         stop.set();path.unlink(missing_ok=True)

@@ -1,0 +1,14 @@
+{#- Chat template for serving TranslateGemma from vLLM with exactly the prompt Ollama builds for
+    translategemma:12b (ollama show translategemma:12b --template): each message wrapped in Gemma
+    turn markers, the model turn opened after the last user message. The engine writes the full
+    translation instruction itself (transformation/llm/translategemma.py), so no other text is added. -#}
+{{- bos_token -}}
+{%- for message in messages -%}
+{%- if message['role'] in ['user', 'system'] -%}
+{{- '<start_of_turn>user\n' + message['content'] + '<end_of_turn>\n' -}}
+{%- if loop.last -%}{{- '<start_of_turn>model\n' -}}{%- endif -%}
+{%- elif message['role'] == 'assistant' -%}
+{{- '<start_of_turn>model\n' + message['content'] -}}
+{%- if not loop.last -%}{{- '<end_of_turn>\n' -}}{%- endif -%}
+{%- endif -%}
+{%- endfor -%}

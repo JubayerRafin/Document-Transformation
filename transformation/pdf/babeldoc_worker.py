@@ -1,6 +1,7 @@
 """Version-pinned BabelDOC integration hooks; no vendor files are modified."""
 import json
 import os
+import sys
 from pathlib import Path
 import runpy
 from types import SimpleNamespace
@@ -329,6 +330,23 @@ def inspect_table_cell_text(document, cells_by_page):
             })
 
     return records
+def resolve_cell_claims(candidates):
+    """One slot for a paragraph that several planned cells claim: [(cell_bbox, slot), ...].
+    A single claim stands. When the cells are nested (a merged cell around a smaller one, as the
+    table detector reports around masking boxes), the innermost cell wins. Otherwise None."""
+    if len(candidates) == 1:
+        return candidates[0][1]
+    def contains(outer, inner, tolerance=1.0):
+        return (outer[0] - tolerance <= inner[0] and outer[1] - tolerance <= inner[1]
+                and inner[2] <= outer[2] + tolerance and inner[3] <= outer[3] + tolerance)
+    area = lambda box: (box[2] - box[0]) * (box[3] - box[1])
+    ordered = sorted(candidates, key=lambda candidate: area(candidate[0]))
+    innermost = ordered[0][0]
+    if all(contains(cell, innermost) for cell, _ in ordered[1:]):
+        return ordered[0][1]
+    return None
+
+
 def plan_table_text_slots(cell_report, padding=1.0, gap=1.0):
     """Plan bounded text areas without modifying the document.
 
@@ -403,11 +421,45 @@ def plan_table_text_slots(cell_report, padding=1.0, gap=1.0):
             })
 
     return plans
+SHAPED_PARAGRAPHS = []
+
+
+def draw_shaped_paragraphs():
+    """Draw the paragraphs taken out before typesetting into the written single-language PDF."""
+    from transformation.llm.ollama_native import record_progress
+    from transformation.pdf.complex_script import draw
+    output = Path(sys.argv[sys.argv.index('--output') + 1])
+    written = sorted(output.glob('*.mono.pdf'))
+    if len(written) != 1:
+        raise RuntimeError(f'Expected one translated PDF to draw shaped text into, found {len(written)}.')
+    # BabelDOC's own Noto font (already downloaded for these languages) for the invisible text layer.
+    text_font = None
+    try:
+        from babeldoc.const import get_cache_file_path
+        candidate = get_cache_file_path('GoNotoKurrent-Regular.ttf', 'fonts')
+        text_font = candidate if candidate.exists() else None
+    except Exception:
+        pass
+    results = draw(written[0], SHAPED_PARAGRAPHS, text_font)
+    folder = os.environ.get('TRANSFORMX_RUN_DIR')
+    if folder:
+        Path(folder, 'complex-script-drawing.json').write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding='utf-8')
+    record_progress('complex_script_paragraphs', drawn=sum(r['status'] == 'drawn' for r in results), total=len(results))
+    if any(r['status'] != 'drawn' for r in results):
+        raise RuntimeError('Some translated paragraphs could not be drawn; see complex-script-drawing.json.')
+
+
 def main():
     from transformation.llm.ollama_native import record_progress
     record_progress('worker_hooks_starting')
     from transformation.pdf.layout_cpu import install as install_layout_cpu
     record_progress('worker_layout_cpu_policy', idle_spinning_disabled=install_layout_cpu())
+    from transformation.pdf.layout_device import install as install_layout_device
+    record_progress('worker_layout_device', providers=install_layout_device())
+    from transformation.pdf.babeldoc_speed import install as install_babeldoc_speed
+    record_progress('worker_babeldoc_setup_reuse', installed=install_babeldoc_speed())
+    from transformation.pdf.thin_glyphs import install as install_thin_glyphs
+    record_progress('worker_thin_glyph_lines', installed=install_thin_glyphs())
     from transformation.pdf.layout_service import install as install_layout_service
     install_layout_service()
     record_progress('worker_layout_service_ready', shared=bool(os.environ.get('TRANSFORMX_LAYOUT_SERVICE')))
@@ -536,20 +588,52 @@ def main():
         self._transformx_panel_slots = dict(PANEL_SLOTS)
         self._transformx_panel_fit_results = []
 
+        claims = {}
         for plan in plans:
             if plan["status"] != "planned":
                 continue
-
             for slot in plan["slots"]:
-                key = (plan["page"], slot["paragraph_id"])
-
-                if key in self._transformx_table_slots:
-                    raise RuntimeError(
-                        f"Ambiguous table-cell assignment: {key}"
-                    )
-
-                self._transformx_table_slots[key] = slot
+                claims.setdefault((plan["page"], slot["paragraph_id"]), []).append((plan["cell_bbox"], slot))
+        for key, candidates in claims.items():
+            slot = resolve_cell_claims(candidates)
+            if slot is None:
+                # Overlapping, non-nested cells (table lines detected twice, e.g. around masked
+                # values): leave this paragraph to BabelDOC's own layout rather than guess.
+                changes.append({"type": "ambiguous_table_cell_left_to_native_layout", "page": key[0], "paragraph_id": key[1]})
+                continue
+            self._transformx_table_slots[key] = slot
+        if folder:
+            Path(folder, "layout-adjustments.json").write_text(json.dumps(changes, indent=2), encoding="utf-8")
         self._transformx_table_slots.update(locked_slots)
+
+        # Text colours BabelDOC's parser lost (white table headers on a dark fill came out black).
+        from transformation.pdf.source_colours import restore as restore_source_colours
+        try:
+            for page_number, paragraph_id, colour in restore_source_colours(document, input_file):
+                changes.append({"type": "source_text_colour_restored", "page": page_number,
+                                "paragraph_id": paragraph_id, "colour": colour})
+        except Exception as error:  # a colour is never worth failing the document for
+            changes.append({"type": "source_text_colour_check_failed", "error": str(error)[:200]})
+        if folder:
+            Path(folder, "layout-adjustments.json").write_text(json.dumps(changes, indent=2), encoding="utf-8")
+
+        # Arabic/Hebrew/Indic paragraphs are drawn after the PDF is written, with shaping
+        # (transformation/pdf/complex_script.py); only for single-language output.
+        if '--no-dual' in sys.argv:
+            from transformation.pdf.complex_script import take, save_records
+            slots = {key: slot['bbox'] for source in (self._transformx_panel_slots, self._transformx_heading_slots,
+                                                      self._transformx_table_slots) for key, slot in source.items()}
+            taken = take(document, slots)
+            SHAPED_PARAGRAPHS.extend(taken)
+            # Fitting hooks skip these: they have no glyphs for BabelDOC and are drawn after the PDF is written.
+            self._transformx_shaped_keys = {(r['page'] + 1, r['paragraph_id']) for r in taken}
+            if folder and SHAPED_PARAGRAPHS: save_records(folder, SHAPED_PARAGRAPHS)
+
+            def fallback_draw(page, paragraph, box, folder=folder):
+                from transformation.pdf.complex_script import take_paragraph
+                SHAPED_PARAGRAPHS.append(take_paragraph(page, paragraph, box, reason='did_not_fit_slot'))
+                if folder: save_records(folder, SHAPED_PARAGRAPHS)
+            self._transformx_fallback_draw = fallback_draw
 
         try:
             result = original(self, document)
@@ -590,7 +674,12 @@ def main():
 
     try:
         record_progress('worker_vendor_starting')
-        runpy.run_module("babeldoc.main", run_name="__main__")
+        try:
+            runpy.run_module("babeldoc.main", run_name="__main__")
+        except SystemExit as exit_:
+            if exit_.code not in (None, 0): raise
+        if SHAPED_PARAGRAPHS and not TRANSLATION_FAILED.is_set():
+            draw_shaped_paragraphs()
     finally:
         if TRANSLATION_FAILED.is_set():
             raise RuntimeError(

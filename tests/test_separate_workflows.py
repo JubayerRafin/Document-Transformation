@@ -50,7 +50,7 @@ class WorkflowTests(unittest.TestCase):
 
     def test_gemma_retry_uses_original_literals_and_still_validates(self):
         prompts=[]
-        def response(endpoint,model,prompt):
+        def response(endpoint,model,prompt,max_output=4096):
             prompts.append(prompt[0]['content'])
             return ('잘못된 번역' if len(prompts)==1 else '연락처: maya@example.org'),{}
         with patch('transformation.llm.ollama_native.chat',side_effect=response):
@@ -118,17 +118,20 @@ class WorkflowTests(unittest.TestCase):
             def engine(data,filename,**options):
                 self.assertEqual(options['model'],'translategemma:12b')
                 self.assertNotIn('pii_model',options)
+                # The masking style and keep-visible list apply to redaction only.
+                self.assertNotIn('pii_style',options); self.assertNotIn('pii_keep',options)
                 with pymupdf.open(stream=data,filetype='pdf') as pdf: self.assertNotIn('maya@example.org',pdf[0].get_text())
                 self.assertNotIn('maya@example.org',json.dumps(options['external_context']))
                 output=engine_dir/'output.pdf'; output.write_bytes(data)
                 yield {'status':'generated','run_dir':str(engine_dir),'output_pdf':str(output)}
             with patch('transformation.pdf.document_runner.run_document',side_effect=engine):
-                last=list(run_workflow(fixture(),'a.pdf','Translation + PII',pii_categories=['Email addresses'],root=root/'jobs',table_strategy='native'))[-1]
+                last=list(run_workflow(fixture(),'a.pdf','Translation + PII',pii_categories=['Email addresses'],root=root/'jobs',table_strategy='native',
+                                       pii_style='label',pii_keep=['Acme Ltd']))[-1]
             self.assertEqual(last['status'],'generated',last.get('error'))
             self.assertEqual(last['models']['pii']['model'],'qwen3.5:9b')
 
     def test_gemma_uses_translation_template_and_exact_protection(self):
-        def response(endpoint,model,prompt):
+        def response(endpoint,model,prompt,max_output=4096):
             self.assertEqual(model,'translategemma:12b'); self.assertEqual(len(prompt),1)
             self.assertEqual(prompt[0]['role'],'user')
             source=prompt[0]['content'].split('\n\n\n',1)[1]

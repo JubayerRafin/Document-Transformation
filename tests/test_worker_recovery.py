@@ -234,12 +234,44 @@ class KeepOcrWarmTests(unittest.TestCase):
 class PiiServerTests(unittest.TestCase):
     def test_environment_points_pii_at_another_server_without_editing_the_config(self):
         from unittest.mock import patch
-        from tools.service.cloud_worker import apply_pii_overrides
+        from tools.service.cloud_worker import apply_profile_overrides
         profile = {'pii_endpoint': 'http://127.0.0.1:11434/v1'}
-        with patch.dict(os.environ, {'TRANSFORMX_PII_ENDPOINT': 'http://127.0.0.1:8000/v1', 'TRANSFORMX_PII_MODEL': 'm-fp8'}):
-            self.assertEqual(apply_pii_overrides(profile), {'pii_endpoint': 'http://127.0.0.1:8000/v1', 'pii_model': 'm-fp8'})
+        with patch.dict(os.environ, {'TRANSFORMX_PII_ENDPOINT': 'http://127.0.0.1:8000/v1', 'TRANSFORMX_PII_MODEL': 'm-fp8'}, clear=True):
+            self.assertEqual(apply_profile_overrides(profile), {'pii_endpoint': 'http://127.0.0.1:8000/v1', 'pii_model': 'm-fp8'})
         with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(apply_pii_overrides({'pii_endpoint': 'x'}), {'pii_endpoint': 'x'})
+            self.assertEqual(apply_profile_overrides({'pii_endpoint': 'x'}), {'pii_endpoint': 'x'})
+
+    def test_environment_points_translation_at_its_installed_environments(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import apply_profile_overrides
+        env = {'TRANSFORMX_BABELDOC_PYTHON': '/srv/babeldoc/bin/python', 'TRANSFORMX_ENGINE_PYTHON': '/srv/engine/bin/python'}
+        with patch.dict(os.environ, env, clear=True):
+            self.assertEqual(apply_profile_overrides({'ocr_python': '/srv/paddle/bin/python'}),
+                             {'ocr_python': '/srv/paddle/bin/python', 'python': '/srv/babeldoc/bin/python',
+                              'engine_python': '/srv/engine/bin/python'})
+
+    def test_environment_sets_translation_server_and_concurrency(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import apply_profile_overrides
+        env = {'TRANSFORMX_TRANSLATION_ENDPOINT': 'http://127.0.0.1:8010/v1', 'TRANSFORMX_TRANSLATION_WORKERS': '16',
+               'TRANSFORMX_TRANSLATION_QPS': '64'}
+        with patch.dict(os.environ, env, clear=True):
+            profile = apply_profile_overrides({'engine_options': {'table_strategy': 'auto', 'translation_qps': 8}})
+        self.assertEqual(profile['translation_endpoint'], 'http://127.0.0.1:8010/v1')
+        self.assertEqual(profile['engine_options'], {'table_strategy': 'auto', 'translation_qps': 64,
+                                                     'translation_workers': 16, 'ollama_parallelism': 16})
+
+    def test_translation_served_by_vllm_is_ready_without_ollama(self):
+        from unittest.mock import patch
+        from tools.service.cloud_worker import translation_ready
+        listing = io.BytesIO(json.dumps({'data': [{'id': 'translategemma:12b'}]}).encode())
+        profile = {'translation_endpoint': 'http://127.0.0.1:8010/v1'}
+        with patch.dict(os.environ, {'TRANSFORMX_OPENAI_COMPATIBLE': 'http://127.0.0.1:8000,http://127.0.0.1:8010'}), \
+             patch('urllib.request.urlopen', return_value=listing) as call:
+            self.assertTrue(translation_ready(profile, 'http://127.0.0.1:11434', []))
+        self.assertEqual(call.call_args.args[0], 'http://127.0.0.1:8010/v1/models')
+        self.assertTrue(translation_ready({}, 'http://127.0.0.1:11434', ['translategemma:12b']))   # Ollama default
+        self.assertFalse(translation_ready({}, 'http://127.0.0.1:11434', ['qwen3.5:9b']))
 
     def test_pii_is_ready_only_when_its_server_serves_the_model(self):
         from unittest.mock import patch

@@ -32,6 +32,38 @@ def failure_code(exc):
     return 'ENGINE_FAILED'
 
 
+FINAL_CHECK_ROUNDS=3
+
+
+def _engine_review_warnings(acceptance):
+    """Readable warnings for paragraphs the PDF engine delivered but flagged (transformation/pdf/runner.py)."""
+    acceptance=acceptance or {}
+    notes={'untranslated_paragraphs':'{} paragraph(s) stayed in the source language because every translation attempt changed a protected value; review them.',
+           'mixed_script_paragraphs':'{} paragraph(s) contain letters from a third writing system (for example Japanese kana in Korean text); review them.',
+           'shrunk_paragraphs':'{} paragraph(s) were drawn with a smaller font to fit their space; review them.'}
+    return [text.format(acceptance[key]) for key,text in notes.items() if isinstance(acceptance.get(key),int) and acceptance[key]>0]
+
+
+def _overlaps(a,b):
+    """Two final-check areas (page fractions) on the same page share some area."""
+    return (a['page']==b['page'] and a['x']<b['x']+b['width'] and b['x']<a['x']+a['width']
+            and a['y']<b['y']+b['height'] and b['y']<a['y']+a['height'])
+
+
+def _pii_memo_path(folder,run,data,ir,categories,model,assist,known_values):
+    """Where the PII answers for exactly these inputs are kept within one job (None: no memo).
+    Keyed on the document bytes, its extracted IR (with this sub-run's own folder name removed)
+    and the detection settings; any difference is a miss and the model is asked as usual."""
+    if not folder: return None
+    blob=json.dumps({'ir':ir,'categories':list(categories),'model':model,'assist':bool(assist),
+                     'known':known_values},sort_keys=True,default=str,ensure_ascii=False)
+    for name in sorted({json.dumps(str(run))[1:-1],json.dumps(run.as_posix())[1:-1]},key=len,reverse=True):
+        blob=blob.replace(name,'<run>')  # as written inside JSON strings (Windows backslashes are escaped)
+    key=hashlib.sha256(data+blob.encode()).hexdigest()
+    Path(folder).mkdir(parents=True,exist_ok=True)
+    return Path(folder)/(key+'.json')
+
+
 def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(),pii_assist=True,
                  visual_analysis=False,table_strategy='auto',translate=True,root=Path('runs/transformation'),**options):
     if not isinstance(data,(bytes,bytearray,memoryview)) or not len(data):
@@ -44,6 +76,11 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
     pii_workers=int(options.pop('pii_workers',8))
     known_values=list(options.pop('known_pii_values',()) or ())
     llm_metrics=bool(options.pop('llm_metrics',True))
+    # Figure sub-runs of a translation + PII job (transformation/ocr/pdf_assets.py): a first pass
+    # stops after PII detection and stores its answers here; the second pass reuses them, so the
+    # GPU switches between the PII and translation models once instead of twice per figure.
+    pii_memo=options.pop('pii_memo',None)
+    stop_after_pii=bool(options.pop('stop_after_pii',False))
     # Per-job masking style and values the customer wants kept visible. Read with get(), not pop(),
     # so figure sub-runs (which copy these options) apply the same policy.
     pii_style=options.get('pii_style') or 'box'
@@ -219,9 +256,17 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 # Per-call model timings (tokens, latency) for runtime analysis, scoped to this call.
                 previous_run_dir=os.environ.get('TRANSFORMX_RUN_DIR')
                 if llm_metrics:os.environ['TRANSFORMX_RUN_DIR']=str(run)
+                memo=_pii_memo_path(pii_memo,run,data,ir,pii_categories,pii_model,pii_assist,known_values)
                 try:
-                  findings,ir['pii_source_regions'],evidence=detect_document(data,ir,pii_categories,pii_endpoint,pii_model,pii_assist,
-                                                                           workers=pii_workers,known_values=known_values)
+                  if memo and memo.exists():
+                      findings,ir['pii_source_regions'],evidence=json.loads(memo.read_text(encoding='utf-8'))
+                      evidence['answers_reused_from_first_pass']=True
+                  else:
+                      findings,ir['pii_source_regions'],evidence=detect_document(data,ir,pii_categories,pii_endpoint,pii_model,pii_assist,
+                                                                               workers=pii_workers,known_values=known_values)
+                      if memo:
+                          try: memo.write_text(json.dumps([findings,ir['pii_source_regions'],evidence],ensure_ascii=False),encoding='utf-8')
+                          except (TypeError,ValueError,OSError): memo.unlink(missing_ok=True)  # no reuse; the second pass asks again
                 finally:
                   if llm_metrics and previous_run_dir is None:os.environ.pop('TRANSFORMX_RUN_DIR',None)
                   elif llm_metrics:os.environ['TRANSFORMX_RUN_DIR']=previous_run_dir
@@ -239,6 +284,8 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             else:
                 findings=detect(text_regions(ir),pii_categories,pii_endpoint,pii_model,pii_assist)
             save_json(run/'pii-findings.json',findings)
+            if stop_after_pii:
+                info.update(status='pii_detected'); yield emit('pii_detection'); return
             values=[f['value'] for f in findings]
             if kind=='pdf':
                 from transformation.validation.value_redaction import RedactionLocalizationError
@@ -300,9 +347,15 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                     native_ir['ocr_acceptance_blockers']=scan_blockers
                     save_json(run/'ocr-nativeized-ir.json',native_ir)
                 from transformation.pdf.document_runner import run_document
+                # The translation stage runs in BabelDOC's own process; on a shared GPU, hand the GPU
+                # to the translation server first (a no-op unless the start script enabled sharing).
+                from transformation.llm.gpu_share import ensure as gpu_for
+                gpu_for(endpoint)
                 work_options=dict(options,root=run/'engine',document_context=safe_context,translate=True)
                 if redact: work_options['protected_values']=list(options.get('protected_values',[]))+['[REDACTED]']
-                for key in ('translation_model','translation_endpoint','pii_model','pii_endpoint','ocr_cache_root'): work_options.pop(key,None)
+                # Masking style and keep-visible values apply to redaction above, not to the PDF runner.
+                for key in ('translation_model','translation_endpoint','pii_model','pii_endpoint','ocr_cache_root','pii_style','pii_keep'):
+                    work_options.pop(key,None)
                 from extraction.context_bridge import build,masked_context_ir
                 context_ir=masked_context_ir(native_ir if any(u.get('ocr_folder') for u in ir['units']) else ir,
                     [f['value'] for f in findings])
@@ -324,6 +377,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                     yield emit('translation_and_reconstruction')
                 if event['status']!='generated': raise RuntimeError(event.get('error','PDF engine failed.'))
                 processed=Path(event['output_pdf']).read_bytes(); info['engine_acceptance']=event.get('acceptance')
+                info['warnings'].extend(_engine_review_warnings(event.get('acceptance')))
                 engine_runs=[Path(event['run_dir'])]+[Path(p['run_dir']) for p in event.get('page_runs',[]) if p.get('run_dir')]
                 from transformation.pdf.ir_bridge import collect_translations
                 save_json(run/'ir-translations.json',collect_translations(context_ir,engine_runs))
@@ -478,26 +532,39 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 raise ValueError('Fresh output OCR found a selected sensitive value; the result is blocked.')
             # Safety net: personal data the detector missed but the final check found (for example
             # in a picture that could not be processed) is masked before release, listed for review,
-            # and the same pages are checked again. Anything still readable then blocks the result.
-            from transformation.validation.review_items import final_check_regions
+            # and the same pages are checked again. The model's answers on fresh OCR vary between
+            # runs, so a recheck can name a different line than the first check (seen 2026-11-16):
+            # that line is masked too and checked again, up to FINAL_CHECK_ROUNDS times. The result is
+            # blocked when a selected value is still readable, a found line is still readable after
+            # its mask, a finding cannot be located, or lines are still found after the last round.
+            from transformation.validation.review_items import final_check_regions,unlocated_findings
             found=final_check_regions(verification['reports'],pii_keep) if output_kind=='pdf' else []
-            if found:
+            masked_areas=[]
+            for round_number in range(1,FINAL_CHECK_ROUNDS+1):
+                if not found: break
                 from transformation.validation.manual_redaction import redact_regions
-                masked=run/'output'/'result-final-check.pdf'
+                suffix='' if round_number==1 else f'-{round_number}'
+                masked=run/'output'/f'result-final-check{suffix}.pdf'
                 redact_regions(destination,masked,[f['region'] for f in found],hashlib.sha256(artifact).hexdigest())
                 artifact=masked.read_bytes();destination.write_bytes(artifact)
+                masked_areas.extend(f['region'] for f in found)
                 info.setdefault('review_items',[]).extend(f['item'] for f in found)
                 info.setdefault('redaction_map',[]).extend(f['box'] for f in found)
-                info['final_check_masked']=len(found)
-                info['warnings'].append(f'{len(found)} line(s) with personal data found by the final privacy check were masked before release; review them.')
-                for verification in verify(artifact,output_kind,run/'final-check-recheck',all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,
+                info['final_check_masked']=info.get('final_check_masked',0)+len(found)
+                for verification in verify(artifact,output_kind,run/f'final-check-recheck{suffix}',all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,
                                            language=output_language,analyzed_texts=analyzed_texts,
                                            ignore=set(replacement_labels(findings,pii_style).values()),pages={f['region']['page'] for f in found}):
                     if 'reports' in verification: independent['rendered_privacy']=verification
-                save_json(run/'privacy-verification-after-masking.json',verification)
-                if any(p['known_residual_values'] or p['detected_pii'] for p in verification['reports']):
+                save_json(run/f'privacy-verification-after-masking{suffix}.json',verification)
+                found=final_check_regions(verification['reports'],pii_keep)
+                if (any(p['known_residual_values'] for p in verification['reports'])
+                        or unlocated_findings(verification['reports'],pii_keep)
+                        or any(_overlaps(f['region'],area) for f in found for area in masked_areas)
+                        or (found and round_number==FINAL_CHECK_ROUNDS)):
                     info['failure_code']='PRIVACY_CHECK_BLOCKED'
                     raise ValueError('Personal data was still readable after final-check masking; the result is blocked.')
+            if info.get('final_check_masked'):
+                info['warnings'].append(f"{info['final_check_masked']} line(s) with personal data found by the final privacy check were masked before release; review them.")
             if verification['passed']:
                 independent['ocr_checked_content']=[c for c in independent['uninspected_content'] if c['kind'] in {'image','raster'}]
                 independent['uninspected_content']=[c for c in independent['uninspected_content'] if c['kind'] not in {'image','raster'}]

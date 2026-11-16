@@ -27,13 +27,39 @@ def source_unit_spacing(source,target,values=()):
     return target
 
 
+def joined_separator_spacing(source,values=()):
+    """Comparison-only: a number broken by a stray space after its separator ("2024-03- 20", from
+    PDF text extraction) may come back joined ("2024-03-20"). Only digit-separator-space-digit is
+    joined; explicit protected spans are never changed. Returned document text is not rewritten."""
+    explicit=[(m.start(),m.end()) for value in values for m in re.finditer(re.escape(value),source)]
+    return re.sub(r'(?<=\d[-/.:])[ \t]+(?=\d)',
+                  lambda m:m.group() if any(a<m.end() and m.start()<b for a,b in explicit) else '',source)
+
+
+def split_compounds(source, target):
+    """Comparison-only: German and Dutch join a source word to a noun with a hyphen ("PDF file" ->
+    "PDF-Datei", "JPG sample" -> "JPG-Beispiel"). Such a compound is the source word plus a plain word,
+    not a new literal. Only applies when the first part is a whole word of the source, the second part
+    is letters only, and the joined form is not itself in the source. Returned text is not rewritten."""
+    def split(match):
+        head, tail = match.group(1), match.group(2)
+        if re.search(r'(?<![\w-])' + re.escape(head) + r'(?![\w-])', source) and match.group(0) not in source:
+            return head + ' ' + tail
+        return match.group(0)
+    return re.sub(r'(?<![\w-])([A-Za-z0-9]+)-([^\W\d_]{2,})(?![\w-])', split, target)
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
-    expected=literal_inventory(source,values)
-    actual=literal_inventory(source_unit_spacing(source,target,values),values)
     from transformation.llm.localized_numbers import permits_numeric_additions,permits_numeric_omissions
-    if not permits_numeric_omissions(source,target,expected-actual,values) or not permits_numeric_additions(source,target,actual-expected,values):
+    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,target,values)),values)
+    def preserved(source):
+        expected=literal_inventory(source,values)
+        return (permits_numeric_omissions(source,target,expected-actual,values)
+                and permits_numeric_additions(source,target,actual-expected,values))
+    joined=joined_separator_spacing(source,values)
+    if not preserved(source) and (joined==source or not preserved(joined)):
         raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.role_bindings import validate_bindings
     validate_bindings(source,target,values)

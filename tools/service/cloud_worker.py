@@ -32,7 +32,11 @@ class JobFailure(Exception):
 
 
 def spawn(command,**kwargs):
-    """Start a process in its own group so a timeout also stops OCR/BabelDOC children."""
+    """Start a process in its own group so a timeout also stops OCR/BabelDOC children.
+    With TRANSFORMX_PRELOAD=1 an engine job starts from a pre-loaded parent (its own session too)."""
+    from transformation.preload import enabled,popen
+    if enabled() and kwargs.get('stderr')==subprocess.STDOUT and kwargs.get('stdout') is not None:
+        return popen(command,kwargs.get('cwd'),kwargs['stdout'],kwargs.get('env'),start_new_session=True)
     if os.name=='nt':kwargs['creationflags']=subprocess.CREATE_NEW_PROCESS_GROUP
     else:kwargs['start_new_session']=True
     return subprocess.Popen(command,**kwargs)
@@ -227,30 +231,54 @@ def summarize_checks(result):
             'translation_errors':errors if type(errors) is int and errors>=0 else 0,
             'privacy_verification':'not_run' if not isinstance(privacy,dict) else 'passed' if privacy.get('passed') is True else 'failed'}
 
-PII_OVERRIDES=(('pii_endpoint','TRANSFORMX_PII_ENDPOINT'),('pii_model','TRANSFORMX_PII_MODEL'))
+PROFILE_OVERRIDES=(('pii_endpoint','TRANSFORMX_PII_ENDPOINT'),('pii_model','TRANSFORMX_PII_MODEL'),
+                   ('translation_endpoint','TRANSFORMX_TRANSLATION_ENDPOINT'),
+                   # Translation runs BabelDOC and the document engine in their own environments.
+                   ('python','TRANSFORMX_BABELDOC_PYTHON'),('engine_python','TRANSFORMX_ENGINE_PYTHON'))
+# Translation concurrency suited to the model server this machine runs (a vLLM server takes 16 parallel
+# requests; the site config's defaults suit Ollama).
+ENGINE_OPTION_OVERRIDES=(('translation_workers','TRANSFORMX_TRANSLATION_WORKERS'),
+                         ('ollama_parallelism','TRANSFORMX_TRANSLATION_WORKERS'),
+                         ('translation_qps','TRANSFORMX_TRANSLATION_QPS'))
 
 
-def apply_pii_overrides(profile):
-    """Let the start script point PII at another loopback model server (vLLM) without
-    editing the config downloaded from the site."""
-    for key,name in PII_OVERRIDES:
+def apply_profile_overrides(profile):
+    """Let the start script point the engine at what this server has installed (the vLLM PII and
+    translation servers, the translation environments) without editing the config downloaded from the site."""
+    for key,name in PROFILE_OVERRIDES:
         if os.environ.get(name):profile[key]=os.environ[name]
+    for key,name in ENGINE_OPTION_OVERRIDES:
+        if os.environ.get(name,'').isdigit():profile.setdefault('engine_options',{})[key]=int(os.environ[name])
     return profile
+
+
+OLLAMA_BASE='http://127.0.0.1:11434'
+
+
+def _served(workflow,model,endpoint,ollama_base,ollama_names):
+    endpoint=endpoint.rstrip('/')
+    base=endpoint[:-3] if endpoint.endswith('/v1') else endpoint
+    if base==ollama_base:return model in ollama_names or model+':latest' in ollama_names
+    try:
+        from transformation.workflows import check_models
+        if workflow=='PII only':check_models(workflow,pii_model=model,pii_endpoint=endpoint)
+        else:check_models(workflow,translation_model=model,translation_endpoint=endpoint)
+        return True
+    except Exception:
+        return False
 
 
 def pii_ready(profile,ollama_base=None,ollama_names=()):
     """The configured PII model is served at the PII endpoint (Ollama or OpenAI-compatible).
     ollama_base/ollama_names: the Ollama server preflight already listed, reused when PII is there."""
-    model=profile.get('pii_model','qwen3.5:9b')
-    endpoint=profile.get('pii_endpoint','http://127.0.0.1:11434/v1').rstrip('/')
-    base=endpoint[:-3] if endpoint.endswith('/v1') else endpoint
-    if base==ollama_base:return model in ollama_names or model+':latest' in ollama_names
-    try:
-        from transformation.workflows import check_models
-        check_models('PII only',pii_model=model,pii_endpoint=endpoint)
-        return True
-    except Exception:
-        return False
+    return _served('PII only',profile.get('pii_model','qwen3.5:9b'),
+                   profile.get('pii_endpoint','http://127.0.0.1:11434/v1'),ollama_base,ollama_names)
+
+
+def translation_ready(profile,ollama_base=None,ollama_names=()):
+    """The translation model (translategemma:12b) is served at the translation endpoint (Ollama or vLLM)."""
+    return _served('Translation only','translategemma:12b',
+                   profile.get('translation_endpoint','http://127.0.0.1:11434/v1'),ollama_base,ollama_names)
 
 
 def preflight(cfg):
@@ -263,13 +291,15 @@ def preflight(cfg):
         import pymupdf
         if not cuda_ready(cfg['engine_profile']):
             raise RuntimeError('GPU-enabled Paddle and an allocated CUDA device are required.')
-        endpoint=cfg['engine_profile'].get('translation_endpoint','http://127.0.0.1:11434/v1').rstrip('/')
-        endpoint=endpoint[:-3] if endpoint.endswith('/v1') else endpoint
-        with urlopen(endpoint+'/api/tags',timeout=15) as response:
-            names=[m['name'] for m in json.load(response).get('models',[])]
+        # Ollama's models (if it runs); each workflow's model may instead be served by vLLM.
+        try:
+            with urlopen(OLLAMA_BASE+'/api/tags',timeout=15) as response:
+                names=[m['name'] for m in json.load(response).get('models',[])]
+        except OSError:
+            names=[]
         capabilities['models']=names[:20]
-        if 'translategemma:12b' in names:capabilities['operations'].append('translation')
-        if pii_ready(cfg['engine_profile'],endpoint,names):capabilities['operations'].append('pii')
+        if translation_ready(cfg['engine_profile'],OLLAMA_BASE,names):capabilities['operations'].append('translation')
+        if pii_ready(cfg['engine_profile'],OLLAMA_BASE,names):capabilities['operations'].append('pii')
         if len(capabilities['operations'])==2:capabilities['operations'].append('combined')
         if capabilities['operations']:capabilities['operations'].append('manual_redaction')
         capabilities['ready']=bool(capabilities['operations'])
@@ -405,7 +435,7 @@ def _run(args,cfg,root,ocr_session=None):
 
 def run(args):
     cfg=json.loads(Path(args.config).read_text(encoding='utf8'));origin(cfg['url'])
-    profile=apply_pii_overrides(cfg.setdefault('engine_profile',{}))
+    profile=apply_profile_overrides(cfg.setdefault('engine_profile',{}))
     for key in ('python','ocr_python'):profile.setdefault(key,sys.executable)
     run_limit(profile)
     enabled=profile.get('persistent_ocr',False)

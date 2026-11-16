@@ -30,25 +30,9 @@ def _locations(data, ir):
     return places
 
 
-def _characters(text):
-    return ''.join(text.split()).casefold()
-
-
-def _read_alike(region):
-    """True when OCR flagged a line only over spacing or letter case: two recognition models
-    each read the line's characters confidently and every confident reading agrees with them.
-
-    OCR keeps such lines uncertain (an identifier's word boundaries matter for its own rules),
-    but PII detection already saw the right characters, so "unreadable" would be a false alarm.
-    A line with no text, no recorded readings or any differing character stays in the queue."""
-    meta = region.get('metadata', {})
-    key = _characters(region.get('text', ''))
-    if not key or meta.get('ocr_unreadable'): return False
-    readings = [c for c in meta.get('candidates', []) if isinstance(c, dict) and c.get('purpose') != 'redaction_geometry_only'
-                and isinstance(c.get('text'), str) and c['text'].strip() and isinstance(c.get('score'), (int, float))]
-    confident = [c for c in readings if c['score'] >= .85]
-    if any(_characters(c['text']) != key for c in confident): return False
-    return len({c.get('model') for c in confident if c.get('model')}) >= 2
+# A line flagged only over spacing or letter case was read correctly; PII detection saw the right
+# characters, so "unreadable" would be a false alarm (transformation/ocr/read_alike.py).
+from transformation.ocr.read_alike import read_alike as _read_alike
 
 
 def _value_boxes(page, region_bbox, value):
@@ -157,3 +141,19 @@ def final_check_regions(reports, keep=()):
             found.append({'region': area, 'item': dict(area, category=d['category'], reason='final_check', state='masked'),
                           'box': dict(area, category=d['category'], method='final_check')})
     return found
+
+
+def unlocated_findings(reports, keep=()):
+    """Personal data the final check found but final_check_regions cannot place on the page (no
+    box or no page size), leaving out values on the job's keep-visible list. These cannot be
+    masked, so they block the result."""
+    from transformation.validation.pii_document import split_kept
+    missing = []
+    for report in reports:
+        width, height = (report.get('page_size') or [0, 0])[:2]
+        detected, _ = split_kept([d for d in report.get('detected_pii', []) if d.get('value')], keep)
+        for d in detected:
+            box = d.get('bbox')
+            if not (width and height and box and box[2] > box[0] and box[3] > box[1]):
+                missing.append(d)
+    return missing

@@ -16,7 +16,20 @@ uv pip install --python /workspace/transformx-engine/bin/python torch torchvisio
 uv pip install --python /workspace/transformx-engine/bin/python -r requirements-deep-doc.txt 'docling-core==2.85.0' 'pymupdf==1.27.2.2' 'Pillow>=11,<13' 'python-docx>=1.1,<2' 'python-pptx>=1,<2'
 uv pip install --python /workspace/transformx-babeldoc/bin/python -r requirements-transformation.txt 'pymupdf==1.28.2'
 uv pip check --python /workspace/transformx-engine/bin/python
-uv pip check --python /workspace/transformx-babeldoc/bin/python
+# BabelDOC's page-layout model runs on the GPU with ONNX Runtime's CUDA build (BabelDOC's own "cuda"
+# extra; transformation/pdf/layout_device.py). Both builds provide the same module, so the CPU build is
+# removed; the dependency check then reports only that BabelDOC's default CPU requirement is absent.
+if nvidia-smi >/dev/null 2>&1; then
+  uv pip uninstall --python /workspace/transformx-babeldoc/bin/python onnxruntime 2>/dev/null || true
+  uv pip install --python /workspace/transformx-babeldoc/bin/python 'onnxruntime-gpu[cuda,cudnn]==1.22.0'
+  /workspace/transformx-babeldoc/bin/python -c "import onnxruntime as o; o.preload_dlls(); assert 'CUDAExecutionProvider' in o.get_available_providers(); print('Layout model: CUDA available')"
+  report=$(uv pip check --python /workspace/transformx-babeldoc/bin/python 2>&1) || {
+    echo "$report" | grep -q 'Found 1 incompatibility' && echo "$report" | grep -q 'requires `onnxruntime>=' \
+      || { echo "$report"; exit 1; }
+  }
+else
+  uv pip check --python /workspace/transformx-babeldoc/bin/python
+fi
 /workspace/transformx-babeldoc/bin/python -c 'from bitstring import BitStream; from babeldoc.format.pdf.document_il.backend.pdf_creater import PDFCreater; from babeldoc.docvision.doclayout import OnnxModel'
 test -x /workspace/paddle-env/bin/python || { echo 'Run the existing GPU Paddle setup first.'; exit 1; }
 /workspace/paddle-env/bin/python -c 'import paddle; assert paddle.is_compiled_with_cuda() and paddle.device.cuda.device_count()>0'

@@ -72,6 +72,9 @@ def install_table_fitting(Typesetting):
 
     def render_in_slot(self, paragraph, page, fonts):
         key = (page.page_number + 1, paragraph.debug_id)
+        if key in getattr(self, "_transformx_shaped_keys", ()):
+            # Drawn with shaping after the PDF is written (transformation/pdf/complex_script.py).
+            return None
         slot = getattr(self, "_transformx_table_slots", {}).get(key)
         heading = False
         panel = False
@@ -228,6 +231,15 @@ def install_table_fitting(Typesetting):
                 record.update(status='preserved_source_atomic_geometry',scale=1.0,
                               source_geometry_retained=True,translation_unchanged=True,
                               rendered_min_font_size=min(c.pdf_style.font_size for c in source_chars))
+                return
+
+            # A translation longer than the slot allows at the minimum size (French, Spanish and
+            # Portuguese table cells, 2026-11-16): draw it shrunk to fit its slot after the PDF is
+            # written (transformation/pdf/complex_script.py) instead of failing the document.
+            fallback = getattr(self, "_transformx_fallback_draw", None)
+            if fallback is not None and not paragraph.vertical:
+                fallback(page, paragraph, slot["bbox"])
+                record.update(status="drawn_shrunk_to_fit", requires_review=True)
                 return
 
             raise RuntimeError(

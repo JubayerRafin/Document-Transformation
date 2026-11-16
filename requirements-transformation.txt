@@ -2,3 +2,5 @@
 babeldoc==0.6.4
 # BabelDOC imports BitStream, removed in bitstring 5.
 bitstring==4.4.0
+# Searchable text layer for right-to-left paragraphs drawn with shaping (transformation/pdf/complex_script.py). LGPL, used unmodified.
+python-bidi==0.6.12
