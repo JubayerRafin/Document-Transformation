@@ -12,6 +12,29 @@ class TranslationGuardTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_candidate('Code AB-9912', 'AB-99120를 사용합니다.')
 
+    def test_german_compounds_with_a_source_word_are_not_new_literals(self):
+        validate_candidate('Upload the PDF file', 'Laden Sie die PDF-Datei hoch')
+        validate_candidate('Asset Report - Scanned JPG Sample', 'Bestandsbericht - Gescannte JPG-Beispiel')
+        validate_candidate('Device WP-0042 is online', 'Gerät WP-0042 ist online')          # existing code, unchanged
+        for changed in ('Gerät WP-0043 ist online', 'Gerät WP-Gerät ist online'):
+            with self.assertRaises(ValueError, msg=changed):
+                validate_candidate('Device WP-0042 is online', changed)
+        with self.assertRaises(ValueError):                  # a word not in the source does not make a compound
+            validate_candidate('Upload the file', 'Laden Sie die XYZ-Datei hoch')
+
+    def test_number_broken_by_a_stray_space_may_come_back_joined(self):
+        # PDF text extraction can leave "2024-03- 20"; the joined date is the same value.
+        source = 'Approved by: Ann Moor Date: 2031-05- 09'
+        validate_candidate(source, '승인자: Ann Moor 날짜: 2031-05-09')
+        validate_candidate(source, '승인자: Ann Moor 날짜: 2031-05- 09')  # kept as written is fine too
+        for changed in ('승인자: Ann Moor 날짜: 2031-05-10', '승인자: Ann Moor 날짜: 2031-0509',
+                        '승인자: Ann Moor 날짜: 2031-05-09-1'):
+            with self.assertRaises(ValueError, msg=changed):
+                validate_candidate(source, changed)
+        # An explicitly protected spaced value stays exact.
+        with self.assertRaises(ValueError):
+            validate_candidate('Ref 2031-05- 09', '참조 2031-05-09', values=['2031-05- 09'])
+
     def test_sentence_punctuation_does_not_change_numeric_literals(self):
         validate_candidate('Device: unit-0072 Owner: maya@example.org',
                            '장치: unit-0072, 소유자: maya@example.org.')

@@ -34,22 +34,74 @@ export TRANSFORMX_OLLAMA_KEEP_ALIVE="${TRANSFORMX_OLLAMA_KEEP_ALIVE:--1h}"
 vllm="${TRANSFORMX_VLLM:-/workspace/vllm-env/bin/vllm}"
 vllm_model="${TRANSFORMX_VLLM_MODEL:-/workspace/models/qwen3.5-9b-fp8}"
 vllm_name=qwen3.5-9b-fp8
+# TranslateGemma for vLLM (tools/gpu/setup_vllm.sh), served under the engine's model name.
+tg_model="${TRANSFORMX_TRANSLATION_VLLM_MODEL:-/workspace/models/translategemma-12b}"
+gpu_mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | head -1)
+# Each server gets the same absolute memory on any card (shares were tuned on a 24 GB RTX 4090).
+pii_share=$(awk -v m="${gpu_mib:-24564}" 'BEGIN{s=16800/m; if(s>0.68)s=0.68; printf "%.3f", s}')
+tg_share=$(awk -v m="${gpu_mib:-24564}" 'BEGIN{s=17400/m; if(s>0.71)s=0.71; printf "%.3f", s}')
+# Under 40 GB the two models do not fit together: each job stage gets the GPU in turn
+# (transformation/llm/gpu_share.py, vLLM sleep mode: about 1 s to switch).
+shared=0; [ "${gpu_mib:-0}" -lt 40000 ] && shared=1
+servers=""
+
+wait_for() {  # port, log
+  for _ in $(seq 1 150); do curl -fsS "http://127.0.0.1:$1/v1/models" >/dev/null 2>&1 && return 0; sleep 2; done
+  echo "vLLM on port $1 did not start; see $2."; exit 1
+}
+
 if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$vllm_model/config.json" ]; then
   if ! curl -fsS http://127.0.0.1:8000/v1/models >/dev/null 2>&1; then
-    # Loopback only. The share of GPU memory leaves room for PaddleOCR; MTP drafts tokens ahead
-    # (lossless with greedy decoding) for about 1.5x faster answers.
-    nohup env PATH="$(dirname "$vllm"):$PATH" "$vllm" serve "$vllm_model" --served-model-name "$vllm_name" \
+    [ "$shared" = 1 ] && curl -fsS -X POST "http://127.0.0.1:8010/sleep?level=1" >/dev/null 2>&1 || true
+    # Loopback only. MTP drafts tokens ahead (lossless with greedy decoding) for about 1.5x faster
+    # answers. Sleep mode (its endpoints need dev mode; loopback only) lets translation borrow the GPU.
+    nohup env PATH="$(dirname "$vllm"):$PATH" VLLM_SERVER_DEV_MODE=1 "$vllm" serve "$vllm_model" --served-model-name "$vllm_name" \
       --host 127.0.0.1 --port 8000 --max-model-len 8192 --max-num-seqs 32 --enable-prefix-caching \
-      --gpu-memory-utilization "${TRANSFORMX_VLLM_GPU_SHARE:-0.68}" --limit-mm-per-prompt '{"image":0,"video":0}' \
-      --speculative-config '{"method":"mtp","num_speculative_tokens":2}' > /workspace/vllm.log 2>&1 &
-    echo "Starting vLLM (first start compiles kernels, about 2 minutes)..."
-    for _ in $(seq 1 150); do curl -fsS http://127.0.0.1:8000/v1/models >/dev/null 2>&1 && break; sleep 2; done
+      --gpu-memory-utilization "${TRANSFORMX_VLLM_GPU_SHARE:-$pii_share}" --limit-mm-per-prompt '{"image":0,"video":0}' \
+      --speculative-config '{"method":"mtp","num_speculative_tokens":2}' --enable-sleep-mode > /workspace/vllm.log 2>&1 &
+    echo "Starting the PII model server (first start compiles kernels, about 2 minutes)..."
+    wait_for 8000 /workspace/vllm.log
   fi
-  curl -fsS http://127.0.0.1:8000/v1/models >/dev/null || { echo "vLLM did not start; see /workspace/vllm.log."; exit 1; }
-  export TRANSFORMX_OPENAI_COMPATIBLE=http://127.0.0.1:8000
+  servers=http://127.0.0.1:8000
   export TRANSFORMX_PII_ENDPOINT=http://127.0.0.1:8000/v1 TRANSFORMX_PII_MODEL="$vllm_name"
   echo "PII model $vllm_name served by vLLM."
-else
+fi
+
+if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$tg_model/config.json" ]; then
+  if ! curl -fsS http://127.0.0.1:8010/v1/models >/dev/null 2>&1; then
+    # Port 8010: RunPod images proxy 8001 to 8000. The PII server sleeps while this one claims memory.
+    [ "$shared" = 1 ] && curl -fsS -X POST "http://127.0.0.1:8000/sleep?level=1" >/dev/null 2>&1 || true
+    nohup env PATH="$(dirname "$vllm"):$PATH" VLLM_SERVER_DEV_MODE=1 "$vllm" serve "$tg_model" --served-model-name "translategemma:12b" \
+      --host 127.0.0.1 --port 8010 --quantization fp8 --max-model-len 4096 --max-num-seqs 32 --enable-prefix-caching \
+      --gpu-memory-utilization "${TRANSFORMX_TRANSLATION_GPU_SHARE:-$tg_share}" --limit-mm-per-prompt '{"image":0}' \
+      --chat-template "$app/tools/gpu/translategemma.jinja" --enable-sleep-mode > /workspace/vllm-translation.log 2>&1 &
+    echo "Starting the translation model server (about 2 minutes)..."
+    wait_for 8010 /workspace/vllm-translation.log
+    if [ "$shared" = 1 ] && [ -n "$servers" ]; then
+      curl -fsS -X POST "http://127.0.0.1:8010/sleep?level=2" >/dev/null && curl -fsS -X POST http://127.0.0.1:8000/wake_up >/dev/null
+    fi
+  fi
+  # Level 2 (#2): this server's weights are reloaded from disk on wake instead of being parked in
+  # pinned memory; two parked models exceeded a 41 GB pod's memory limit (gpu_share.py).
+  servers="${servers:+$servers,}http://127.0.0.1:8010#2"
+  # A vLLM translation server serves many requests at once (measured: 16 parallel calls).
+  export TRANSFORMX_TRANSLATION_ENDPOINT=http://127.0.0.1:8010/v1 TRANSFORMX_TRANSLATION_WORKERS=16 TRANSFORMX_TRANSLATION_QPS=64
+  echo "Translation model translategemma:12b served by vLLM."
+fi
+
+if [ -n "$servers" ]; then
+  plain="${servers//#2/}"   # addresses without the sleep-level marker
+  export TRANSFORMX_OPENAI_COMPATIBLE="$plain"
+  if [ "$shared" = 1 ]; then
+    for server in ${plain//,/ }; do
+      curl -fsS "$server/is_sleeping" >/dev/null 2>&1 || { echo "$server runs without sleep mode; stop it and run this script again."; exit 1; }
+    done
+    export TRANSFORMX_GPU_SWAP="$servers"
+    echo "Model servers share the GPU (${gpu_mib} MiB) and take turns on it."
+  fi
+fi
+
+if [ -z "${TRANSFORMX_PII_ENDPOINT:-}" ]; then
   model="${TRANSFORMX_PII_MODEL:-qwen3.5:9b}"
   # Load and warm the model now, with the engine's exact context size (a different size reloads it),
   # so the first customer job does not pay the model load and first-use GPU setup.
@@ -61,10 +113,25 @@ fi
 # Match the worker process itself (an interpreter running the script), not another command
 # that only mentions it, such as a remote shell started to run this script.
 worker_pattern='^[^ ]*python[0-9.]* (-u )?tools/service/cloud_worker[.]py run'
+# Translation runs BabelDOC and the document engine in the environments setup_full_pipeline.sh creates.
+if [ -x /workspace/transformx-babeldoc/bin/python ] && [ -x /workspace/transformx-engine/bin/python ]; then
+  export TRANSFORMX_BABELDOC_PYTHON=/workspace/transformx-babeldoc/bin/python
+  export TRANSFORMX_ENGINE_PYTHON=/workspace/transformx-engine/bin/python
+  # BabelDOC's page-layout model on the GPU when its CUDA build is installed (transformation/pdf/layout_device.py).
+  if "$TRANSFORMX_BABELDOC_PYTHON" -c "import onnxruntime as o, sys; sys.exit('CUDAExecutionProvider' not in o.get_available_providers())" 2>/dev/null; then
+    export TRANSFORMX_LAYOUT_DEVICE=cuda
+  fi
+fi
+# Engine and BabelDOC job processes start from pre-loaded parents (transformation/preload.py).
+export TRANSFORMX_PRELOAD="${TRANSFORMX_PRELOAD:-1}"
+
 if pgrep -f "$worker_pattern" >/dev/null; then
   echo "Worker already running (log: $log)."
   exit 0
 fi
+# A new worker loads the current code: stop pre-load servers left from a previous start.
+pkill -f '^[^ ]*python[0-9.]* -m transformation[.]preload ' 2>/dev/null || true
+rm -f /tmp/transformx-preload-"$(id -u)"/*.sock 2>/dev/null || true
 cd "$app"
 PYTHONPATH="$app" nohup "$python" -u tools/service/cloud_worker.py run --config "$config" > "$log" 2>&1 &
 for _ in $(seq 1 90); do

@@ -2,8 +2,10 @@
 own engine profile, and the job options the upload form sends. Run ON the pod from the app folder:
 
   /workspace/paddle-env/bin/python -m evaluation.pii.pod_samples <pdf_dir> <out_dir> [--style box] [--set KEY=VALUE]
+      [--operation pii|translation|combined] [--source en] [--target ko]
 
 Writes <out_dir>/<name>/{summary.json, findings/*.json, redacted.pdf, privacy-verification*.json}
+(output.pdf instead of redacted.pdf for translation and combined jobs)
 so only small files need to come back over a slow link.
 """
 import argparse, json, os, shutil, subprocess, sys, time
@@ -19,7 +21,10 @@ def main():
     ap.add_argument('--config', default=str(APP / 'configs/gpu.worker.local.json'))
     ap.add_argument('--set', action='append', default=[], metavar='KEY=VALUE',
                     help='override an engine-profile value, e.g. pii_endpoint=http://127.0.0.1:8000/v1 or engine_options.pii_workers=16')
+    ap.add_argument('--operation', default='pii', choices=['pii', 'translation', 'combined'])
+    ap.add_argument('--source', default='en'); ap.add_argument('--target', default='ko')
     args = ap.parse_args()
+    output_name = 'redacted.pdf' if args.operation == 'pii' else 'output.pdf'
     profile = json.loads(Path(args.config).read_text())['engine_profile']
     for item in args.set:
         key, _, value = item.partition('=')
@@ -41,7 +46,7 @@ def main():
             if folder.exists(): shutil.rmtree(folder)
             folder.mkdir(parents=True)
             source = folder / 'source.pdf'; source.write_bytes(pdf.read_bytes())
-            options = {'operation': 'pii', 'source_language': 'en', 'target_language': 'ko', 'output_format': 'pdf',
+            options = {'operation': args.operation, 'source_language': args.source, 'target_language': args.target, 'output_format': 'pdf',
                        'protected_values': [], 'document_context': '', 'pii_categories': CATEGORIES, 'pii_style': args.style}
             request = folder / 'request.json'
             request.write_text(json.dumps({'source': str(source), 'filename': pdf.name, 'options': options, 'profile': profile}))
@@ -49,8 +54,10 @@ def main():
             if session: session.ensure(); env['TRANSFORMX_OCR_SERVICE_PID'] = str(session.process.pid)
             started = time.monotonic()
             with (folder / 'process.log').open('w') as log:
-                subprocess.run([profile.get('engine_python', sys.executable), '-u', '-m', 'backend.engine_job', str(request),
-                                str(folder / 'events.jsonl'), str(folder / 'terminal.json')], cwd=APP, env=env, stdout=log, stderr=subprocess.STDOUT)
+                # Started like the site worker starts it (pre-loaded when TRANSFORMX_PRELOAD=1).
+                from transformation.preload import popen
+                popen([profile.get('engine_python', sys.executable), '-u', '-m', 'backend.engine_job', str(request),
+                       str(folder / 'events.jsonl'), str(folder / 'terminal.json')], APP, log, env).wait()
             seconds = time.monotonic() - started
             terminal = json.loads((folder / 'terminal.json').read_text()) if (folder / 'terminal.json').exists() else {}
             keep = out / pdf.stem
@@ -60,7 +67,7 @@ def main():
                 shutil.copy(f, keep / 'findings' / f'{i:02d}-{f.parent.name}.json')
             for name in ('privacy-verification.json', 'privacy-verification-after-masking.json', 'review-items.json', 'redaction-map.json'):
                 if (run / name).exists(): shutil.copy(run / name, keep / name)
-            if terminal.get('status') == 'generated' and terminal.get('output_file'): shutil.copy(terminal['output_file'], keep / 'redacted.pdf')
+            if terminal.get('status') == 'generated' and terminal.get('output_file'): shutil.copy(terminal['output_file'], keep / output_name)
             stages, last = [], None
             for line in (folder / 'events.jsonl').read_text().splitlines() if (folder / 'events.jsonl').exists() else []:
                 event = json.loads(line)
@@ -70,7 +77,7 @@ def main():
                        'server_seconds': terminal.get('seconds'), 'stages': stages, 'warnings': terminal.get('warnings', []),
                        'final_check_masked': terminal.get('final_check_masked', 0),
                        # Same fields as evaluation.pii.run, so evaluation.pii.score can read this folder too.
-                       'run_dir': str(run), 'output_file': str(keep / 'redacted.pdf') if terminal.get('status') == 'generated' else None}
+                       'run_dir': str(run), 'output_file': str(keep / output_name) if terminal.get('status') == 'generated' else None}
             (keep / 'summary.json').write_text(json.dumps(summary, indent=1))
             print(pdf.stem, summary['status'], summary['failure_code'] or '', round(seconds, 1), 's', flush=True)
 

@@ -10,7 +10,7 @@ class TranslationRecoveryTests(unittest.TestCase):
     def test_repeated_equation_markers_and_ids_stay_outside_model(self):
         source='Inspect {v1} using AB-81 then {v1}.'
         responses=iter(['검사', '사용', '다음'])
-        def chat(endpoint,model,prompt):
+        def chat(endpoint,model,prompt,max_output=4096):
             request=prompt[0]['content']
             self.assertNotIn('{v1}',request)
             self.assertNotIn('AB-81',request)
@@ -107,7 +107,7 @@ class TranslationRecoveryTests(unittest.TestCase):
             recovery_parts(' '.join(f'word {{v{i}}}' for i in range(25)))
 
     def test_successful_original_response_never_uses_recovery(self):
-        def response(endpoint,model,prompt):
+        def response(endpoint,model,prompt,max_output=4096):
             return prompt[0]['content'].split('\n\n\n')[-1].replace('Inspect','검사'),{}
         with patch('transformation.llm.ollama_native.chat',side_effect=response) as calls,patch(
                 'transformation.llm.translation_recovery.recover_literals') as recovery:

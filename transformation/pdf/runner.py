@@ -64,12 +64,14 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
     if sum(bool(v) for v in (ocr_python, ocr_recognition_dir, ocr_remote)) > 1:
         raise ValueError("Choose fresh OCR or saved OCR, not both.")
     validate_options(python, endpoint, source, target, translate, redact)
-    if isinstance(translation_qps,bool) or not isinstance(translation_qps,int) or not 1<=translation_qps<=16:
-        raise ValueError('translation_qps must be an integer from 1 to 16.')
-    if type(translation_workers) is not int or translation_workers not in {1,2,4}:
-        raise ValueError('translation_workers must be 1, 2 or 4.')
-    if type(ollama_parallelism) is not int or ollama_parallelism not in {1,2,4} or translation_workers>ollama_parallelism:
-        raise ValueError('Declare matching Ollama parallelism before enabling translation_workers.')
+    # Ollama serves a few requests at once; a vLLM translation server serves dozens, so the larger
+    # values are for that server (the model server's own parallelism is declared below).
+    if isinstance(translation_qps,bool) or not isinstance(translation_qps,int) or not 1<=translation_qps<=64:
+        raise ValueError('translation_qps must be an integer from 1 to 64.')
+    if type(translation_workers) is not int or translation_workers not in {1,2,4,8,16}:
+        raise ValueError('translation_workers must be 1, 2, 4, 8 or 16.')
+    if type(ollama_parallelism) is not int or ollama_parallelism not in {1,2,4,8,16} or translation_workers>ollama_parallelism:
+        raise ValueError('Declare matching model-server parallelism before enabling translation_workers.')
     protected_values = normalize_protected_values(protected_values)
     if not isinstance(document_context, str) or len(document_context) > 2000:
         raise ValueError("Document context must be text of at most 2000 characters.")
@@ -209,13 +211,18 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
             info['integration_version'] = 'generic-scan-regions-v7'
             save()
         with timed(run,'pdf_worker_execution'), (run / "process.log").open("w", encoding="utf-8") as log:
-            process = subprocess.Popen(command, cwd=Path(__file__).resolve().parents[2], stdout=log, stderr=subprocess.STDOUT, env=env)
+            # From a pre-loaded parent when the server enables it (skips BabelDOC's imports per job).
+            from transformation.preload import popen as preloaded_popen
+            process = preloaded_popen(command, Path(__file__).resolve().parents[2], log, env)
             info["status"] = "processing"
+            last_save = 0.0
             while process.poll() is None:
                 if time.monotonic() - started > timeout:
                     raise TimeoutError("Translation exceeded the run time limit.")
-                yield save()
-                time.sleep(1)
+                # Check often (a 1 s sleep cost up to a second per job), save progress once a second.
+                if time.monotonic() - last_save >= 1:
+                    yield save(); last_save = time.monotonic()
+                time.sleep(.1)
         if process.returncode:
             log_text = (run / "process.log").read_text(encoding="utf-8", errors="replace")
             if 'WinError 10061' in log_text or 'ConnectionRefusedError' in log_text:
@@ -260,6 +267,22 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
                 raise ValueError("Output page count differs from the source; review required.")
         log_text = (run / "process.log").read_text(encoding="utf-8", errors="replace")
         info.update(status="generated", output_pdf=str(result), structural_checks={"opens": True, "page_count_matches": True}, warnings={"babeldoc_warnings_present": "WARNING" in log_text, "translation_quality_validated": False, "table_translation_enabled": False, "image_text_translation_validated": False})
+        # Paragraphs left in the source language (every retry changed a protected value), paragraphs
+        # whose translation still mixes in a third script (for example Japanese kana inside Korean)
+        # and text drawn shrunk into a slot it did not fit: the document is delivered, flagged for review.
+        progress_file = run / "translation-progress.jsonl"
+        progress = progress_file.read_text(encoding="utf-8").splitlines() if progress_file.exists() else []
+        kept = sum('"translation_kept_source"' in line for line in progress)
+        mixed = sum('"foreign_script_kept"' in line for line in progress)
+        drawn_file = run / "complex-script-paragraphs.json"
+        shrunk = sum(r.get("reason") == "did_not_fit_slot" for r in json.loads(drawn_file.read_text(encoding="utf-8"))) if drawn_file.exists() else 0
+        if kept or shrunk or mixed:
+            info["warnings"].update(paragraphs_kept_in_source_language=kept, paragraphs_shrunk_to_fit=shrunk,
+                                    paragraphs_with_mixed_script=mixed)
+            acceptance = dict(info.get("acceptance") or {})
+            acceptance.update(status="requires_human_review", automatic_approval=False,
+                              untranslated_paragraphs=kept, shrunk_paragraphs=shrunk, mixed_script_paragraphs=mixed)
+            info["acceptance"] = acceptance
         save()
         from transformation.validation.quality import review_signals
         try:

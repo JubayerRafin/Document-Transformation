@@ -2,6 +2,7 @@
 
 Not PII redaction: uncertain regions retain the original source pixels.
 """
+from transformation.ocr.read_alike import reads_consistently
 import json
 import hashlib
 import math
@@ -261,7 +262,10 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 record['reason'] = 'Explicit correction: retain exact source pixels instead of uncertain transcription.'
                 records.append(record)
                 continue
-            if not correction and region.get('metadata', {}).get('requires_review', False):
+            # A line whose models agree on its characters (spacing and case aside, a minority of crop
+            # readings aside) was read reliably and is rebuilt like a confident line
+            # (transformation/ocr/read_alike.py).
+            if not correction and region.get('metadata', {}).get('requires_review', False) and not reads_consistently(region):
                 reason = 'Uncertain OCR or recognition variants disagree; preserve source, review transcription.'
             elif agreement < .75:
                 reason = 'Nonuniform background; preserve source artwork.'

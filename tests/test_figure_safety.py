@@ -50,6 +50,20 @@ class FinalCheckTests(unittest.TestCase):
         self.assertEqual(found[0]['box']['method'], 'final_check')
         self.assertNotIn('Bronwyn', str(found[0]['item']) + str(found[0]['box']))
 
+    def test_findings_that_cannot_be_placed_are_reported_unless_kept(self):
+        from transformation.validation.review_items import unlocated_findings
+        self.assertEqual([d['value'] for d in unlocated_findings([self.report])], ['no box'])
+        self.assertEqual(unlocated_findings([self.report], keep=['no box']), [])
+        no_size = dict(self.report, page_size=None, detected_pii=self.report['detected_pii'][:1])
+        self.assertEqual(len(unlocated_findings([no_size])), 1)
+
+    def test_a_recheck_finding_on_a_masked_area_counts_as_still_readable(self):
+        from transformation.pipeline import _overlaps
+        masked = {'page': 1, 'x': .2, 'y': .5, 'width': .3, 'height': .03}
+        self.assertTrue(_overlaps(dict(masked, x=.4), masked))
+        self.assertFalse(_overlaps(dict(masked, y=.6), masked))          # another line: masked next round
+        self.assertFalse(_overlaps(dict(masked, page=2), masked))
+
     def test_masking_removes_the_pixels_on_an_image_only_page(self):
         with pymupdf.open() as text_pdf:
             p = text_pdf.new_page(width=600, height=800); p.insert_text((125, 415), 'Bronwyn Fairbanks', fontsize=14)

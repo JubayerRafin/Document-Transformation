@@ -5,6 +5,54 @@ Prompt format: https://ollama.com/library/translategemma:12b
 from transformation.llm.protected_text import protect_values,restore_values,PlaceholderIntegrityError
 
 
+import unicodedata
+
+# Letters each target language is written in. Latin is always allowed (names, codes, brands), as is
+# any script already present in the source.
+_SCRIPTS = {'Latin': 'LATIN', 'Cyrillic': 'CYRILLIC', 'Greek': 'GREEK', 'Arabic': 'ARABIC', 'Hebrew': 'HEBREW',
+            'Devanagari': 'DEVANAGARI', 'Bengali': 'BENGALI', 'Thai': 'THAI', 'Hangul': 'HANGUL',
+            'Hiragana': 'HIRAGANA', 'Katakana': 'KATAKANA', 'Han': 'CJK UNIFIED'}
+TARGET_SCRIPTS = {'ko': {'Hangul', 'Han'}, 'zh': {'Han'}, 'ja': {'Hiragana', 'Katakana', 'Han'}, 'ar': {'Arabic'},
+                  'hi': {'Devanagari'}, 'bn': {'Bengali'}, 'en': set(), 'fr': set(), 'de': set(), 'es': set(), 'pt': set()}
+
+
+def _script(character):
+    name = unicodedata.name(character, '')
+    if 'HALFWIDTH KATAKANA' in name: return 'Katakana'
+    for script, prefix in _SCRIPTS.items():
+        if name.startswith(prefix) or (script == 'Han' and 'CJK' in name and 'IDEOGRAPH' in name): return script
+    return None
+
+
+def foreign_script(source, target, language):
+    """The name of a script whose letters appear in the translation but belong to neither the source
+    nor the target language (a Russian word inside a Bengali translation of English text, seen
+    2026-11-16), else ''. Unknown target languages are not checked."""
+    from transformation.pdf.runner import LANGUAGES
+    code = LANGUAGES.get(language, language)
+    if code not in TARGET_SCRIPTS: return ''
+    allowed = TARGET_SCRIPTS[code] | {'Latin'} | {_script(c) for c in source if c.isalpha()}
+    found = {_script(c) for c in target if c.isalpha()} - allowed - {None}
+    return ', '.join(sorted(found))
+
+
+CLOSING = '.!?。！？．।॥؟۔…:;'
+FULL_STOPS = '.。．।۔'
+
+
+def match_terminal_punctuation(source, target):
+    """TranslateGemma ends labels and headings with a full stop the source does not have ("Field" ->
+    "الحقل.", "ক্ষেত্র.", "앱 콘솔 화면 캡처."; seen across languages 2026-11-16). When the source ends
+    without closing punctuation, drop one added full stop of any script. Ellipses and everything
+    else stay as translated."""
+    body = target.rstrip(); trailing = target[len(body):]
+    stripped = source.rstrip()
+    if (not stripped or not body or stripped[-1] in CLOSING or body[-1] not in FULL_STOPS
+            or body.endswith(('..', '。。'))):
+        return target
+    return body[:-1].rstrip() + trailing
+
+
 def normalize_field_layout(source, target):
     """Restore one-line field layout only when the source proves its structure.
 
@@ -53,6 +101,17 @@ def messages(text,language,context='',source='en'):
     return [{'role':'user','content':header+text}]
 
 
+TRUNCATED=('Model server returned an empty, incomplete, or truncated answer.',  # vLLM (OpenAI API)
+           'Ollama returned an empty, incomplete, or truncated translation.')
+
+
+def answer_budget(text):
+    """Output tokens allowed for one translation: generous for any target script (a token covers
+    at least two characters of a translation about 1.5 times the source length), small enough that
+    a looping answer stops early."""
+    return min(4096,256+3*len(text))
+
+
 def translate(endpoint,model,text,language,protected=(),context='',source='en'):
     import hashlib,time
     from transformation.llm.ollama_native import chat,record_progress,needs_no_translation
@@ -95,6 +154,11 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         # A translation-specialized model may translate artificial markers.
         # Retry original source literals instead; validation remains exact.
         current=safe if attempt==1 else text
+        # BabelDOC's formula placeholder can swallow the separator before the next word
+        # ("HR-2024-{v1}Classification: Internal"); the model then keeps the English word. Show the
+        # model a word boundary there; validation still compares with the original text.
+        import re
+        current=re.sub(r'(\{v\d+\})(?=[^\W\d_])',r'\1 ',current)
         # Source relationships take precedence over optional background when
         # the model's bounded context budget truncates that background.
         import re
@@ -116,15 +180,33 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                 prompt[0]['content']=('Translate only the single isolated heading at the end of this request. '
                     'Return one line in the target language. Do not repeat the source heading, '
                     'add neighboring headings, background, lists or explanations.\n'+prompt[0]['content'])
-        result,stats=chat(endpoint,model,prompt)
+        # A translation is about as long as its source; a looping answer otherwise runs to the
+        # 4096-token cap (about 40 s, seen 2026-11-16 on a one-word label) before it is rejected.
+        try:
+            result,stats=chat(endpoint,model,prompt,max_output=answer_budget(text))
+        except ValueError as error:
+            if str(error) not in TRUNCATED: raise
+            if attempt==2: raise ValueError('Translation answer was empty or did not end (model loop).') from error
+            failure_reason='the previous answer did not end; return only the translation'
+            record_progress('validation_failed',source_sha256=digest,attempt=attempt,model=model,reason=str(error))
+            continue
         for key in totals: totals[key]+=stats.get(key,0)
         record_progress('request_completed',source_sha256=digest,attempt=attempt,model=model,
             seconds=round(time.monotonic()-start,2),prompt_tokens=stats.get('prompt_eval_count',0),output_tokens=stats.get('eval_count',0))
         try:
             restored=restore_values(result,tokens) if attempt==1 else result
             restored=normalize_field_layout(text,restored)
+            restored=match_terminal_punctuation(text,restored)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
+            stray=foreign_script(text,restored,language)
+            if stray and attempt==1:
+                raise ValueError(f'Translation contains {stray} text that is in neither the source nor the target language; '
+                                 'answer only in the target language.')
+            if stray:
+                # A second answer still mixes in another script: keep it (the literals are exact) and flag it.
+                record_progress('foreign_script_kept',source_sha256=digest,script=stray,model=model)
+                return restored,{**stats,**totals,'translation_backend':'translategemma','foreign_script_review_required':True}
             return restored,{**stats,**totals,'translation_backend':'translategemma'}
         except (PlaceholderIntegrityError,ValueError) as error:
             failure_reason=str(error)

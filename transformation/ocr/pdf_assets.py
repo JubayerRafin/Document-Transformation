@@ -104,6 +104,20 @@ def process(data,ir,run,translate,redact,categories,assist,options):
                 jobs.append({'unit':unit,'region':region,'box':box,'raster':raster,'payload':payload,'options':suboptions})
         workers=PII_FIGURE_WORKERS if (redact and not translate) else 1
         results={}
+        if translate and redact and len(jobs)>1:
+            # On a GPU shared by the PII and translation models (transformation/llm/gpu_share.py) each
+            # figure would switch models twice, and waking the translation model costs about 10 s
+            # (measured 2026-11-16, RTX 4090). First detect PII in every figure in parallel, keeping
+            # the answers for this job only; the figures' full runs below then reuse them.
+            memo=str(Path(run)/'figure-pii-memo')
+            for job in jobs: job['options']['pii_memo']=memo
+            with ThreadPoolExecutor(max_workers=max(1,min(PII_FIGURE_WORKERS,len(jobs)))) as pool:
+                futures=[pool.submit(_run_figure,job['payload'],run,translate,redact,categories,assist,
+                                     dict(job['options'],stop_after_pii=True)) for job in jobs]
+                for future in as_completed(futures):
+                    try: future.result()
+                    except Exception: pass  # the full run below detects again and reports any failure
+                    yield {'region_id':None,'progress':{'stage':'figure_pii_checked'}}
         if jobs:
             with ThreadPoolExecutor(max_workers=max(1,min(workers,len(jobs)))) as pool:
                 futures={pool.submit(_run_figure,job['payload'],run,translate,redact,categories,assist,job['options']):index
@@ -132,11 +146,16 @@ def apply_results(processed,jobs,results,translate,redact,reports):
                 reports.append({'region_id':region['id'],'status':'no_selected_values','source_preserved':True,
                                 'run_dir':event['run_dir'],'raster':raster})
                 continue
-            if event.get('engine_run',{}).get('source_pages_preserved_for_review'):
+            masked_here=redact and event.get('validation',{}).get('pii_findings')!=[]
+            if event.get('engine_run',{}).get('source_pages_preserved_for_review') and not masked_here:
                 reports.append({'region_id':region['id'],'status':'source_preserved_requires_review',
                                 'source_preserved':True,'run_dir':event['run_dir'],
                                 'reason':'No confidently translatable OCR text; source image retained.'})
                 continue
+            # With masking on, values selected in this image are masked only in the figure run's output:
+            # the page's own image still shows them (combined jobs mask figure text here). So even when
+            # its text could not be translated, the masked figure replaces the source (2026-11-16 fix).
+            untranslated=bool(event.get('engine_run',{}).get('source_pages_preserved_for_review'))
             with pymupdf.open(event['output_pdf']) as transformed:
                 placements=[]
                 for block in transformed[0].get_text('dict')['blocks']:
@@ -152,6 +171,7 @@ def apply_results(processed,jobs,results,translate,redact,reports):
                 page.add_redact_annot(box,fill=(1,1,1))
                 page.apply_redactions(images=2,graphics=2,text=0)
                 page.show_pdf_page(box,transformed,0,overlay=True)
-            reports.append({'region_id':region['id'],'status':'processed_requires_review','run_dir':event['run_dir'],
+            reports.append({'region_id':region['id'],'status':'masked_untranslated_requires_review' if untranslated
+                            else 'processed_requires_review','run_dir':event['run_dir'],
                             'raster':raster,'intended_text_placements':placements})
         return pdf.tobytes(garbage=4,deflate=True),reports

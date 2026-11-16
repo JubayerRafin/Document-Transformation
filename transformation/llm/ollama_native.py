@@ -88,6 +88,9 @@ def chat(endpoint, model, messages, max_output=4096, response_format=None, purpo
     if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or parsed.scheme not in {"http", "https"}:
         raise ValueError("Only a loopback Ollama endpoint is permitted.")
     base = f"{parsed.scheme}://{parsed.netloc}"
+    # On a GPU shared by several model servers, the one about to be called gets it (see gpu_share).
+    from transformation.llm.gpu_share import ensure
+    ensure(base)
     if server_kind(base) == "openai":
         return _openai_chat(base, model, messages, max_output, response_format, purpose)
     url = f"{base}/api/chat"
@@ -294,10 +297,26 @@ def _translate_paragraph(endpoint, model, text, language, protected_values=(), d
                 logger.info("Placeholder retry succeeded: source_sha256=%s", source_hash)
             return restored, {**stats, **totals}
 
-    except Exception:
+    except Exception as error:
+        if model.startswith('translategemma:') and validation_failure(error):
+            # Every retry changed a protected value (a number, code or name). Keep this paragraph in
+            # the source language, exact, and flag the run for review rather than failing the whole
+            # document for one paragraph. Server, timeout and configuration errors still fail it.
+            record_progress("translation_kept_source", source_sha256=hashlib.sha256(text.encode()).hexdigest(),
+                            reason=str(error)[:200])
+            return text, {"prompt_eval_count": 0, "eval_count": 0, "kept_source_requires_review": True}
         record_progress("translation_failed")
         TRANSLATION_FAILED.set()
         raise
+
+
+def validation_failure(error):
+    """True for a translation that failed the literal/placeholder/shape checks (not for an unreachable
+    server, a timeout or a configuration error)."""
+    if isinstance(error, PlaceholderIntegrityError): return True
+    message = str(error)
+    return isinstance(error, (ValueError, RuntimeError)) and (
+        message.startswith(('Translation ', 'Protected placeholder', 'PII response')) or message == 'TranslateGemma failed validation.')
 
 def install(endpoint, paragraph_mode=False, protected_values=(), document_context="", external_context=None,terminology=None):
     protected_values = normalize_protected_values(protected_values)

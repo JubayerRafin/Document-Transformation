@@ -56,7 +56,7 @@ class TranslationSegmentTests(unittest.TestCase):
     def test_long_adapter_requests_fit_and_final_literals_are_checked(self):
         text=' '.join('Inspect record AB-'+str(n)+'.' for n in range(150))
         # An echo is a transport/preservation fixture, not semantic approval.
-        def echo(endpoint,model,messages):
+        def echo(endpoint,model,messages,max_output=4096):
             payload=messages[0]['content'].rsplit('\n\n\n',1)[1]
             self.assertLessEqual(len(payload),1500)
             return payload,{'eval_count':2,'prompt_eval_count':3}

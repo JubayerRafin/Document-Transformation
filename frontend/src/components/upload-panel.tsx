@@ -27,6 +27,20 @@ import { Button } from "./ui/button";
 import { Label, Textarea } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+// The 11 languages the engine translates between (transformation/pdf/runner.py LANGUAGES).
+const LANGUAGES: [string, string][] = [
+  ["en", "English"],
+  ["ko", "Korean"],
+  ["ja", "Japanese"],
+  ["zh", "Chinese (Simplified)"],
+  ["ar", "Arabic"],
+  ["hi", "Hindi"],
+  ["bn", "Bengali"],
+  ["fr", "French"],
+  ["de", "German"],
+  ["es", "Spanish"],
+  ["pt", "Portuguese"],
+];
 export function UploadPanel({
   api,
   workers,
@@ -329,11 +343,18 @@ export function UploadPanel({
                     id="source-language"
                     className="select-input"
                     value={source}
-                    onChange={(e) => setSource(e.target.value)}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setSource(next);
+                      // Translating into the same language is never useful: move the target off it.
+                      if (next === target) setTarget(next === "en" ? "ko" : "en");
+                    }}
                   >
-                    <option value="en">English</option>
-                    <option value="ko">Korean</option>
-                    <option value="ja">Japanese</option>
+                    {LANGUAGES.map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </div>
                 <div className="field">
@@ -344,9 +365,11 @@ export function UploadPanel({
                     value={target}
                     onChange={(e) => setTarget(e.target.value)}
                   >
-                    <option value="ko">Korean</option>
-                    <option value="en">English</option>
-                    <option value="ja">Japanese</option>
+                    {LANGUAGES.filter(([code]) => code !== source).map(([code, name]) => (
+                      <option key={code} value={code}>
+                        {name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </m.div>

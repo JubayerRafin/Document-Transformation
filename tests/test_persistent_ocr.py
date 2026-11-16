@@ -120,4 +120,21 @@ class PersistentOCRTests(unittest.TestCase):
         self.assertEqual(report['peak_tree_rss_bytes'],123);self.assertEqual(report['peak_ocr_service_rss_bytes'],999)
 
 
+class GpuCacheReleaseTests(unittest.TestCase):
+    def test_paddle_cache_is_released_when_paddle_is_loaded_and_ignored_otherwise(self):
+        import sys
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock, patch
+        from tools.ocr.persistent_worker import release_gpu_cache
+        with patch.dict(sys.modules, {'paddle': None}):
+            sys.modules.pop('paddle'); release_gpu_cache()            # not loaded: nothing to do
+        empty = MagicMock()
+        with patch.dict(sys.modules, {'paddle': SimpleNamespace(device=SimpleNamespace(cuda=SimpleNamespace(empty_cache=empty)))}):
+            release_gpu_cache()
+        empty.assert_called_once_with()
+        broken = MagicMock(side_effect=RuntimeError('no CUDA device'))
+        with patch.dict(sys.modules, {'paddle': SimpleNamespace(device=SimpleNamespace(cuda=SimpleNamespace(empty_cache=broken)))}):
+            release_gpu_cache()                                       # CPU build: no error
+
+
 if __name__=='__main__':unittest.main()
