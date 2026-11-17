@@ -1,0 +1,16 @@
+{
+  "source_repository": "https://github.com/JubayerRafin/research_paper",
+  "source_snapshot": "runs/diagnostics/prior-stage1-source",
+  "commit": "not established; content pinned by SHA256",
+  "files": {
+    "docling_table_extractor.py": "c79994711c71c2b04fa098ba3ee2ecb5dd5f7ac8524a5355da29a3b3c3335ba5",
+    "extracted_element.py": "7a3050fc75290afa890c0e785eef8d42dd62b0508a290e8344190c7b0abd00ba",
+    "file_validator.py": "e7ec094496493d0abc0a98dc1c396b30ba34fc06fcbdec237a314e3cbb33a0d7",
+    "image_extractor.py": "224843201348ed8afc12fc64e0f20cce86dac2aa16306a87837c106cdcd5d0e6",
+    "markdown_compiler.py": "b827bf6815a52a48e8108e5daef3c4a2e57f5eaceb8ec91afd92ab5c623f9c99",
+    "pipeline.py": "aaf9259433149489f0a8c1357dda983134fea64020a24a2e5787ffc7a163a96d",
+    "table_extractor.py": "1f09bcefdef910d41c43e066dcdf636744537c5a44f074f04e9ea8ec1d388561",
+    "text_extractor.py": "fb13632b33ebe2082c171a77e8dacb9d5196461bfeca44767d9fd6b5bd2ff7bc",
+    "__init__.py": "ee79ee9fffa1fab17daca733b7217f2ef2dbb79c688da4227ce8173464248f40"
+  }
+}

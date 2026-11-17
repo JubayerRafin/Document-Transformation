@@ -1,0 +1,7 @@
+<section data-page="workers" hidden>
+ <div class="tx-heading"><div><p class="tx-eyebrow">YOUR COMPUTE</p><h1>GPU servers</h1><p>Connect RunPod, a university allocation or your own compatible NVIDIA server.</p></div></div>
+ <form id="worker-register-form"><label class="tx-field">Server name<input id="worker-name" required maxlength="100" placeholder="My university GPU"></label><button class="tx-primary" id="register-worker">Register private worker</button></form>
+ <div id="worker-onboarding" hidden class="tx-panel"><h3>Save your worker configuration</h3><p>This credential is shown once. Transfer it privately to the GPU server. Do not share it or upload it to Git.</p><button id="download-worker-config">Download private configuration</button><p>After installing this project and its engine dependencies on that server, run:</p><pre><code>python -m tools.service.cloud_worker run --config /path/to/gpu.worker.local.json</code></pre><p>University clusters: run the command inside an allocated GPU job, using your scheduler. This app does not bypass your institution's access rules.</p></div>
+ <div class="tx-tablewrap"><table><thead><tr><th>Server</th><th>Status</th><th>GPU / operations</th><th></th></tr></thead><tbody id="worker-rows"></tbody></table></div>
+ <p class="tx-note">Only your own workers are selectable. Offline jobs wait for that exact server. Running work is never automatically moved to another server. Readiness checks prerequisites; each job retains its own inference evidence.</p>
+</section>

@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm --prefix ../frontend run build && npm run build:studio && node ../tools/service/package_customer_frontend.mjs",
+    "build:studio": "python ../tools/service/build_cloud_frontend.py",
+    "test:frontend": "npm --prefix ../frontend run typecheck && npm --prefix ../frontend test",
+    "pretest": "npm run build",
+    "test": "node --test test/*.test.mjs",
+    "dev": "wrangler dev",
+    "predeploy": "npm run test:frontend && npm test",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {"wrangler": "^4.0.0"}
+}

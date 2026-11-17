@@ -1,0 +1,205 @@
+@import "tailwindcss";
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-destructive: var(--destructive);
+}
+:root {
+  color-scheme: dark;
+  --background: #07131f;
+  --foreground: #edf6fc;
+  --primary: #54c7f4;
+  --primary-foreground: #051a29;
+  --muted: #132d43;
+  --muted-foreground: #a9bfce;
+  --accent: #123c58;
+  --border: #29455c;
+  --input: #3b5f78;
+  --ring: #6bdcf6;
+  --destructive: #ffadba;
+}
+* {
+  box-sizing: border-box;
+}
+html {
+  scroll-behavior: smooth;
+}
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Inter, "Segoe UI", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled),
+a {
+  cursor: pointer;
+}
+button,
+select,
+input,
+textarea {
+  font: inherit;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+}
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+::selection {
+  background: #c9eafb;
+}
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+summary {
+  cursor: pointer;
+}
+dialog {
+  color: inherit;
+}
+svg {
+  flex-shrink: 0;
+}
+.skip-link {
+  position: fixed;
+  top: -80px;
+  left: 12px;
+  z-index: 100;
+  background: var(--foreground);
+  color: #111c24;
+  padding: 12px;
+}
+.skip-link:focus {
+  top: 12px;
+}
+.shell-width {
+  width: min(1180px, calc(100% - 64px));
+  margin-inline: auto;
+}
+.eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--primary);
+}
+.field {
+  display: grid;
+  gap: 9px;
+}
+.select-input {
+  height: 44px;
+  min-width: 0;
+  width: 100%;
+  border: 1px solid var(--input);
+  border-radius: 8px;
+  background: var(--background);
+  padding: 0 12px;
+  color: var(--foreground);
+  outline-offset: 3px;
+}
+.hero-wash {
+  background:
+    radial-gradient(ellipse at 85% 30%, #daf2fc 0, transparent 52%),
+    linear-gradient(180deg, #f8fcfe 0%, #ffffff 100%);
+}
+.paper-rule {
+  height: 5px;
+  border-radius: 2px;
+  background: #e6edf2;
+}
+.document-art {
+  box-shadow:
+    0 24px 70px -24px #0b5a8738,
+    0 2px 8px #17273209;
+}
+.fine-grid {
+  background-image:
+    linear-gradient(#b6d9ea22 1px, transparent 1px),
+    linear-gradient(90deg, #b6d9ea22 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.content-enter {
+  animation: appear 0.2s ease-out;
+}
+@keyframes appear {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pdf-frame {
+  height: 650px;
+  width: 100%;
+  border: 0;
+  background: #edf2f5;
+}
+.empty-illustration {
+  background: radial-gradient(circle, #dceef7 0, transparent 70%);
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+@media (max-width: 640px) {
+  .shell-width {
+    width: calc(100% - 36px);
+  }
+  .pdf-frame {
+    height: 450px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media(prefers-reduced-motion:no-preference){
+ .tx-workspace-view>div>section,.tx-workspace-view>div>aside{animation:tx-workspace-card .45s cubic-bezier(.22,1,.36,1) both}
+ .tx-workspace-view>div>:nth-child(2){animation-delay:75ms}
+ .tx-workspace-view>div>:nth-child(3){animation-delay:150ms}
+ button:not(:disabled){transition-property:color,background-color,border-color,box-shadow,transform;transition-duration:.18s}
+ button:not(:disabled):active{transform:scale(.98)}
+ @keyframes tx-workspace-card{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+}

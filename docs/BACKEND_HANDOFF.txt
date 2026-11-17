@@ -1,0 +1,157 @@
+TransformX Backend Development Handoff
+Purpose: give the backend teammate the current processing engine and a concrete integration contract so TransformX can become a hosted web application. This is a source code handoff dated 17 October 2026. An HTTP backend, database, durable queue and hosted frontend are not implemented in this snapshot.
+
+Keep the engine and replace the presentation layer
+
+Streamlit currently collects uploads, sets options and consumes a synchronous generator. The reusable entry point is transformation.workflows.run_workflow, with run_translation and run_pii convenience functions. The new service should call that entry point from an isolated worker, not import or execute transform_app.py or ui/transformx.py.
+
+Proposed stack: FastAPI for the HTTP API, a durable Redis backed queue such as Celery or RQ, PostgreSQL for job and artifact metadata, and private filesystem or object storage for documents. These are proposed backend choices, not existing project dependencies. Start with one document worker and serialize GPU requests until concurrency has been measured.
+
+Current verification and limitations
+
+Both the fallback and corrected Deep Doc translation batches generated all six PDFs. Table geometry F1 was 1.000 and image placement F1 was 0.966 at IoU 0.50 and 0.75. Layout quality did not materially improve; Sample01 still has uncertain OCR and Sample04 has unresolved image or layout findings. The six document PII GPU evaluation is pending. A new service must preserve these limitations and must not present generated output as approved.
+
+The PII teammate owns detector and redaction quality. The backend teammate owns upload and job APIs, isolation, persistence, access control, progress, downloads and deployment. Both reuse the same engine and IR contracts. Do not fork separate extraction implementations for the API and PII work.
+
+Code map and engine boundary
+Path | Use in the new service
+backend_examples/worker_adapter.py | Framework neutral reference adapter with tests; not an API server
+transformation/workflows.py | Independent operations and model defaults
+transformation/pipeline.py | Synchronous coordinator; emits progress and final manifest
+extraction/coordinator.py | Extraction routing and shared content IR
+extraction/deep_doc_adapter.py and deep_doc_stage1/ | Prior extraction integration with coverage and geometry guards
+extraction/figures.py | Render and mask figure candidates and assets
+transformation/ocr/ and tools/ocr/ | Paddle OCR transport, workers, caches and evidence
+transformation/llm/ | TranslateGemma and Qwen transports, prompts and protection
+transformation/pdf/ and layout/ | BabelDOC, scan reconstruction and text fitting
+transformation/validation/ | PII detection, redaction validation and output checks
+transformation/office/ | Native Office extraction and package reconstruction
+tools/evaluation/ and tests/ | Offline evaluations and regression coverage
+ui/ and transform_app.py | Current local UI; use only to understand existing controls
+
+The worker integration example
+
+from backend_examples.worker_adapter import EngineSettings, execute
+
+settings = EngineSettings(
+    run_root=SERVER_JOB_DIRECTORY,
+    babeldoc_python=SERVER_BABELDOC_PYTHON,
+    ocr_remote=SERVER_OCR_SETTINGS,
+)
+result = execute(upload_bytes, display_filename, validated_options,
+                 settings, emit=persist_progress, publish=store_artifact)
+
+SERVER_JOB_DIRECTORY must be allocated by the backend per job. persist_progress must durably store safe public events. store_artifact must copy or register a private artifact and return an opaque ID. The example does not implement these callbacks, authentication, scheduling, cancellation or database transactions. Validation in the example is a starting boundary, not complete upload security.
+
+Proposed API and client options
+backend_examples/openapi.proposed.json defines an initial contract. It is a proposal to implement, not an already deployed endpoint. Use multipart upload so binary documents do not have to be base64 encoded.
+
+Endpoint | Behavior to implement
+POST /v1/jobs | Validate file and JSON options; persist job; return 202 and job ID
+GET /v1/jobs/{job_id} | Owner scoped status, current stage, elapsed time and artifact IDs
+GET /v1/jobs/{job_id}/events | Authenticated SSE progress stream with persisted event sequence IDs
+GET /v1/jobs/{job_id}/artifacts/{artifact_id} | Authorized download of a registered artifact
+POST /v1/jobs/{job_id}/cancel | Record cancellation request; worker confirms terminal cancellation
+GET /health/live | Process liveness only; never claim model readiness
+
+Multipart options JSON example
+
+{
+  "operation": "translation",
+  "source_language": "en",
+  "target_language": "ko",
+  "output_format": "pdf",
+  "protected_values": [],
+  "document_context": "",
+  "pii_categories": []
+}
+
+operation is translation, pii or combined. Translation requires target_language. PII and combined require selected categories. The six exact category strings are Email addresses, Phone numbers, Names, Addresses, Identifiers and Bank accounts. Combined mode currently redacts before translation. Preserve manual names or values and document context fields for translation. They are not PII exemptions.
+
+The API must not accept engine paths, private keys, SSH hosts, endpoints, model download commands or arbitrary root directories from clients. Keep model selection and model service addresses under server configuration. Verify the actual file content and size, not just its filename. The example proposes a 50 MB upload bound and same format output; confirm those product choices before releasing the API.
+
+Begin acceptance testing with PDF to PDF, then enable DOCX to DOCX and PPTX to PPTX after their own tests. Existing cross format export is a prototype route and should not be advertised as fidelity equivalent. Public errors should use stable codes and a job ID; detailed traces and document text belong in private diagnostics.
+
+Jobs storage and progress
+A document can take several minutes and spawn OCR and BabelDOC subprocesses. HTTP requests should return quickly after durable enqueueing. Use a separate worker process; do not run the engine inline in an async route. FastAPI documents a heavier task queue approach for substantial background computation. Reference: https://fastapi.tiangolo.com/tutorial/background-tasks/
+
+Entity | Minimum fields
+Job | id, owner_id, operation, options snapshot, source hash, state, timestamps, engine run ID, attempt number
+Artifact | id, job_id, private storage key, type, size, hash, review status
+Job event | job_id, monotonic sequence, stage, elapsed seconds, public status
+Job attempt | job_id, attempt ID, worker, model digest, settings hash, private diagnostic location
+Review record | job_id, reviewer, independent findings, timestamp and acceptance decision
+
+Store PDFs, image assets and large IR files in private artifact storage. Store searchable metadata in PostgreSQL. Existing JSON manifests remain scientific and diagnostic evidence, not a replacement for a concurrent multiuser job database. Never serve the whole runs directory as static files.
+
+Service states:
+queued -> running -> succeeded | failed
+queued or running -> cancelling -> cancelled
+
+Quality state is separate:
+not_reviewed -> requires_review -> accepted | requires_revision
+
+Map the engine generated status to service succeeded only when the final artifact exists and has been registered. The engine can finish with unresolved validation findings. The worker example therefore always returns requires_review on success. A failed final engine event is a failure even when the generator returned normally; caught engine exceptions are represented by failed events.
+
+Add retries as new attempts with immutable input and settings provenance. Use idempotency keys for job submission and handle queue redelivery without publishing duplicate artifacts. Resume in the offline evaluation runner is not a durable web job retry protocol. A cancellation request is not proof that child processes or GPU inference stopped; implement scoped process ownership, timeouts and cleanup before exposing confirmed cancellation.
+
+Keep SSE and polling based on persisted events so browser refreshes and API restarts do not lose status. The engine does not report a reliable percent complete; display actual stage and elapsed time. Account for worker restarts and stale job leases.
+
+Runtime setup and deployment
+Install the engine first in a local Python 3.11 environment. Keep BabelDOC 0.6.4 isolated in its own environment. The API and worker dependencies should be pinned separately by the backend teammate; do not mix a web framework upgrade into the established BabelDOC environment.
+
+py -3.11 -m venv .venv-engine
+.\.venv-engine\Scripts\python.exe -m pip install -r requirements.txt -r requirements-deep-doc.txt
+
+py -3.11 -m venv .venv-babeldoc
+.\.venv-babeldoc\Scripts\python.exe -m pip install -r requirements-transformation.txt
+
+.\.venv-engine\Scripts\python.exe -m unittest tests.test_backend_adapter tests.test_separate_workflows -v
+
+requirements.txt currently contains Streamlit for the local UI. It can remain during engine reproduction. Split API and engine requirements only after import and regression tests demonstrate the correct dependencies. The API process should not import transformation.pipeline at startup if it does not need models or heavy extraction dependencies; let the worker own the engine environment.
+
+Models and OCR
+
+Translation uses translategemma:12b; PII uses qwen3.5:9b. tools/gpu/setup_transformx.sh installs Ollama, GPU PaddleOCR and model caches on a Linux pod. Translation and PII can share the GPU serially; GPU memory and throughput limits need measurement. The present engine validates loopback endpoints or SSH tunnels. It does not accept an arbitrary public remote Ollama URL. Hosting must preserve that boundary with colocated access or a managed private tunnel.
+
+The existing remote OCR worker executes via SSH and uses /workspace/paddle-env/bin/python. Configure these service owned credentials and worker paths. No SSH key or live pod address is in this package. A container deployment must install system PDF and image dependencies, supply the correct BabelDOC interpreter, mount persistent job storage and test on Linux; the current Windows workflow is not proof that Linux container deployment is complete.
+
+First hosted milestone
+
+Deploy one API service, one queue and one engine worker with persistent storage and one test user. Reproduce one PDF job through upload, progress and download before adding concurrent workers or autoscaling. Add TLS, owner checks, retention and deletion policies, request limits and worker isolation before accepting other users documents. Keep original documents and outputs out of public logs and source control.
+
+Implementation plan and handover checks
+Step | Deliverable
+1 | Reproduce engine tests and read the worker adapter and core workflows
+2 | Build FastAPI routes and strict request models from the proposed contract
+3 | Persist owner scoped jobs and artifacts; enqueue jobs durably
+4 | Implement worker callbacks and preserve private manifests and IR evidence
+5 | Add polling, SSE replay and authorized artifact streaming
+6 | Implement failure recovery, idempotency and scoped cancellation
+7 | Integrate a separate frontend using the same user operation controls
+8 | Run all six PDFs and compare artifacts with the frozen baseline
+9 | Integrate the PII teammate improvements and run reviewed privacy tests
+10 | Document deployment, environment variables, recovery and operational limits
+
+Backend acceptance tests
+
+Test upload rejection for invalid PDF and Office packages, unauthorized job access, cross user downloads, forged artifact IDs and attempts to inject server options. Test a normal translation job, a PII only job with no translation call, a combined job and an engine failed event. Confirm public events contain no absolute server paths or document text.
+
+Test broker or worker restart, duplicate delivery, client disconnect, cancellation during OCR and BabelDOC, retention cleanup and concurrent jobs. Ensure one job cannot read or delete another job directory. Document jobs that fail before model inference separately from GPU placement checks. Store package versions and model digests with each attempt.
+
+Quality and evaluation continuity
+
+The backend should preserve source-ir.json, transformed-ir.json, extraction evidence, validation reports and output hashes privately, so tools/evaluation can score saved runs. Human reviews are specific to source and output hashes. Do not mark new output accepted because a previous run was reviewed. The PII teammate owns exact span precision, recall, F1 and residual review; the backend owns retaining and retrieving the evidence needed for those evaluations.
+
+Sample01 OCR and Sample04 image or layout findings remain unresolved. Native Office and cross format routes need their own dataset evaluation. No automatic check currently certifies complete PII removal. Hosting the engine will not fix document quality defects; those should stay visible in review status and warnings.
+
+Contents of this package
+
+project contains the reusable source, local UI for reference, engine requirements, tests, a proposed OpenAPI contract and the worker example. START_HERE.txt gives the order of work. Samples are provided for reproduction. The backend handoff has no live credentials, environments, model weights, database or running API. The previous PII ZIP remains a separate deliverable for the PII teammate.
+18 October update: full processing can now run on the existing server CPU/GPU.
+transformation/remote_worker.py invokes the same engine with server-local paths
+and GPU Paddle. transformation/remote_pipeline.py is the Streamlit/CLI SSH client
+adapter; it is not a public backend. New server configuration and installation
+are described in docs/SERVER_EXECUTION.txt. The previously exported teammate ZIP
+snapshots were not overwritten. Backend workers should invoke the engine locally
+on the server, not start another SSH hop back into themselves.

@@ -1,0 +1,64 @@
+OCR source-resolution policy
+============================
+
+Problem
+-------
+An embedded image could be rendered into a PDF crop at 72 dpi, then rendered
+again at 72 dpi by the OCR worker. Small figures lost native image detail before
+recognition. Enlarging those already degraded pixels could not restore it.
+
+Current implementation
+----------------------
+tools/ocr/raster_policy.py is shared by figure cropping, CPU/GPU OCR workers,
+cache identification, source verification and conservative reconstruction.
+
+* Preserve the native density of an image covering at least half the region.
+  Vector/composite regions without a dominant image use a 3x render scale.
+* Bound each raster to 3072 pixels per side and 8 million pixels. Record scale,
+  physical bounds, pixel bounds, requested density and any limiting in evidence.
+* Keep PDF page sizes and region boxes in points. Recognition maps detector
+  pixels back to those physical coordinates, independently for each axis.
+* Handoff verifies image/detector hashes, the policy metadata and source pixels.
+  Older evidence without raster metadata retains its existing 72 dpi proof.
+* Hash the actual OCR raster and policy helper in the cache key. Old low-resolution
+  results cannot silently satisfy a new-policy OCR request.
+* Reconstruction keeps its point-grid fitting. The default font floor is 8 pt;
+  detailed source images can use a measured source-relative floor bounded at
+  4 pt and no more than 15 percent below the estimated original font size.
+  Committed erasures are mapped to the native-density background. Pixels outside
+  those erasures remain unchanged before translated text is drawn.
+* A confidently recognized line too small for the existing 3 pt invisible source
+  layer remains in OCR IR and original pixels, with source_layer_omitted recorded.
+  It no longer aborts other lines or becomes a false OCR-confidence failure.
+
+No document names, sample text, replacement identifiers or sample coordinates
+are used to decide these behaviors. Recognition confidence thresholds are not
+reduced. Sensitive literals now require separate-recognizer confirmation;
+resized copies from the same recognizer cannot establish that confirmation.
+
+Limits
+------
+This repairs avoidable information loss; it does not prove OCR accuracy.
+Both recognition models can agree on the same wrong glyph. Currency symbols,
+punctuation, identifiers, tiny text and reading order still require annotated
+evaluation. A line may be confidently recognized but remain untranslated because
+its physical output slot cannot fit at the existing font limits.
+
+The shared raster cap bounds the input image, not the full model memory footprint.
+Rasterizing an image-only page still cannot recover detail absent from the source.
+Rotated/mixed pages retain the existing routing and handoff restrictions.
+
+Validation artifacts
+--------------------
+configs/evaluation-ocr-resolution-20261018.local.json defines the six-document
+server regression. Results are kept separately under:
+runs/dataset-evaluation/ocr-resolution-regression-20261018-v1
+
+Compare OCR source evidence with:
+python -m tools.evaluation.ocr_resolution_audit --before runs/dataset-evaluation/post-fixes-regression-20261018-v1 --after runs/dataset-evaluation/ocr-resolution-regression-20261018-v1
+
+Compare finished PDFs with:
+python -m tools.evaluation.regression --root runs/dataset-evaluation/ocr-resolution-regression-20261018-v1
+
+The latter needs the evaluation environment with scikit-image installed. Neither
+command reruns translation nor copies previous human approvals into new outputs.
