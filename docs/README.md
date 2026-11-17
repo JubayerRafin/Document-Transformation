@@ -19,6 +19,8 @@ without relocating referenced files or changing existing commands.
 - [Deep Doc / extraction lab](EXTRACTION_LAB_GUIDE.md).
 - [PaddleOCR setup](PADDLEOCR.md) and [raster policy](OCR_RASTER_POLICY.txt).
 - [Detailed evaluation](DETAILED_EVALUATION.md) and [GPU dataset evaluation](GPU_DATASET_EVALUATION.md).
+- [PII detection](PII_DETECTION.md), [manual redaction](MANUAL_REDACTION.md) and
+  [value-only redaction](VALUE_ONLY_REDACTION.md).
 - [PII handoff](PII_HANDOFF.txt): earlier teammate handoff, not evidence of present deployment status.
 - [Quality hardening](QUALITY_HARDENING_PLAN.txt).
 - [Prediction format](PREDICTION_FORMAT.md), [evaluation contract](EVALUATION.md) and [validation](VALIDATION.md).

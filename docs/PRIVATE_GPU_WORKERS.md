@@ -20,19 +20,35 @@ IP is required. Workers are private; cross-account sharing is not enabled.
 
 ## Run the server agent
 
-Copy the updated repository and install the existing processing dependencies on
-the chosen server. Set up CUDA-enabled PaddleOCR, Ollama and the selected models.
-Transfer `gpu.worker.local.json` privately to that server; restrict permissions:
+Clone the repository to `/workspace/transformx-app` on the server and run the
+three setup scripts once (about 80 GB of disk; most of the time is model and
+package downloads):
 
 ```bash
-chmod 600 /path/to/gpu.worker.local.json
-python -m tools.service.cloud_worker run --config /path/to/gpu.worker.local.json
+bash tools/gpu/setup_transformx.sh pii      # CUDA PaddleOCR and Ollama
+bash tools/gpu/setup_full_pipeline.sh       # Deep Doc Extractor, BabelDOC, LibreOffice
+bash tools/gpu/setup_vllm.sh                # vLLM, Qwen 3.5 9B FP8, TranslateGemma 12B
 ```
 
-Use the Python environment containing the engine dependencies. The downloaded
-configuration intentionally contains no laptop Python paths. The agent resolves
-Python/OCR Python on the server. Alternatively use the CLI registration command
-documented in CLOUD_SETUP.md; registration now also works for customer accounts.
+Transfer `gpu.worker.local.json` privately to `configs/` on the server, then:
+
+```bash
+bash tools/gpu/start_worker.sh
+```
+
+The start script launches the PII model server (port 8000) and the translation
+model server (port 8010) on loopback, gives each a fixed amount of GPU memory,
+and starts the agent with the matching environment. On cards under 40 GB the two
+models take turns on the GPU using vLLM sleep mode
+(`transformation/llm/gpu_share.py`); on larger cards both stay loaded. The
+script is safe to rerun and leaves running services alone. To load new code,
+stop the agent process and run the script again; it also restarts the
+pre-loaded engine processes.
+
+The downloaded configuration intentionally contains no laptop Python paths; the
+start script points the agent at the server's environments. Alternatively use
+the CLI registration command documented in CLOUD_SETUP.md; registration also
+works for customer accounts.
 
 For Slurm/PBS clusters, obtain the institution-approved GPU allocation first and
 run the agent within that allocated job. It must not run on the login node. The
@@ -67,7 +83,7 @@ with an exact matching assigned worker and owner. Administrators do not get a
 cross-account compute exception. No unassigned job is silently routed.
 
 The agent reports allocated NVIDIA GPU visibility, CUDA Paddle availability and
-installed Ollama models. The database checks readiness, a recent heartbeat and
+the models its model servers (vLLM or Ollama) provide. The database checks readiness, a recent heartbeat and
 operation compatibility when claiming a job. Translation-only servers cannot
 claim combined/PII jobs. Prerequisite checks do not prove GPU model placement:
 actual inference evidence remains a per-run concern. Existing engine behavior is
