@@ -90,3 +90,22 @@ class ComplexScriptTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ShapedFitTests(unittest.TestCase):
+    def test_image_text_is_fitted_shaped_at_the_largest_size_that_fits_or_refused(self):
+        rect = pymupdf.Rect(0, 0, 160, 30)
+        fitted = cs.fit_shaped(rect, 'जारी किया गया: 2024-03-18', max_size=12, min_size=5)
+        self.assertIsNotNone(fitted)
+        outlines, size = fitted
+        with outlines:
+            self.assertEqual(len(outlines), 1)
+            self.assertTrue(outlines[0].get_drawings())               # shaped glyphs drawn as outlines
+        self.assertTrue(5 <= size <= 12)
+        self.assertIsNone(cs.fit_shaped(pymupdf.Rect(0, 0, 20, 4), 'تحذير: منطقة ذات وصول مقيد', 12, 8))
+
+    def test_numbers_in_right_to_left_text_are_kept_left_to_right(self):
+        marked = cs._keep_left_to_right('الهاتف 010-2345-6789 والتاريخ 2024-03-18 والرمز HR-2024-00417')
+        for value in ('010-2345-6789', '2024-03-18', 'HR-2024-00417'):
+            self.assertIn('\u202a' + value + '\u202c', marked)
+        self.assertEqual(cs._keep_left_to_right('بريد minjun.kim@example.com'), 'بريد minjun.kim@example.com')

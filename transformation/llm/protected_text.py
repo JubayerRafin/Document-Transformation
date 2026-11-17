@@ -69,6 +69,9 @@ def protect_values(text, values=()):
     # Conservative structured literals; this is preservation, not PII detection.
     # Names outside this narrow hyphenated form still require explicit values.
     alternatives = [r'\{v\d+\}', EMAIL_PATTERN.pattern,
+                    # A partly masked value stays whole ("901231-1******", "****-1234"): the number
+                    # pattern below kept "901231-1" and the model dropped the mask (2026-11-17).
+                    r'(?<![\w*])[\w-]*\d[\w-]*\*{2,}[\w*-]*|(?<![\w*])\*{2,}[\w-]*\d[\w*-]*',
                     r'\b\d{4}-\d{2}-\d{2}[T ](?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?:Z|[+-]\d{2}:\d{2}|\s+[A-Z]{2,5})?\b',
                     r'\b(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?:\s+[A-Z]{2,5})?\b',
                     r'\b[A-Z]{3}\s*\d+(?:,\d+)*(?:\.\d+)?\b',
@@ -78,13 +81,25 @@ def protect_values(text, values=()):
                     r'\b[A-Za-z]+\d[\w.-]*\b',
                     r'\b(?=[IVXLCDM]{2,8}\b)M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})(?<=[IVXLCDM])\b',
                     r'\b[A-Z][a-z]+ [A-Z][a-z]+-[a-z]+\b',
-                    r'\b[A-Z]{2,}(?:-[A-Za-z0-9]+)+\b',
+                    # Codes such as HR-2024, SKU-PR, UTF-8; not an English compound such as
+                    # "OCR-aware", which then had to stay in English inside translations (2026-11-17).
+                    r'\b[A-Z]{2,}(?:-(?=[A-Za-z0-9]*[0-9A-Z])[A-Za-z0-9]+)+\b',
                     r'\b\d{4}-\d{2}-\d{2}\b',
                     r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
                     r'\bsk_[A-Za-z0-9_.-]+\b',
-                    r'(?<!\w)\d+(?:,\d+)*(?:\.\d+)?%?(?!\w)']
+                    r'(?<!\w)\d+(?:,\d+)*(?:\.\d+)?%?(?!\w)',
+                    # Letter grades (A-, B+): models transliterated "A-" into Arabic, Hindi and Bengali
+                    # letters while keeping "B+" (2026-11-17 review).
+                    r'(?<![\w+-])[A-F][+-](?![\w+-])',
+                    # A currency code on its own, as in a column header "Bonus (KRW)". Not before an
+                    # amount ("KRW 1.2M"): the amount pattern above covers that, and a second literal
+                    # there made Japanese and Bengali notes fail and stay in English (2026-11-17).
+                    r'\b(?:KRW|USD|EUR|JPY|GBP|CNY|RMB|INR|BDT|SAR|AED|CHF|CAD|AUD|HKD|SGD|TWD|BRL|MXN|RUB|TRY|ZAR|SEK|NOK|DKK|PLN|THB|VND|IDR|MYR|PHP|PKR|EGP|NGN|KWD|QAR)\b(?!\s*\d)']
     if literals:
-        alternatives.append(
+        # Explicit values first: the regex takes the first alternative that matches at a position,
+        # so after the patterns, "12, Teheran-ro 4-gil" was protected as the number "12" and the
+        # rest of the address was translated (2026-11-17).
+        alternatives.insert(0,
             r"(?<!\w)(?:"
             + "|".join(re.escape(value) for value in literals)
             + r")(?!\w)"

@@ -71,6 +71,38 @@ def fit_text(box, text, font, max_size=None, min_size=8):
     return None
 
 
+SAME_SIZE = 1.12  # source text sizes within this ratio are one size (one table, one paragraph style)
+
+
+def harmonize_sizes(planned, font):
+    """Draw lines that had one size in the source at one size again.
+
+    Each OCR line is fitted on its own, so lines of the same source size came out at different
+    sizes depending on how tight their box was ("SKU-PR-0417" larger than the other SKUs, a heading
+    smaller than its body; scanned page, 2026-11-17). Lines are grouped by measured source size;
+    a line drawn above its group's median size is refitted at the median, when that fits."""
+    measured = sorted((p for p in planned if (p['policy'] or {}).get('source_font_estimate')),
+                      key=lambda p: p['policy']['source_font_estimate'])
+    groups = []
+    for item in measured:
+        estimate = item['policy']['source_font_estimate']
+        if groups and estimate <= groups[-1][0]['policy']['source_font_estimate'] * SAME_SIZE:
+            groups[-1].append(item)
+        else:
+            groups.append([item])
+    from statistics import median
+    for group in groups:
+        if len(group) < 2: continue
+        target = median(item['size'] for item in group)
+        for item in group:
+            if item['size'] <= target * 1.04: continue
+            refit = fit_text(item['box'], item['text'], font, max_size=target,
+                             min_size=min(target, item['policy'].get('minimum', target)))
+            if refit and validate_placements(item['box'], refit, font):
+                item.update(fitted=refit, size=refit[0][2])
+                item['record'].update(font_size=item['size'], size_harmonized=True)
+
+
 def available_text_box(region, regions, pixels, rules):
     """Grow into verified background to the right, bounded by artwork and cells."""
     box=available_line_box(region,regions,pixels,rules)
@@ -247,7 +279,7 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                     else:
                         grouped[best].append(dict(span, source_line=line_number))
         font = pymupdf.Font('cjk')
-        records, placements = [], []
+        records, placements, shaped_placements, planned = [], [], [], []
         for region, spans in zip(regions, grouped):
             correction = corrections.get(region['id'])
             box = pymupdf.Rect(region['bbox'])
@@ -306,11 +338,20 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             from transformation.layout.ocr_fitting import source_fit_policy
             font_policy=source_fit_policy(region,source[0])
             record['font_policy']=font_policy
-            fitted = fit_text(fitting_box, text.strip(), font, max_size=font_policy['maximum'],min_size=font_policy['minimum'])
-            if fitted and not validate_placements(fitting_box,fitted,font):
-                reason=reason or 'Rendered glyphs exceed the safe region; preserve source.'
-            if any(not font.has_glyph(ord(c)) for c in text if not c.isspace()):
-                reason = reason or 'Output font lacks required characters; preserve original text.'
+            from transformation.pdf.complex_script import needs_shaping, fit_shaped
+            shaped = None
+            if needs_shaping(text):
+                # Arabic, Hebrew and Indic text is laid out shaped (complex_script.fit_shaped); the
+                # per-glyph CJK font below can neither shape nor cover these scripts.
+                ink_guess = (1, 1, 1) if float(np.mean(color)) < 125 else (0, 0, 0)
+                shaped = fit_shaped(fitting_box, text.strip(), font_policy['maximum'], font_policy['minimum'], ink_guess)
+                fitted = [(None, text.strip(), shaped[1])] if shaped else None
+            else:
+                fitted = fit_text(fitting_box, text.strip(), font, max_size=font_policy['maximum'],min_size=font_policy['minimum'])
+                if fitted and not validate_placements(fitting_box,fitted,font):
+                    reason=reason or 'Rendered glyphs exceed the safe region; preserve source.'
+                if any(not font.has_glyph(ord(c)) for c in text if not c.isspace()):
+                    reason = reason or 'Output font lacks required characters; preserve original text.'
             if fitted is None:
                 reason = reason or f"Translation cannot fit inside the available region at minimum {font_policy['minimum']:.2f} pt; preserve original text."
             else:
@@ -332,8 +373,16 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                     erase_mask[y0:y1,x0:x1]=True
                 record.update(status='replaced_requires_review', translated_text=text, font_size=best_size, fitting_bbox=list(fitting_box))
                 ink = (1, 1, 1) if float(np.mean(color)) < 125 else (0, 0, 0)
-                placements.extend((baseline, line, size, ink) for baseline,line,size in fitted)
+                if shaped:
+                    shaped_placements.append((pymupdf.Rect(fitting_box), shaped[0])); shaped = None
+                else:
+                    planned.append({'record': record, 'box': fitting_box, 'text': text.strip(), 'fitted': fitted,
+                                    'ink': ink, 'policy': font_policy, 'size': best_size})
+            if shaped: shaped[0].close()
             records.append(record)
+        harmonize_sizes(planned, font)
+        for item in planned:
+            placements.extend((baseline, line, size, item['ink']) for baseline, line, size in item['fitted'])
         pixels[rules] = original_pixels[rules]
         erase_mask[rules]=False
         with pymupdf.open() as result:
@@ -344,6 +393,9 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             p.insert_font(fontname='scanfont', fontbuffer=font.buffer)
             for baseline, text, size, ink in placements:
                 p.insert_text(baseline, text, fontname='scanfont', fontsize=size, color=ink)
+            for rect, outlines in shaped_placements:
+                with outlines:
+                    p.show_pdf_page(rect, outlines, 0)
             output = run / 'output' / ('scan-corrected.pdf' if corrections_path else 'scan-reconstructed.pdf')
             result.save(output, garbage=4, deflate=True)
         report = {'review_status': 'requires_human_review', 'model_requests': 0,'raster':raster,

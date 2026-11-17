@@ -6,8 +6,9 @@ from transformation.llm.ollama_native import translate_paragraph
 
 
 def units(text, split=False):
+    def box(y): return NS(y=y, y2=y + 10)
     return [NS(try_get_unicode=lambda c=c: c, can_break_line_cache=None,
-               box=NS(y=10 if not split or i < 8 else 0)) for i,c in enumerate(text)]
+               box=box(10 if not split or i < 8 else 0)) for i,c in enumerate(text)]
 
 
 class LineBreakTests(unittest.TestCase):
@@ -81,3 +82,13 @@ class LineBreakTests(unittest.TestCase):
             translate_paragraph('unused','model','Title','Korean',document_context='Document title.')
             translate_paragraph('unused','model','Title','German',document_context='"Title" means job position.')
             self.assertEqual(chat.call_count,3)
+
+
+    def test_a_number_on_its_own_baseline_in_the_same_line_is_not_a_split(self):
+        class Layout:
+            def _layout_typesetting_units(self, values, *args, **kwargs): return values, True
+        install_date_line_breaks(Layout)
+        values = units('HR-2024-00417')
+        for u in values[8:]: u.box = NS(y=11.5, y2=21.5)      # formula drawn 1.5 pt higher
+        _, fits = Layout()._layout_typesetting_units(values, None, 1, 1, None)
+        self.assertTrue(fits)

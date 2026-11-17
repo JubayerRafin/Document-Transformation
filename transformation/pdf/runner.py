@@ -59,8 +59,10 @@ def validate_options(python, endpoint, source, target, translate=True, redact=Fa
         raise ValueError("Select the Python executable in your BabelDOC environment.")
 
 
-def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v1", source="en", target="ko", root=Path("runs/transformation"), timeout=3600, translate=True, redact=False, protected_values=(), document_context="", ignore_cache=False, ocr_recognition_dir=None, ocr_python=None, ocr_remote=None, terminology=None, external_context=None, external_ir=None, http_keepalive=False, babeldoc_dual_output=True, light_pdf_io=False, translation_qps=1, translation_workers=1, ollama_parallelism=1):
-    """Yield status snapshots. Success means generated, never human-approved."""
+def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v1", source="en", target="ko", root=Path("runs/transformation"), timeout=3600, translate=True, redact=False, protected_values=(), document_context="", ignore_cache=False, ocr_recognition_dir=None, ocr_python=None, ocr_remote=None, terminology=None, external_context=None, external_ir=None, http_keepalive=False, babeldoc_dual_output=True, light_pdf_io=False, translation_qps=1, translation_workers=1, ollama_parallelism=1, glossary=None, glossary_file=None):
+    """Yield status snapshots. Success means generated, never human-approved.
+    glossary: {source term: translation} for this document (transformation/llm/glossary.py), or
+    glossary_file: where it is being written while BabelDOC starts."""
     if sum(bool(v) for v in (ocr_python, ocr_recognition_dir, ocr_remote)) > 1:
         raise ValueError("Choose fresh OCR or saved OCR, not both.")
     validate_options(python, endpoint, source, target, translate, redact)
@@ -134,6 +136,14 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
     env["TRANSFORMX_DOCUMENT_CONTEXT_FILE"] = str(context_path)
     terms_path=run/'terminology.json';terms_path.write_text(json.dumps(terminology,ensure_ascii=False),encoding='utf-8')
     env['TRANSFORMX_TERMINOLOGY_FILE']=str(terms_path)
+    env.pop('TRANSFORMX_GLOSSARY_FILE',None)
+    if glossary_file and not glossary:
+        env['TRANSFORMX_GLOSSARY_FILE']=str(glossary_file)
+    elif glossary:
+        glossary_path=run/'glossary.json'
+        glossary_path.write_text(json.dumps(dict(glossary),ensure_ascii=False),encoding='utf-8')
+        env['TRANSFORMX_GLOSSARY_FILE']=str(glossary_path)
+        info['glossary_terms']=len(glossary)
     env.pop('TRANSFORMX_EXTERNAL_CONTEXT_FILE',None)
     env.pop('TRANSFORMX_EXTERNAL_IR_FILE',None)
     if external_ir:

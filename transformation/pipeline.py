@@ -50,6 +50,59 @@ def _overlaps(a,b):
             and a['y']<b['y']+b['height'] and b['y']<a['y']+a['height'])
 
 
+def _document_glossary(options,ir,run,info):
+    """The document's translation glossary: inherited (a figure run of a larger job), built with the
+    PII server's instruction-following model, or {} (disabled, no such server, or the request
+    failed: translation then runs without it, as before)."""
+    if 'glossary' in options: return options['glossary'] or {}
+    if options.get('use_glossary') is False or not options.get('pii_endpoint') or not options.get('pii_model'): return {}
+    from transformation.pdf.runner import LANGUAGES
+    target=options.get('target','ko'); source=options.get('source','en')
+    language=next((n for n,c in LANGUAGES.items() if c==target),target)
+    source_name=next((n for n,c in LANGUAGES.items() if c==source),source)
+    started=time.monotonic()
+    try:
+        from transformation.llm.glossary import build
+        glossary=build(ir,language,options['pii_endpoint'],options['pii_model'],source_name)
+    except Exception as exc:  # advisory: never fail a translation over its glossary
+        info.setdefault('warnings',[]).append('Translation glossary unavailable; terms may vary between paragraphs.')
+        save_json(run/'translation-glossary.json',{'error':type(exc).__name__,'detail':str(exc)[:300]})
+        return {}
+    # The customer's own terms (and product names kept as written) always win: an automatic entry for
+    # the same term, or one containing it ("Employee ID" for "employee"), would otherwise translate a
+    # whole-label paragraph its own way before they are applied.
+    configured=[t for t in (options.get('terminology') or {})]
+    if configured:
+        import re
+        contains=re.compile(r'(?<!\w)(?:'+'|'.join(re.escape(t) for t in configured)+r')(?!\w)',re.IGNORECASE)
+        glossary={s:t for s,t in glossary.items() if not contains.search(s)}
+    save_json(run/'translation-glossary.json',{'language':language,'terms':glossary,
+        'seconds':round(time.monotonic()-started,2),'review_status':'model proposal; not human-approved'})
+    info['glossary_terms']=len(glossary)
+    return glossary
+
+
+def _start_glossary(options,ir,run,info):
+    """Build the glossary in the background while BabelDOC reads the page layout (several seconds,
+    no translation server needed), instead of before it (2.6-5.2 s per document, 2026-11-17). The
+    translator waits for the file only if it reaches its first paragraph sooner. Returns
+    (thread, file) or None when there is no glossary to build (an inherited one is used directly)."""
+    if 'glossary' in options or options.get('use_glossary') is False or not options.get('pii_endpoint') or not options.get('pii_model'):
+        return None
+    import threading
+    path=run/'glossary-terms.json'
+    def work():
+        try:
+            glossary=_document_glossary(options,ir,run,info)
+        finally:
+            temporary=path.with_suffix('.tmp')
+            temporary.write_text(json.dumps(locals().get('glossary') or {},ensure_ascii=False),encoding='utf-8')
+            temporary.replace(path)
+    thread=threading.Thread(target=work,name='translation-glossary',daemon=True)
+    thread.start()
+    return thread,path
+
+
 def _pii_memo_path(folder,run,data,ir,categories,model,assist,known_values):
     """Where the PII answers for exactly these inputs are kept within one job (None: no memo).
     Keyed on the document bytes, its extracted IR (with this sub-run's own folder name removed)
@@ -229,6 +282,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
         terms,proposals=schema_terms(ir,options.get('terminology'))
         options['terminology']=terms
         info['terminology']=terms
+        # Postal addresses are copied unchanged into translations (transformation/llm/address_literals.py).
+        from transformation.llm.address_literals import address_literals
+        addresses=address_literals(ir)
+        if addresses:
+            options['protected_values']=list(dict.fromkeys(list(options.get('protected_values',[]))+addresses))
+            info['address_literals']=len(addresses)
         save_json(run/'document-terminology.json',{'terms':terms,'source_proposals':proposals,
             'policy':'preserve_model_names_in_explicit_product_columns; configured terms take precedence',
             'review_status':'source_schema_evidence; not human-approved'})
@@ -347,20 +406,29 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                     native_ir['ocr_acceptance_blockers']=scan_blockers
                     save_json(run/'ocr-nativeized-ir.json',native_ir)
                 from transformation.pdf.document_runner import run_document
-                # The translation stage runs in BabelDOC's own process; on a shared GPU, hand the GPU
-                # to the translation server first (a no-op unless the start script enabled sharing).
                 from transformation.llm.gpu_share import ensure as gpu_for
-                gpu_for(endpoint)
                 work_options=dict(options,root=run/'engine',document_context=safe_context,translate=True)
                 if redact: work_options['protected_values']=list(options.get('protected_values',[]))+['[REDACTED]']
                 # Masking style and keep-visible values apply to redaction above, not to the PDF runner.
-                for key in ('translation_model','translation_endpoint','pii_model','pii_endpoint','ocr_cache_root','pii_style','pii_keep'):
+                for key in ('translation_model','translation_endpoint','pii_model','pii_endpoint','ocr_cache_root','pii_style','pii_keep','use_glossary'):
                     work_options.pop(key,None)
                 from extraction.context_bridge import build,masked_context_ir
                 context_ir=masked_context_ir(native_ir if any(u.get('ocr_folder') for u in ir['units']) else ir,
                     [f['value'] for f in findings])
                 work_options['external_context']=build(context_ir)
                 work_options['external_ir']=context_ir
+                # One glossary per document and language (transformation/llm/glossary.py), from the
+                # masked context, built while BabelDOC starts. Figure runs inherit it through options.
+                pending_glossary=_start_glossary(options,context_ir,run,info)
+                if pending_glossary:
+                    work_options['glossary_file']=str(pending_glossary[1])
+                else:
+                    if options.get('glossary'): work_options['glossary']=options['glossary']
+                    # The translation stage runs in BabelDOC's own process; on a shared GPU, hand the GPU
+                    # to the translation server first (a no-op unless the start script enabled sharing).
+                    # With a glossary being built, the PII server has it now and the translator's first
+                    # request switches it.
+                    gpu_for(endpoint)
                 work_options['timeout']=max(1,int(limit-(time.monotonic()-started)))
                 if any(u.get('ocr_folder') for u in ir['units']):
                     for key in ('ocr_recognition_dir','ocr_python','ocr_remote'): work_options.pop(key,None)
@@ -375,6 +443,10 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 for event in engine_events:
                     info['engine_run']=event; info['translation_progress']=event.get('translation_progress',{})
                     yield emit('translation_and_reconstruction')
+                if pending_glossary:
+                    pending_glossary[0].join(timeout=60)
+                    try: options['glossary']=json.loads(pending_glossary[1].read_text(encoding='utf-8'))
+                    except (OSError,ValueError): options['glossary']={}
                 if event['status']!='generated': raise RuntimeError(event.get('error','PDF engine failed.'))
                 processed=Path(event['output_pdf']).read_bytes(); info['engine_acceptance']=event.get('acceptance')
                 info['warnings'].extend(_engine_review_warnings(event.get('acceptance')))

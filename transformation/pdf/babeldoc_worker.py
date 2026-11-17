@@ -121,6 +121,43 @@ def constrain_caption_boxes(document, source_images=None):
     return changes
 
 
+def clear_side_images(document, source_images=None, skip=()):
+    """Narrow a paragraph's box so it no longer reaches under an image beside its text.
+
+    In the source, text can wrap around a picture: a caption's first line starts right of a photo
+    and the next lines run under it. BabelDOC merges the lines into one box from the left margin,
+    and the translation reflowed from that edge put its first words under the photo, hidden or
+    overprinted, in all ten languages (2026-11-17, an ID-photo caption). When an image sits at the
+    left or right end of a paragraph box, overlaps it vertically, and covers less than 60% of its
+    width, the box is narrowed to start (or end) just past the image; the text is fitted into it.
+    Paragraphs adjusted by constrain_caption_boxes (skip) and table text are left alone."""
+    changes = []
+    gap = 2.0
+    for page in document.page:
+        images = [f.box for f in list(page.pdf_figure) + (source_images or {}).get(page.page_number, []) if f.box]
+        for paragraph in page.pdf_paragraph:
+            box = paragraph.box
+            if not box or paragraph.layout_label == 'table' or paragraph.debug_id in skip: continue
+            width = box.x2 - box.x
+            if width <= 0: continue
+            for image in images:
+                vertical = min(box.y2, image.y2) - max(box.y, image.y)
+                horizontal = min(box.x2, image.x2) - max(box.x, image.x)
+                if vertical <= 0 or horizontal <= 0 or horizontal > 0.6 * width: continue
+                before = [box.x, box.y, box.x2, box.y2]
+                if image.x <= box.x + gap * 3 and image.x2 < box.x2:      # image at the left end
+                    box.x = image.x2 + gap; side = 'left'
+                elif image.x2 >= box.x2 - gap * 3 and image.x > box.x:    # image at the right end
+                    box.x2 = image.x - gap; side = 'right'
+                else:
+                    continue  # an image in the middle of a text block: leave for review
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': f'text_beside_image_{side}', 'before': before,
+                                'after': [box.x, box.y, box.x2, box.y2]})
+                width = box.x2 - box.x
+    return changes
+
+
 def source_image_boxes(path):
     """Read actual PDF image placements; native IL does not always list figures."""
     import pymupdf
@@ -460,6 +497,10 @@ def main():
     record_progress('worker_babeldoc_setup_reuse', installed=install_babeldoc_speed())
     from transformation.pdf.thin_glyphs import install as install_thin_glyphs
     record_progress('worker_thin_glyph_lines', installed=install_thin_glyphs())
+    from transformation.pdf.layout_duplicates import install as install_layout_duplicates
+    record_progress('worker_layout_duplicates', installed=install_layout_duplicates())
+    from transformation.pdf.font_flags import install as install_font_flags
+    record_progress('worker_font_flags', installed=install_font_flags())
     from transformation.pdf.layout_service import install as install_layout_service
     install_layout_service()
     record_progress('worker_layout_service_ready', shared=bool(os.environ.get('TRANSFORMX_LAYOUT_SERVICE')))
@@ -493,6 +534,8 @@ def main():
             document_context=document_context,
             external_context=json.loads(Path(os.environ['TRANSFORMX_EXTERNAL_CONTEXT_FILE']).read_text(encoding='utf-8')) if os.environ.get('TRANSFORMX_EXTERNAL_CONTEXT_FILE') else None,
             terminology=json.loads(Path(os.environ['TRANSFORMX_TERMINOLOGY_FILE']).read_text(encoding='utf-8')) if os.environ.get('TRANSFORMX_TERMINOLOGY_FILE') else None,
+            # Possibly still being written by the pipeline: loaded on the first paragraph.
+            glossary=__import__('transformation.llm.glossary',fromlist=['pending']).pending(os.environ['TRANSFORMX_GLOSSARY_FILE']) if os.environ.get('TRANSFORMX_GLOSSARY_FILE') else None,
         )
         if os.environ.get("TRANSFORMX_PARAGRAPH_MODE") == "1":
             from transformation.pdf.source_repairs import install_source_repairs
@@ -537,6 +580,10 @@ def main():
     from transformation.layout.table_fitting import install_table_fitting
     from transformation.layout.line_breaks import install_date_line_breaks, widen_page_footers, join_split_dates, heading_slots
     install_date_line_breaks(Typesetting, protected_values)
+    from transformation.layout.line_breaks import install_whole_word_breaks, install_attached_punctuation
+    install_whole_word_breaks(Typesetting)
+    from babeldoc.format.pdf.document_il.midend.typesetting import TypesettingUnit
+    install_attached_punctuation(TypesettingUnit)
     install_table_fitting(Typesetting)
     original = Typesetting.typesetting_document
 
@@ -562,6 +609,7 @@ def main():
         changes = constrain_caption_boxes(
             document, source_images
         )
+        changes.extend(clear_side_images(document, source_images, {c['paragraph_id'] for c in changes}))
         changes.extend(widen_page_footers(document))
         changes.extend(join_split_dates(document))
         changes.extend(

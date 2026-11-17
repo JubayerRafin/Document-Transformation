@@ -43,6 +43,12 @@ tg_share=$(awk -v m="${gpu_mib:-24564}" 'BEGIN{s=17400/m; if(s>0.71)s=0.71; prin
 # Under 40 GB the two models do not fit together: each job stage gets the GPU in turn
 # (transformation/llm/gpu_share.py, vLLM sleep mode: about 1 s to switch).
 shared=0; [ "${gpu_mib:-0}" -lt 40000 ] && shared=1
+# A sleeping server's weights wait in pinned host memory (level 1, ~1 s to wake) unless the machine's
+# memory limit is too small for that; then they are reloaded from disk on wake (level 2, ~10 s). Two
+# parked models exceeded a 41 GB pod's limit; 80 GB leaves room for them and the engine processes.
+mem_limit=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo max)
+[ "$mem_limit" = max ] && mem_limit=$(awk '/MemTotal/{print $2*1024}' /proc/meminfo)
+tg_level=2; [ "${mem_limit:-0}" -ge 80000000000 ] && tg_level=1
 servers=""
 
 wait_for() {  # port, log
@@ -78,12 +84,12 @@ if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [
     echo "Starting the translation model server (about 2 minutes)..."
     wait_for 8010 /workspace/vllm-translation.log
     if [ "$shared" = 1 ] && [ -n "$servers" ]; then
-      curl -fsS -X POST "http://127.0.0.1:8010/sleep?level=2" >/dev/null && curl -fsS -X POST http://127.0.0.1:8000/wake_up >/dev/null
+      curl -fsS -X POST "http://127.0.0.1:8010/sleep?level=$tg_level" >/dev/null && curl -fsS -X POST http://127.0.0.1:8000/wake_up >/dev/null
     fi
   fi
-  # Level 2 (#2): this server's weights are reloaded from disk on wake instead of being parked in
-  # pinned memory; two parked models exceeded a 41 GB pod's memory limit (gpu_share.py).
-  servers="${servers:+$servers,}http://127.0.0.1:8010#2"
+  # "#2" marks a level-2 server: gpu_share.py reloads its weights on wake (see tg_level above).
+  marker=""; [ "$tg_level" = 2 ] && marker="#2"
+  servers="${servers:+$servers,}http://127.0.0.1:8010$marker"
   # A vLLM translation server serves many requests at once (measured: 16 parallel calls).
   export TRANSFORMX_TRANSLATION_ENDPOINT=http://127.0.0.1:8010/v1 TRANSFORMX_TRANSLATION_WORKERS=16 TRANSFORMX_TRANSLATION_QPS=64
   echo "Translation model translategemma:12b served by vLLM."

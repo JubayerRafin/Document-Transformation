@@ -84,6 +84,22 @@ class TransformationBoundaries(unittest.TestCase):
         self.assertEqual(constrain_caption_boxes(doc), [])
         self.assertEqual(para.box.y2, 60)
 
+    def test_text_wrapping_beside_an_image_is_narrowed_past_it(self):
+        from transformation.pdf.babeldoc_worker import clear_side_images
+        caption = NS(box=NS(x=72, y=314, x2=515, y2=339), layout_label="plain text", debug_id="caption")
+        right = NS(box=NS(x=300, y=200, x2=500, y2=260), layout_label="plain text", debug_id="right")
+        photo = NS(box=NS(x=72, y=329, x2=140, y2=410))
+        chart = NS(box=NS(x=420, y=180, x2=520, y2=240))
+        background = NS(box=NS(x=0, y=0, x2=612, y2=792))
+        doc = NS(page=[NS(page_number=0, pdf_paragraph=[caption, right], pdf_figure=[photo, chart, background])])
+        changes = clear_side_images(doc)
+        self.assertEqual(caption.box.x, 142); self.assertEqual(caption.box.x2, 515)   # starts past the photo
+        self.assertEqual(right.box.x2, 418)                                         # ends before the chart
+        self.assertEqual({c["reason"] for c in changes}, {"text_beside_image_left", "text_beside_image_right"})
+        middle = NS(box=NS(x=10, y=10, x2=300, y2=60), layout_label="plain text", debug_id="m")
+        doc = NS(page=[NS(page_number=0, pdf_paragraph=[middle], pdf_figure=[NS(box=NS(x=120, y=20, x2=160, y2=50))])])
+        self.assertEqual(clear_side_images(doc), [])                                # image inside: left for review
+
     def test_native_transport_rejects_truncated_translation(self):
         response = BytesIO(json.dumps({"message": {"content": "partial"}, "done": True, "done_reason": "length"}).encode())
         with patch("transformation.llm.ollama_native.urllib.request.urlopen", return_value=response):
