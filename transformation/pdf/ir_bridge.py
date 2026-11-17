@@ -64,7 +64,9 @@ def lock_ocr_regions(document,ir,evidence=None):
             chars=[]
             for c,p in characters:
                 if p is paragraph: chars.append(c)
-            if chars and any(id(c) not in assigned for c in chars):
+            # A space BabelDOC adds between two locked lines it read as one paragraph ("Iceland" and
+            # "June" set in the same font and colour) carries no text and belongs to neither.
+            if chars and any(id(c) not in assigned and (c.char_unicode or '').strip() for c in chars):
                 raise ValueError('Unassociated native glyphs remain after OCR field separation.')
         page.pdf_paragraph[:]=sorted(locked,key=lambda p:(-p.box.y2,p.box.x))
     return overrides,slots,report
