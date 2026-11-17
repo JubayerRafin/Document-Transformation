@@ -52,6 +52,18 @@ class SupervisionTests(unittest.TestCase):
         self.assertGreaterEqual(len(ticks),2)
         self.assertGreaterEqual(ticks[0],.45)
 
+    def test_a_new_stage_is_reported_at_once_and_an_unchanged_one_once_per_heartbeat(self):
+        with temporary_workspace() as folder:
+            events=Path(folder)/'events.jsonl';sent=[]
+            tick=cw.progress_reporter(events,lambda stage,seconds:sent.append((stage,seconds)),every=10)
+            tick(1)                                                   # engine not started yet
+            events.write_text('{"stage":"extraction","elapsed_seconds":0}\n')
+            tick(2);tick(3)
+            with events.open('a') as f:f.write('{"stage":"translation_and_reconstruction","elapsed_seconds":3.5}\n')
+            tick(4);tick(9);tick(14)
+            self.assertEqual(sent,[('starting',0),('extraction',0.0),('translation_and_reconstruction',3.5),
+                                   ('translation_and_reconstruction',3.5)])
+
     def test_lost_lease_during_progress_stops_processing(self):
         process=cw.spawn([sys.executable,'-c','import time; time.sleep(60)'])
         def tick(elapsed):raise cw.JobFailure('LEASE_LOST')

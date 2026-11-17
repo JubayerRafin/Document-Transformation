@@ -14,6 +14,8 @@ PROJECT=Path(__file__).resolve().parents[2]
 MAX=50_000_000
 USER_AGENT='TransformX-Worker/1.0'
 HEARTBEAT_SECONDS=10
+# How often a running job's stage is checked; a new stage reaches the site at once.
+STAGE_CHECK_SECONDS=1
 # Extra time beyond the engine's own limit, so the engine can report its own timeout first.
 DEADLINE_GRACE_SECONDS=300
 MANUAL_LIMIT_SECONDS=600
@@ -73,6 +75,21 @@ def supervise(process,limit,tick,interval=HEARTBEAT_SECONDS,clock=time.monotonic
     except BaseException:
         stop_process(process);raise
     return process.returncode
+
+
+def progress_reporter(events,send,every=HEARTBEAT_SECONDS):
+    """tick(elapsed) for supervise(): sends the engine's latest stage as soon as it changes, so the
+    site stops showing "Starting" once work begins, and otherwise once per `every` seconds (the lease)."""
+    sent={'stage':None,'at':float('-inf')}
+    def tick(elapsed):
+        stage,seconds='starting',0
+        if events.exists():
+            for line in reversed(events.read_text(encoding='utf8').splitlines()):
+                try:ev=json.loads(line);stage=ev['stage'];seconds=float(ev['elapsed_seconds']);break
+                except (ValueError,KeyError,TypeError):continue
+        if stage==sent['stage'] and elapsed-sent['at']<every:return
+        send(stage,seconds);sent.update(stage=stage,at=elapsed)
+    return tick
 
 
 def run_limit(profile):
@@ -345,19 +362,13 @@ def execute(cfg,j,root):
     request.write_text(json.dumps({'source':str(source),'filename':j['filename'],'options':j['options'],
         'profile':cfg['engine_profile']}),encoding='utf8')
     started=time.monotonic()
-    def progress(elapsed):
-        stage,seconds='starting',0
-        if events.exists():
-            for line in reversed(events.read_text(encoding='utf8').splitlines()):
-                try:ev=json.loads(line);stage=ev['stage'];seconds=float(ev['elapsed_seconds']);break
-                except (ValueError,KeyError,TypeError):continue
-        heartbeat(cfg,j,stage,seconds)
+    progress=progress_reporter(events,lambda stage,seconds:heartbeat(cfg,j,stage,seconds))
     # All parsing/reconstruction and inference execute on this server. The
     # engine enforces timeout_seconds itself; the worker stops it shortly after.
     limit=run_limit(cfg['engine_profile'])+DEADLINE_GRACE_SECONDS
     with (folder/'process.log').open('w',encoding='utf8') as log:
         process=spawn([engine_python(cfg),'-u','-m','backend.engine_job',str(request),str(events),str(terminal)],cwd=PROJECT,stdout=log,stderr=subprocess.STDOUT)
-        supervise(process,limit,progress)
+        supervise(process,limit,progress,interval=STAGE_CHECK_SECONDS)
     try:result=json.loads(terminal.read_text(encoding='utf8')) if terminal.exists() else {}
     except ValueError:result={}
     if not isinstance(result,dict):result={}
