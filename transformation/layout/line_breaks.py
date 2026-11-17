@@ -154,6 +154,53 @@ def widen_page_footers(document):
     return changes
 
 
+def install_whole_word_breaks(Typesetting):
+    """Keep words whole when they fit at the end of a line.
+
+    BabelDOC 0.6.4 checks each unit with current_x + unit_width + _get_width_before_next_break_point(units[i:])
+    > box.x2, but that width already includes the current unit, so it is counted twice. At every
+    letter inside a word the check becomes "word end + this letter's width", and a word ending
+    within one letter of the edge was split at its widest letter without a hyphen ("seule | ment",
+    "cert | ains", "do | micilio"; French and Spanish, 2026-11-17). The width here is the rest of
+    the word after the current unit, as the check intends."""
+    if getattr(Typesetting, '_transformx_whole_words', False):
+        return
+
+    def width_after(self, typesetting_units, scale):
+        if not typesetting_units or typesetting_units[0].can_break_line:
+            return 0
+        total = 0
+        for unit in typesetting_units[1:]:
+            if unit.can_break_line:
+                break
+            total += unit.width
+        return total * scale
+
+    Typesetting._get_width_before_next_break_point = width_after
+    Typesetting._transformx_whole_words = True
+
+
+ATTACHING_PUNCTUATION = set('.,:;!?)]}%’”') | set('([{“‘')
+
+
+def install_attached_punctuation(TypesettingUnit):
+    """No extra gap between Chinese/Japanese/Korean text and punctuation that attaches to it.
+
+    BabelDOC 0.6.4 adds half a space wherever CJK and non-CJK units meet, except for five
+    full-width marks, so Korean sentences were drawn as "했습니다 ." and labels as "직원 :" (2026-11-17)
+    although the translated text had no space there. ASCII punctuation and brackets are added to
+    that exception list; spaces typed in the translation are unchanged."""
+    if getattr(TypesettingUnit, '_transformx_attached_punctuation', False):
+        return
+    original = TypesettingUnit.calc_mixed_character_blacklist
+
+    def blacklist(self):
+        return original(self) or (self.try_get_unicode() or '') in ATTACHING_PUNCTUATION
+
+    TypesettingUnit.calc_mixed_character_blacklist = blacklist
+    TypesettingUnit._transformx_attached_punctuation = True
+
+
 def install_date_line_breaks(Typesetting, protected_values=()):
     if getattr(Typesetting, "_transformx_date_breaks", False):
         return
@@ -168,12 +215,17 @@ def install_date_line_breaks(Typesetting, protected_values=()):
             parts = [unit_text(u) for u in placed]
             text = ''.join(parts)
             for start,end in atomic_ranges(text,protected_values):
-                offset, positions = 0, []
+                offset, positions, heights = 0, [], []
                 for u, part in zip(placed, parts):
                     if offset<end and offset+len(part)>start:
-                        positions.append(u.box.y)
+                        positions.append((u.box.y + u.box.y2) / 2)
+                        heights.append(u.box.y2 - u.box.y)
                     offset += len(part)
-                if positions and max(positions)-min(positions) > 1:
+                # On another line means at least half a line lower. A protected number BabelDOC keeps
+                # as a formula sits on its own baseline, a point or two off the letters around it,
+                # and with "> 1 pt" a whole "HR-2024-00417 | ..." line never fitted and was drawn at
+                # 3 pt in every language (2026-11-17).
+                if positions and max(positions)-min(positions) > max(1.0, 0.5 * max(heights)):
                     fits = False
         return placed, fits
 

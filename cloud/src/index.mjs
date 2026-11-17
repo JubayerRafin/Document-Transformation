@@ -61,6 +61,21 @@ export function options(raw){
  if(o.pii_keep!==undefined&&(!Array.isArray(o.pii_keep)||o.pii_keep.length>100||o.pii_keep.some(v=>typeof v!=='string'||!v.trim()||v.length>200)))throw new Fault('INVALID_PII_KEEP');
  return o;
 }
+const LANGUAGE=/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
+// A customer glossary: the account's required translations for its own terms. Limits match the
+// engine's terminology check (transformation/llm/policy.py): 100 entries, 200 characters each.
+export function glossaryEntries(raw){
+ if(!Array.isArray(raw)||raw.length>100)throw new Fault('INVALID_GLOSSARY');
+ const seen=new Set(),out=[];
+ for(const e of raw){
+  if(!e||typeof e!=='object'||Array.isArray(e))throw new Fault('INVALID_GLOSSARY');
+  const source=typeof e.source==='string'?e.source.trim():'',target=typeof e.target==='string'?e.target.trim():'';
+  if(!source||!target||source.length>200||target.length>200||/[\r\n\t]/.test(source+target)||!/[\p{L}\p{N}]/u.test(source))throw new Fault('INVALID_GLOSSARY');
+  const key=source.toLowerCase();if(seen.has(key))throw new Fault('DUPLICATE_GLOSSARY_TERM');
+  seen.add(key);out.push({source,target});
+ }
+ return out;
+}
 const cookie=(r,name)=>r.headers.get('cookie')?.split(';').map(v=>v.trim()).find(v=>v.startsWith(name+'='))?.slice(name.length+1)||'';
 const safeName=n=>typeof n==='string'&&n.length<=180&&!/[\\/\x00-\x1f]/.test(n)&&/\.pdf$/i.test(n);
 const uuid=x=>typeof x==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(x);
@@ -233,6 +248,26 @@ export function createHandler(transport=fetch){
     const revoked=await sb('/rest/v1/rpc/tx_revoke_worker',{method:'POST',body:JSON.stringify({p_worker:revoke[1],p_owner:u.id})});
     if(!revoked)throw new Fault('WORKER_BUSY_STOP_PROCESSING_FIRST',409);return json({status:'revoked'});
    }
+   if(p==='/v1/glossaries'&&method==='GET'){
+    const rows=await db('tx_glossaries','?owner=eq.'+u.id+'&select=source_language,target_language,entries,updated&order=target_language');
+    return json(rows.map(g=>({source_language:g.source_language,target_language:g.target_language,terms:g.entries.length,updated:Date.parse(g.updated)/1000})));
+   }
+   if(p==='/v1/glossary'&&method==='GET'){
+    const source=url.searchParams.get('source')||'en',target=url.searchParams.get('target')||'';
+    if(!LANGUAGE.test(source)||!LANGUAGE.test(target))throw new Fault('INVALID_LANGUAGE');
+    const rows=await db('tx_glossaries','?owner=eq.'+u.id+'&source_language=eq.'+source+'&target_language=eq.'+target+'&select=entries,updated');
+    return json({source_language:source,target_language:target,entries:rows[0]?.entries||[],updated:rows[0]?Date.parse(rows[0].updated)/1000:null});
+   }
+   if(p==='/v1/glossary'&&method==='PUT'){
+    if(!['admin','mentor','customer'].includes(u.role))throw new Fault('PROCESSING_ROLE_REQUIRED',403);
+    const b=await body();
+    if(!LANGUAGE.test(b.source_language||'')||!LANGUAGE.test(b.target_language||'')||b.source_language===b.target_language)throw new Fault('INVALID_LANGUAGE');
+    const entries=glossaryEntries(b.entries);
+    const rows=await db('tx_glossaries','?on_conflict=owner,source_language,target_language',{method:'POST',
+      headers:{Prefer:'resolution=merge-duplicates,return=representation'},
+      body:JSON.stringify({owner:u.id,source_language:b.source_language,target_language:b.target_language,entries,updated:new Date().toISOString()})});
+    return json({source_language:b.source_language,target_language:b.target_language,entries:rows[0].entries,updated:Date.parse(rows[0].updated)/1000});
+   }
    if(p==='/v1/system'&&method==='GET'){
     const ws=await db('tx_workers','?enabled=eq.true&owner=eq.'+u.id+'&select=heartbeat');
     return json({database:'PostgreSQL · Supabase',worker:ws.some(w=>Date.now()-Date.parse(w.heartbeat)<60000)?'connected':'offline',gpu_verified:false,software_version:'cloud-v1'});
@@ -262,6 +297,17 @@ export function createHandler(transport=fetch){
     delete o.worker_id;
     const bytes=await file.arrayBuffer();if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')throw new Fault('INVALID_PDF');
     const hash=await sha(bytes),requestHash=await sha(new TextEncoder().encode(JSON.stringify([file.name,hash,o,assigned])));
+    // The account's glossary for this language pair goes with the job (server-side only: a browser
+    // cannot send terminology). Attached after the request hash, so a retry of the same upload
+    // after a glossary edit is still the same request. Without the 202611170001 migration, or on
+    // any read error, the job runs without one.
+    if(o.operation!=='pii'){
+     try{
+      const g=await db('tx_glossaries','?owner=eq.'+u.id+'&source_language=eq.'+o.source_language+'&target_language=eq.'+o.target_language+'&select=entries');
+      const entries=g[0]?.entries||[];
+      if(entries.length)o.terminology=Object.fromEntries(entries.map(e=>[e.source,e.target]));
+     }catch{}
+    }
     let prior=await db('tx_jobs','?owner=eq.'+u.id+'&idempotency_key=eq.'+key);
     if(!prior.length){try{prior=await insert('tx_jobs',{owner:u.id,filename:file.name,source_sha256:hash,options:o,assigned_worker_id:assigned,request_hash:requestHash,idempotency_key:key});}catch(e){if(e.message!=='CONFLICT')throw e;prior=await db('tx_jobs','?owner=eq.'+u.id+'&idempotency_key=eq.'+key);}}
     const j=prior[0];if(!j||j.request_hash!==requestHash)throw new Fault('IDEMPOTENCY_CONFLICT',409);

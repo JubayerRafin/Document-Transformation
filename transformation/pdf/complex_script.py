@@ -23,6 +23,11 @@ SHAPED = re.compile(r'[֐-ࣿיִ-﷿ﹰ-﻿ऀ-෿]')
 RTL = re.compile(r'[֐-ࣿיִ-﷿ﹰ-﻿]')
 
 
+# MuPDF's HTML layout (PyMuPDF 1.28.2) mirrors text-align inside right-to-left text: "right" puts the
+# lines at the left edge (Arabic paragraphs came out left-aligned, 2026-11-17); "start" is the right edge.
+RTL_ALIGN = 'start'
+
+
 def needs_shaping(text):
     return bool(text) and bool(SHAPED.search(text))
 
@@ -115,6 +120,19 @@ def take_paragraph(page, paragraph, box=None, reason='shaping'):
     return record
 
 
+# A run of Latin letters/digits joined by separators that contains a digit: phone numbers, dates,
+# IDs, amounts, versions (010-2345-6789, 2024-03-18, HR-2024-00417, 1,250.00).
+_LTR_RUN = re.compile(r'(?=[A-Za-z0-9*/.:,+_-]*[0-9])[A-Za-z0-9*]+(?:[-/.:,+_][A-Za-z0-9*]+)+')
+
+
+def _keep_left_to_right(text):
+    """Wrap number-like runs in left-to-right embedding marks (U+202A … U+202C). MuPDF's HTML layout
+    (PyMuPDF 1.28.2) reverses digit groups joined by hyphens inside right-to-left lines
+    (010-2345-6789 drawn as 6789-2345-010), against the Unicode bidirectional algorithm;
+    dir="ltr" spans and isolates have no effect there, embedding marks do."""
+    return _LTR_RUN.sub(lambda m: '‪' + m.group(0) + '‬', text)
+
+
 def _visual_order(text):
     """Each line of right-to-left text in display order (Unicode bidirectional algorithm)."""
     try:
@@ -136,6 +154,26 @@ def _outlined(rect, markup, css):
         svg = page.get_svg_image(text_as_path=True)
     with pymupdf.open('svg', svg.encode('utf-8')) as vector:
         return pymupdf.open('pdf', vector.convert_to_pdf()), spare, scale
+
+
+def fit_shaped(rect, text, max_size, min_size, color=(0.0, 0.0, 0.0)):
+    """Lay text out shaped inside rect at the largest size up to max_size that fits.
+
+    For text drawn into images (transformation/pdf/scan_reconstruction.py), which otherwise writes
+    glyphs one by one with a CJK font: Arabic, Hindi and Bengali image text was never drawn
+    (2026-11-17; the glyphs could not be shaped and failed the fit check). Returns
+    (one-page PDF of vector outlines, font size used), or None when even min_size does not fit."""
+    rtl = bool(RTL.search(text))
+    r, g, b = color
+    css = ('* {font-size: %.2fpt; line-height: 1.15; margin: 0; padding: 0; color: rgb(%d,%d,%d); '
+           'direction: %s; text-align: %s;}' % (max_size, r * 255, g * 255, b * 255,
+                                                 'rtl' if rtl else 'ltr', RTL_ALIGN if rtl else 'left'))
+    body = html.escape(_keep_left_to_right(text) if rtl else text).replace('\n', '<br>')
+    outlines, spare, scale = _outlined(rect, f'<div dir="{"rtl" if rtl else "ltr"}">{body}</div>', css)
+    if spare < 0 or max_size * scale < min_size - 1e-6:
+        outlines.close()
+        return None
+    return outlines, max_size * scale
 
 
 def draw(pdf_path, records, text_font=None):
@@ -163,8 +201,9 @@ def draw(pdf_path, records, text_font=None):
             css = ('* {font-size: %.2fpt; line-height: 1.15; margin: 0; padding: 0; color: rgb(%d,%d,%d); '
                    'font-weight: %s; direction: %s; text-align: %s;}'
                    % (record['font_size'], r * 255, g * 255, b * 255, 'bold' if record['bold'] else 'normal',
-                      'rtl' if record['rtl'] else 'ltr', 'right' if record['rtl'] else 'left'))
-            body = html.escape(record['text']).replace('\n', '<br>')
+                      'rtl' if record['rtl'] else 'ltr', RTL_ALIGN if record['rtl'] else 'left'))
+            text = _keep_left_to_right(record['text']) if record['rtl'] else record['text']
+            body = html.escape(text).replace('\n', '<br>')
             markup = f'<div dir="{"rtl" if record["rtl"] else "ltr"}">{body}</div>'
             outlines, spare, scale = _outlined(rect, markup, css)
             with outlines:

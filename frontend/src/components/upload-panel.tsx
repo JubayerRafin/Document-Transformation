@@ -27,20 +27,7 @@ import { Button } from "./ui/button";
 import { Label, Textarea } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
-// The 11 languages the engine translates between (transformation/pdf/runner.py LANGUAGES).
-const LANGUAGES: [string, string][] = [
-  ["en", "English"],
-  ["ko", "Korean"],
-  ["ja", "Japanese"],
-  ["zh", "Chinese (Simplified)"],
-  ["ar", "Arabic"],
-  ["hi", "Hindi"],
-  ["bn", "Bengali"],
-  ["fr", "French"],
-  ["de", "German"],
-  ["es", "Spanish"],
-  ["pt", "Portuguese"],
-];
+import { LANGUAGES } from "@/lib/languages";
 export function UploadPanel({
   api,
   workers,

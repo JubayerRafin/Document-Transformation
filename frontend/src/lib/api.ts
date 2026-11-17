@@ -1,3 +1,4 @@
+import type { Glossary, GlossaryEntry, GlossarySummary } from "./glossary";
 export type Operation = "translation" | "pii" | "combined";
 export type Role = "customer" | "mentor" | "admin" | "viewer";
 export type Account = { name: string; role: Role; csrf: string };
@@ -206,6 +207,10 @@ const MESSAGES: Record<string, string> = {
     "This job has already started or finished. Only queued jobs can be cancelled.",
   WORKER_BUSY_STOP_PROCESSING_FIRST:
     "This server is processing a job. Wait for it to finish before revoking access.",
+  INVALID_GLOSSARY:
+    "Every glossary term needs a translation, on one line, of at most 200 characters (100 terms at most).",
+  DUPLICATE_GLOSSARY_TERM: "A term appears twice in this glossary.",
+  INVALID_LANGUAGE: "Choose two different languages.",
 };
 export class ApiError extends Error {
   constructor(
@@ -311,6 +316,20 @@ export class ApiClient {
   revokeWorker(id: string) {
     return this.request(`/v1/workers/${encodeURIComponent(id)}/revoke`, {
       method: "POST",
+    });
+  }
+  glossaries(signal?: AbortSignal) {
+    return this.request<GlossarySummary[]>("/v1/glossaries", { signal });
+  }
+  glossary(source: string, target: string, signal?: AbortSignal) {
+    const q = new URLSearchParams({ source, target });
+    return this.request<Glossary>(`/v1/glossary?${q}`, { signal });
+  }
+  saveGlossary(source: string, target: string, entries: GlossaryEntry[]) {
+    return this.request<Glossary>("/v1/glossary", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ source_language: source, target_language: target, entries }),
     });
   }
 }

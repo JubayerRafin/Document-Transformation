@@ -36,6 +36,49 @@ def foreign_script(source, target, language):
     return ', '.join(sorted(found))
 
 
+def foreign_share(source, target, language):
+    """Share of the translation's letters in a script that belongs to neither language."""
+    from transformation.pdf.runner import LANGUAGES
+    code = LANGUAGES.get(language, language)
+    if code not in TARGET_SCRIPTS: return 0.0
+    allowed = TARGET_SCRIPTS[code] | {'Latin'} | {_script(c) for c in source if c.isalpha()}
+    letters = [_script(c) for c in target if c.isalpha()]
+    return sum(s not in allowed and s is not None for s in letters) / max(1, len(letters))
+
+
+# After a retry still mixes in another script, the source is kept (and flagged) instead when the
+# foreign letters are this large a share, or the text is a short label: "Assigned To" came back
+# as Russian "назначено кому" in Bengali twice (2026-11-17), which is worse than English.
+FOREIGN_KEEP_SOURCE = 0.2
+SHORT_LABEL_WORDS = 4
+
+
+import re as _re
+
+_CJK = r'[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]'
+_FULL = {'ja': {':': '：', '(': '（', ')': '）', '.': '。', ',': '、', '!': '！', '?': '？', ';': '；'},
+         'zh': {':': '：', '(': '（', ')': '）', '.': '。', ',': '，', '!': '！', '?': '？', ';': '；'}}
+
+
+def cjk_punctuation(target, language):
+    """Full-width punctuation next to Japanese or Chinese text, as those languages write it.
+
+    TranslateGemma mixes "アクセス制限区域." and "(テキストレイヤーなし)" with full-width forms in the
+    same document (2026-11-17 review). A half-width mark becomes full-width only when the character
+    before it (or, for an opening bracket, after it) is Japanese or Chinese; marks between Latin
+    letters or digits (09:41, 1,250.00, an email, "ID: HR-2024") are unchanged."""
+    from transformation.pdf.runner import LANGUAGES
+    table = _FULL.get(LANGUAGES.get(language, language))
+    if not table: return target
+    target = _re.sub(r'\((?=' + _CJK + ')', table['('], target)
+    target = _re.sub(r'(?<=' + _CJK + r')([:.,!?;)])(?![0-9A-Za-z])',
+                     lambda m: table[m.group(1)], target)
+    # A closing bracket matches its full-width opening one.
+    if table['('] in target:
+        target = _re.sub(r'(（[^()（）]*)\)', lambda m: m.group(1) + table[')'], target)
+    return _re.sub(r'([：。、，！？；）]) +(?=' + _CJK + ')', r'\1', target)
+
+
 CLOSING = '.!?。！？．।॥؟۔…:;'
 FULL_STOPS = '.。．।۔'
 
@@ -197,14 +240,21 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             restored=restore_values(result,tokens) if attempt==1 else result
             restored=normalize_field_layout(text,restored)
             restored=match_terminal_punctuation(text,restored)
+            restored=cjk_punctuation(restored,language)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
             stray=foreign_script(text,restored,language)
             if stray and attempt==1:
                 raise ValueError(f'Translation contains {stray} text that is in neither the source nor the target language; '
                                  'answer only in the target language.')
+            if stray and (foreign_share(text,restored,language)>=FOREIGN_KEEP_SOURCE
+                          or len(text.split())<=SHORT_LABEL_WORDS):
+                # Mostly another language, or a short label: the source reads better than that.
+                record_progress('translation_kept_source',source_sha256=digest,reason='foreign_script',script=stray,model=model)
+                return text,{**totals,'translation_backend':'translategemma','kept_source_requires_review':True}
             if stray:
-                # A second answer still mixes in another script: keep it (the literals are exact) and flag it.
+                # A second answer still mixes in a word of another script: keep it (the literals are
+                # exact) and flag it.
                 record_progress('foreign_script_kept',source_sha256=digest,script=stray,model=model)
                 return restored,{**stats,**totals,'translation_backend':'translategemma','foreign_script_review_required':True}
             return restored,{**stats,**totals,'translation_backend':'translategemma'}

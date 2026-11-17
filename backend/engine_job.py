@@ -29,6 +29,10 @@ def main():
         timeout=cfg.get('timeout_seconds',3600),translation_model='translategemma:12b',pii_model='qwen3.5:9b')
     for key in ('pii_style','pii_keep'):
         if opts.get(key):options[key]=opts[key]
+    # The account's glossary for this language pair, attached by the hosted API (never by a browser).
+    if isinstance(opts.get('terminology'),dict) and opts['terminology']:
+        from transformation.llm.policy import validate_terminology
+        options['terminology']=validate_terminology(opts['terminology'])
     if cfg.get('execution_remote'):options['execution_remote']=cfg['execution_remote']
     else:
         options=local_cache_options(options,cfg,folder)

@@ -27,13 +27,29 @@ def schema_terms(ir,configured=None):
     return terms,proposals
 
 
+def _cased(original, entry, target):
+    """A term written with a capital where the glossary entry has none (sentence start, title case)
+    gets its replacement capitalised the same way; an all-caps heading gets an all-caps one."""
+    if original == entry or not target[:1].isalpha(): return target
+    if original.isupper() and len(original) > 1 and not entry.isupper(): return target.upper()
+    if original[:1].isupper() and entry[:1].islower(): return target[:1].upper() + target[1:]
+    return target
+
+
 def prepare(source,terms,values=()):
+    """Replace configured terms with their required translation before the model sees the text, and
+    lock them as protected values. Whole words, any letter case ("Redaction" at a sentence start
+    matches a customer entry "redaction"); an exact-case entry wins over a case-insensitive one."""
     terms=validate_terminology(terms)
     if not terms:return source,[],[]
-    pattern=re.compile(r'(?<!\w)(?:'+'|'.join(re.escape(s) for s in sorted(terms,key=lambda s:-len(s)))+r')(?!\w)')
+    lowered={}
+    for s in terms: lowered.setdefault(s.lower(),s)
+    pattern=re.compile(r'(?<!\w)(?:'+'|'.join(re.escape(s) for s in sorted(terms,key=lambda s:-len(s)))+r')(?!\w)',re.IGNORECASE)
     applied=[]
     def replace(match):
-        original=match.group(0);target=terms[original]
+        original=match.group(0)
+        entry=original if original in terms else lowered[original.lower()]
+        target=_cased(original,entry,terms[entry])
         # A glossary cannot authorize changing an identifier or protected value.
         from transformation.llm.translation_guard import validate_candidate
         validate_candidate(original,target,values)

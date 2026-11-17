@@ -10,6 +10,7 @@ import {
 import {
   ArrowLeft,
   ArrowUpRight,
+  BookText,
   FilePlus2,
   Files,
   FlaskConical,
@@ -30,7 +31,8 @@ import { HistoryPanel } from "./history-panel";
 import { ProgressPanel } from "./progress-panel";
 import { PreviewPanel } from "./preview-panel";
 import { WorkersPanel } from "./workers-panel";
-type View = "new" | "history" | "progress" | "result" | "servers";
+import { GlossaryPanel } from "./glossary-panel";
+type View = "new" | "history" | "progress" | "result" | "servers" | "glossary";
 const titles: Record<View, [string, string]> = {
   new: [
     "Make your document work for you",
@@ -48,6 +50,10 @@ const titles: Record<View, [string, string]> = {
   servers: [
     "Your processing servers",
     "Connect and manage the GPU servers you use for your documents.",
+  ],
+  glossary: [
+    "Your glossary",
+    "Set how your own terms are translated, for each language pair.",
   ],
 };
 export function Workspace() {
@@ -105,6 +111,7 @@ export function Workspace() {
           [
             { id: "new", label: "New transformation", icon: FilePlus2 },
             { id: "history", label: "Your documents", icon: Files },
+            { id: "glossary", label: "Glossary", icon: BookText },
             { id: "servers", label: "GPU servers", icon: Server },
           ] as const
         ).map((n) => (
@@ -180,6 +187,8 @@ export function Workspace() {
                     ? "New transformation"
                     : view === "servers"
                       ? "GPU servers"
+                      : view === "glossary"
+                        ? "Glossary"
                       : view === "history"
                         ? "Your documents"
                         : "Document details"}
@@ -315,6 +324,13 @@ export function Workspace() {
                       api={s.api}
                       workers={s.workers}
                       onRefresh={s.refresh}
+                      onError={s.handleError}
+                      readOnly={readOnly}
+                    />
+                  )}
+                  {view === "glossary" && (
+                    <GlossaryPanel
+                      api={s.api}
                       onError={s.handleError}
                       readOnly={readOnly}
                     />

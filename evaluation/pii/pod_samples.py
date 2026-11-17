@@ -23,6 +23,7 @@ def main():
                     help='override an engine-profile value, e.g. pii_endpoint=http://127.0.0.1:8000/v1 or engine_options.pii_workers=16')
     ap.add_argument('--operation', default='pii', choices=['pii', 'translation', 'combined'])
     ap.add_argument('--source', default='en'); ap.add_argument('--target', default='ko')
+    ap.add_argument('--terminology', help='JSON file of {term: required translation}, sent like a customer glossary')
     args = ap.parse_args()
     output_name = 'redacted.pdf' if args.operation == 'pii' else 'output.pdf'
     profile = json.loads(Path(args.config).read_text())['engine_profile']
@@ -48,6 +49,7 @@ def main():
             source = folder / 'source.pdf'; source.write_bytes(pdf.read_bytes())
             options = {'operation': args.operation, 'source_language': args.source, 'target_language': args.target, 'output_format': 'pdf',
                        'protected_values': [], 'document_context': '', 'pii_categories': CATEGORIES, 'pii_style': args.style}
+            if args.terminology: options['terminology'] = json.loads(Path(args.terminology).read_text(encoding='utf-8'))
             request = folder / 'request.json'
             request.write_text(json.dumps({'source': str(source), 'filename': pdf.name, 'options': options, 'profile': profile}))
             env = dict(os.environ)

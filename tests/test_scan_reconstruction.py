@@ -44,3 +44,20 @@ class ScanReconstructionTests(unittest.TestCase):
         image = np.zeros((30, 30, 3), dtype=np.uint8)
         image[:, 15:] = 255
         self.assertLess(background(image)[1], .75)
+
+
+class SizeHarmonyTests(unittest.TestCase):
+    def test_lines_of_one_source_size_are_drawn_at_one_size(self):
+        import pymupdf
+        from transformation.pdf.scan_reconstruction import harmonize_sizes, fit_text
+        font = pymupdf.Font('cjk')
+        def item(text, estimate, size, width=200):
+            box = pymupdf.Rect(0, 0, width, 30)
+            return {'record': {}, 'box': box, 'text': text, 'size': size, 'policy': {'source_font_estimate': estimate, 'minimum': 5},
+                    'fitted': fit_text(box, text, font, max_size=size, min_size=5)}
+        cells = [item('SKU-PR-0417', 10.0, 14.0), item('SKU-LT-0982', 10.4, 10.0), item('SKU-FS-2201', 10.2, 10.0)]
+        title = item('Quarterly Review', 20.0, 20.0)
+        harmonize_sizes(cells + [title], font)
+        self.assertEqual([c['size'] for c in cells], [10.0, 10.0, 10.0])
+        self.assertTrue(cells[0]['record']['size_harmonized'])
+        self.assertEqual(title['size'], 20.0)                  # a different source size is its own group

@@ -33,13 +33,47 @@ class ForeignScriptTests(unittest.TestCase):
             self.assertEqual(find(source, target, language), '', (source, target))
 
 
+class ForeignScriptFallbackTests(unittest.TestCase):
+    def run_twice(self, source, answers):
+        from unittest.mock import patch
+        from transformation.llm import translategemma, ollama_native
+        replies = iter(answers)
+        with patch.object(ollama_native, 'chat', side_effect=lambda *a, **k: (next(replies), {})):
+            return translategemma.translate('http://127.0.0.1:1/v1', 'translategemma:12b', source, 'Bengali')
+
+    def test_a_short_label_or_a_mostly_foreign_answer_keeps_the_source_after_the_retry(self):
+        text, stats = self.run_twice('Assigned To', ['назначено кому', 'назначено кому'])
+        self.assertEqual(text, 'Assigned To'); self.assertTrue(stats['kept_source_requires_review'])
+        sentence = 'They could not risk flying and had to travel by train across the border at night.'
+        text, stats = self.run_twice(sentence, ['они не могли рисковать полётом', 'они не могли рисковать полётом'])
+        self.assertEqual(text, sentence)
+
+    def test_one_foreign_word_in_a_long_translation_is_kept_and_flagged(self):
+        sentence = 'They could not risk flying and had to travel by train across the border at night.'
+        answer = 'তারা বিমানে ভ্রমণের ঝুঁকি নিতে পারেনি এবং রাতে সীমান্ত পেরিয়ে поезд দিয়ে যেতে হয়েছিল।'
+        text, stats = self.run_twice(sentence, [answer, answer])
+        self.assertEqual(text, answer); self.assertTrue(stats['foreign_script_review_required'])
+
+
+class CjkPunctuationTests(unittest.TestCase):
+    def test_half_width_marks_next_to_japanese_or_chinese_become_full_width_and_values_stay(self):
+        from transformation.llm.translategemma import cjk_punctuation as fix
+        self.assertEqual(fix('アクセス制限区域.', 'Japanese'), 'アクセス制限区域。')
+        self.assertEqual(fix('(テキストレイヤーなし)', 'ja'), '（テキストレイヤーなし）')
+        self.assertEqual(fix('分类: 内部', 'zh'), '分类：内部')
+        for text in ('文档ID: HR-2024-00417', '截图 2024-03-20 09:41 KST', '价格 KRW 1,200,000', '邮件 a.b@example.com, 电话'):
+            self.assertEqual(fix(text, 'zh'), text)
+        self.assertEqual(fix('Note: done.', 'French'), 'Note: done.')
+
+
 class KeptSourceTests(unittest.TestCase):
     def test_only_translation_validation_failures_keep_the_source_paragraph(self):
         from transformation.llm.ollama_native import validation_failure
         from transformation.llm.protected_text import PlaceholderIntegrityError
         for error in (ValueError('Translation changed, added or omitted protected literals.'),
                       ValueError('Translation added lines to a short source label.'), PlaceholderIntegrityError([]),
-                      RuntimeError('TranslateGemma failed validation.')):
+                      RuntimeError('TranslateGemma failed validation.'),
+                      ValueError('Literal recovery left a prose segment untranslated.')):
             self.assertTrue(validation_failure(error), error)
         for error in (OSError('connection refused'), TimeoutError('slow'), ValueError('Choose an explicitly configured source and target language.'),
                       RuntimeError('Model connection refused')):

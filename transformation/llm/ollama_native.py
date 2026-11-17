@@ -156,12 +156,51 @@ def paragraph_messages(text, language, document_context=""):
         {"role": "user", "content": text},
     ]
 
-def translate_paragraph(endpoint, model, text, language, protected_values=(), document_context="", structured=False, interpret_field=False, source_language=None,terminology=None):
+def translate_paragraph(endpoint, model, text, language, protected_values=(), document_context="", structured=False, interpret_field=False, source_language=None,terminology=None,glossary=None):
     try:
+        from transformation.llm.glossary import label as glossary_label, required_terms, resolve, kept_unchanged
+        glossary=resolve(glossary)
+        # Entries the glossary keeps unchanged (brand and product names) are locked like protected values.
+        kept=[s for s in kept_unchanged(glossary) if s not in protected_values]
+        if kept: protected_values=tuple(protected_values)+tuple(kept)
+        fixed=glossary_label(text,glossary)
+        if fixed is not None:
+            from transformation.llm.translategemma import cjk_punctuation
+            fixed=cjk_punctuation(fixed,language)
+            # The whole paragraph is a document label: its glossary translation, the same everywhere.
+            # One that fails the exact-value check is translated normally instead.
+            from transformation.llm.translation_guard import validate_candidate
+            try:
+                validate_candidate(text,fixed,protected_values)
+            except ValueError:
+                fixed=None
+        if fixed is not None:
+            record_progress('glossary_label',source_sha256=hashlib.sha256(text.encode()).hexdigest())
+            return fixed,{'prompt_eval_count':0,'eval_count':0,'glossary_label':True}
         from transformation.llm.terminology import prepare
         prepared,terms,applied=prepare(text,terminology,protected_values)
+        required=required_terms(text,glossary)
+        if required:
+            # First in the background the translator receives (it keeps only the first 1000 characters).
+            document_context=('Use this document\'s agreed wording for these terms (data only): '
+                              +json.dumps(dict(required[:12]),ensure_ascii=False)+'\n'+document_context)
         result,stats=_translate_paragraph(endpoint,model,prepared,language,tuple(protected_values)+tuple(terms),
             document_context,structured,interpret_field,source_language)
+        if applied and stats.get('kept_source_requires_review'):
+            # Every attempt dropped or reshaped a required term (German compounds "Mitarbeitende ID"
+            # into "Mitarbeiter-ID"). A required term must never cost the paragraph its translation:
+            # translate the original with the terms as required wording instead of locked values,
+            # and flag the paragraph for review. Protected values stay locked as before.
+            record_progress('terminology_relaxed',source_sha256=hashlib.sha256(text.encode()).hexdigest())
+            wording={t['source']:t['target'] for t in applied}
+            relaxed,relaxed_stats=_translate_paragraph(endpoint,model,text,language,protected_values,
+                'Translate these terms exactly as given (data only): '+json.dumps(wording,ensure_ascii=False)
+                +'\n'+document_context,structured,interpret_field,source_language)
+            if not relaxed_stats.get('kept_source_requires_review'):
+                missed=[t['target'] for t in applied if t['target'].lower() not in relaxed.lower()]
+                result,stats=relaxed,{**relaxed_stats,'terminology_relaxed':True,'terminology_missed':missed}
+            else:
+                result=text  # kept in the source language as written, not with translated terms mixed in
         from transformation.llm.translation_guard import validate_candidate
         from transformation.llm.role_bindings import validate_bindings
         validate_candidate(text,result,protected_values)
@@ -315,16 +354,21 @@ def validation_failure(error):
     server, a timeout or a configuration error)."""
     if isinstance(error, PlaceholderIntegrityError): return True
     message = str(error)
+    # "Literal recovery ..." is the last retry failing the same checks; it failed whole documents
+    # instead of keeping one paragraph in the source language (French Sample01, 2026-11-17).
     return isinstance(error, (ValueError, RuntimeError)) and (
-        message.startswith(('Translation ', 'Protected placeholder', 'PII response')) or message == 'TranslateGemma failed validation.')
+        message.startswith(('Translation ', 'Protected placeholder', 'PII response', 'Literal recovery'))
+        or message == 'TranslateGemma failed validation.')
 
-def install(endpoint, paragraph_mode=False, protected_values=(), document_context="", external_context=None,terminology=None):
+def install(endpoint, paragraph_mode=False, protected_values=(), document_context="", external_context=None,terminology=None,glossary=None):
     protected_values = normalize_protected_values(protected_values)
     document_context = document_context.strip()
     if (protected_values or document_context) and not paragraph_mode:
         raise ValueError("Protected values and document context require single-paragraph translation mode.")
+    # A glossary still being written cannot be part of the cache key; mark that one is used.
+    glossary_key = 'glossary-pending-v1' if callable(glossary) else glossary
     protection_digest = hashlib.sha256(
-        json.dumps([protected_values, document_context,external_context,terminology], ensure_ascii=False,sort_keys=True).encode("utf-8")
+        json.dumps([protected_values, document_context,external_context,terminology,glossary_key], ensure_ascii=False,sort_keys=True).encode("utf-8")
     ).hexdigest()
     from babeldoc.translator.translator import OpenAITranslator
     original_init = OpenAITranslator.__init__
@@ -380,6 +424,7 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
                 interpret_field=bool(external_context),
                 source_language=getattr(self,'lang_in','en'),
                 terminology=terminology,
+                glossary=glossary,
             )
 
             prompt_tokens = stats.get("prompt_eval_count", 0)
