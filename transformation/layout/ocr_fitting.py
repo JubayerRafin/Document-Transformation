@@ -33,7 +33,10 @@ def source_fit_policy(region,page):
     # supply the font estimate; thin rules and large artwork are excluded.
     measured_ink_height=float(np.median(heights))/scale
     text=region.get('text','')
-    font=pymupdf.Font('helv') if text.isascii() else pymupdf.Font('cjk')
+    # Latin letters are measured on a Latin font even with a non-ASCII symbol in the line ("Japan ·
+    # March-April" was measured on CJK letter shapes and estimated at 5.9 pt instead of ~13).
+    latin=all(ord(c)<0x250 for c in text if c.isalpha())
+    font=pymupdf.Font('helv') if latin else pymupdf.Font('cjk')
     glyphs=[font.glyph_bbox(ord(c)) for c in text if c.isalnum() and font.has_glyph(ord(c))]
     if not glyphs:return fallback
     ink_height=float(np.median([g.height for g in glyphs]))
