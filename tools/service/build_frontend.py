@@ -1,12 +1,17 @@
-"""Export the approved Product/Studio look into a real same-origin application."""
+"""Export the approved Product/Studio look into a real same-origin application.
+
+usage: python tools/service/build_frontend.py <approved design .html>
+"""
 from pathlib import Path
 import re
 import json
+import sys
 import pymupdf
 
 PROJECT=Path(__file__).resolve().parents[2]
 static=PROJECT/'backend/static'
-source=Path('design/transformx-product-and-studio.html').read_text(encoding='utf8')
+if len(sys.argv)!=2:sys.exit(__doc__.strip())
+source=Path(sys.argv[1]).read_text(encoding='utf8')
 css=re.search(r'<style>(.*?)</style>',source,re.S).group(1)
 css+='\nbody{margin:0;background:#f3f8fc;font-family:Segoe UI,Arial,sans-serif}#tx-v1{max-width:1280px;margin:0 auto;min-height:100vh;border-radius:0}#tx-v1 .tx-account{padding-right:0}#tx-v1 .tx-product-appnav{display:none}#tx-v1[data-site=product] .tx-product-appnav{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px}#tx-v1 .tx-linkbutton{display:inline-block;padding:10px 14px;border-radius:7px;text-decoration:none;color:var(--tx-accent);border:1px solid var(--tx-line)}#tx-v1 #notice:not(:empty){padding:12px;background:var(--tx-warnbg);border:1px solid var(--tx-line);border-radius:8px;margin-bottom:15px}#tx-v1 .tx-site-nav{margin-left:auto}#tx-v1 .tx-stage-list small{margin-left:auto}#tx-v1 #signin-error{color:#a53a35}#tx-v1 .tx-compare img{min-height:100px}#tx-v1 .tx-compare figcaption{padding:10px}#tx-v1 .tx-panel p{color:var(--tx-muted)}#tx-v1 dd{font-size:12px}#tx-v1 .tx-docname{overflow-wrap:anywhere}@media(max-width:480px){#tx-v1 .tx-product-art{max-width:100%}}'
 (static/'app.css').write_text(css,encoding='utf8')
