@@ -65,3 +65,7 @@ coverage/
 
 # Per-project administrator bootstrap; share only the editable example.
 supabase/bootstrap-admin.sql
+
+# Local assistant and tooling files
+.agents/
+evaluation/pii/review_artifact.html
