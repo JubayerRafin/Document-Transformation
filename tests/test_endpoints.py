@@ -289,6 +289,15 @@ class WorkerCleanupTests(unittest.TestCase):
             self.assertFalse(old.exists()); self.assertTrue(new.exists()); self.assertTrue(other.exists())
             self.assertEqual(worker.clean_old_jobs(root, hours=0), 0)
 
+    def test_a_nearly_full_job_disk_is_reported(self):
+        import importlib.util, shutil
+        spec = importlib.util.spec_from_file_location('cloud_worker', Path(__file__).resolve().parents[1] / 'tools/service/cloud_worker.py')
+        worker = importlib.util.module_from_spec(spec); spec.loader.exec_module(worker)
+        with tempfile.TemporaryDirectory() as root:
+            free = shutil.disk_usage(root).free / 1024 ** 3
+            self.assertTrue(worker.low_disk(root, minimum=free + 1))
+            self.assertFalse(worker.low_disk(root, minimum=0))
+
 
 class WorkerSettingTests(unittest.TestCase):
     def test_translation_model_name_can_be_set_for_the_worker(self):

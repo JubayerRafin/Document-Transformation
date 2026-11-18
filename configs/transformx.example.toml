@@ -85,6 +85,7 @@
 # The site worker (tools/service/cloud_worker.py), only when the hosted website is used.
 # connection_file = "configs/gpu.worker.local.json"   # downloaded from the site's Workers panel
 # keep_runs_hours = 72       # 0 keeps job folders
+# min_free_gb = 5            # stop taking jobs below this much free disk space
 
 [paths]
 # Python environments; the start script finds them on a standard GPU server.

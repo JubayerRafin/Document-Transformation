@@ -475,6 +475,16 @@ def clean_old_jobs(root,hours=None,now=None):
     return removed
 
 
+def low_disk(root,minimum=None):
+    """Free space on the job disk is below TRANSFORMX_MIN_FREE_GB (default 5): a full disk failed
+    every running job at once with unrelated-looking errors (GPU server, 2026-11-19)."""
+    if minimum is None:
+        try:minimum=float(os.environ.get('TRANSFORMX_MIN_FREE_GB','5'))
+        except ValueError:minimum=5.0
+    try:return shutil.disk_usage(root).free<minimum*1024**3
+    except OSError:return False
+
+
 def _run(args,cfg,root,ocr_session=None):
     lock=(root/'worker.lock').open('a+b');lock.write(b'0');lock.flush();lock.seek(0)
     if os.name=='nt':
@@ -491,8 +501,13 @@ def _run(args,cfg,root,ocr_session=None):
                 layout_ping()  # keeps the shared layout service from reaching its idle limit
                 removed=clean_old_jobs(root)
                 if removed:print(f'Deleted {removed} local job folder(s) past the retention period.',flush=True)
-                state=preflight(cfg);rpc(cfg,'/worker/status',{'capabilities':state});last_check=time.monotonic()
+                state=preflight(cfg)
+                if low_disk(root):
+                    state.update(ready=False,operations=[],note='Not ready: the job disk is almost full.')
+                rpc(cfg,'/worker/status',{'capabilities':state});last_check=time.monotonic()
                 print('Worker ready for: '+(', '.join(state['operations']) or 'none; prerequisites missing'),flush=True)
+            if low_disk(root):
+                time.sleep(15);continue
             j=rpc(cfg,'/worker/claim').get('job')
         except Exception:print('Application unavailable; retrying claim later.',flush=True);time.sleep(15);continue
         if not j:time.sleep(5);continue

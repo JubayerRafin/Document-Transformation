@@ -155,6 +155,7 @@ document text alone as the user message.
 | `TRANSFORMX_SERVICE_WORKERS` | Jobs processed at the same time (default 1) |
 | `TRANSFORMX_SERVICE_RETENTION_HOURS` | Engine service: delete finished jobs after this many hours (default 24) |
 | `TRANSFORMX_RUN_RETENTION_HOURS` | Site worker: delete local job folders after this many hours (default 72, `0` keeps them) |
+| `TRANSFORMX_MIN_FREE_GB` | Site worker: report not ready and take no jobs while the job disk has less free space (default 5) |
 | `TRANSFORMX_FIGURE_WORKERS` | Pictures translated at the same time (default 3; 1 when models share the GPU) |
 | `TRANSFORMX_SHARED_LAYOUT` | `0` turns off the shared page-layout model (each run then loads its own) |
 | `TRANSFORMX_PRELOAD` | `1` starts job processes from pre-loaded parents (saves import time); restart them after a code update (`tools/gpu/restart_worker.sh`) |

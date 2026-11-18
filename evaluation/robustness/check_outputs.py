@@ -6,9 +6,13 @@
 Per document: whether it was generated (else its failure code and reason), page count, protected
 values found in the source (the engine's own literal detector: codes, emails, dates, amounts, long
 numbers) and whether each is still in the output, letters in a script that is neither the source's
-nor the target's, source sentences left untranslated, replacement characters (missing glyphs) and
-text placed outside the page. Nothing here knows any particular test file. With --review, writes
-side-by-side images (source | output) of the first pages for reading the results.
+nor the target's, source sentences left untranslated, letters still in the source's own script,
+unread glyphs ("(cid:N)"), answers about the translation instead of a translation, replacement
+characters (missing glyphs) and text placed outside the page. Nothing here knows any particular test
+file. For documents made by make_corpus.py and translated into English, the meaning is checked too:
+each generator sentence found in the source must come out with its key English words, so invented
+text is not passed for a translation (every Arabic document did that on 2026-11-19 and passed).
+With --review, writes side-by-side images (source | output) of the first pages for reading the results.
 """
 import argparse
 import glob
@@ -24,6 +28,11 @@ SCRIPTS = {'ko': {'HANGUL', 'CJK'}, 'ja': {'HIRAGANA', 'KATAKANA', 'CJK'}, 'zh':
            'hi': {'DEVANAGARI'}, 'bn': {'BENGALI'}}
 ALL = ('HANGUL', 'HIRAGANA', 'KATAKANA', 'CJK', 'ARABIC', 'DEVANAGARI', 'BENGALI', 'CYRILLIC', 'GREEK', 'HEBREW', 'THAI')
 PUNCTUATION = set('।॥')  # danda: the full stop of Hindi and Bengali alike
+# Key English words of make_corpus.OTHER's sentences, in the same order in every language.
+MEANING = [(r'revenue|income|sales', r'logistic'), (r'shipment|cargo|consignment|goods|deliver', r'damage'),
+           (r'committee', r'office'), (r'training', r'fiscal|financial'), (r'satisf',), (r'writ', r'sign')]
+CHATTER = re.compile(r'here is the translation|the provided text|please provide|translation:|'
+                     r"i cannot translate|i'm sorry|as an ai", re.I)
 
 
 def script(c):
@@ -80,6 +89,36 @@ def untranslated_lines(source_pages, output_text, source):
             if len(words) >= 5 and normal(line) in out:
                 lines.append(line.strip())
     return lines
+
+
+def meaning_missing(source_pages, output_text, source, target):
+    """Generator sentences found in the source whose key English words are missing from the output,
+    as (checked, missing indexes), or None when the document is not one of make_corpus's."""
+    if target != 'en':
+        return None
+    from evaluation.robustness.make_corpus import OTHER
+    if source not in OTHER:
+        return None
+    text = normal('\n'.join(source_pages))
+    checked, missing = 0, []
+    for index, sentence in enumerate(OTHER[source]):
+        compact = normal(sentence)
+        pieces = [compact[k:k + 6] for k in range(0, max(1, len(compact) - 5), 6)]
+        if sum(piece in text for piece in pieces) < max(2, len(pieces) // 3):
+            continue
+        checked += 1
+        if not all(re.search(word, output_text, re.I) for word in MEANING[index]):
+            missing.append(index)
+    return checked, missing
+
+
+def source_script_share(output_text, source, target):
+    """Share of the output's letters still in the source's own script (when the target's differs)."""
+    own = SCRIPTS.get(source, set()) - SCRIPTS.get(target, set())
+    letters = [script(c) for c in output_text if c.isalpha()]
+    if not own or not letters:
+        return 0.0
+    return sum(s in own for s in letters) / len(letters)
 
 
 def off_page_spans(path):
@@ -150,7 +189,12 @@ def check(results, sources, target, source='en', review=None):
         row.update(pages=[len(source_pages) or None, len(output_pages)], values=sum(expected.values()),
                    values_missing=missing, foreign_letters=''.join(foreign[:20]), foreign_count=len(foreign),
                    untranslated=untranslated_lines(source_pages, output_text, source) if target != source else [],
-                   replacement_chars=output_text.count('�'), off_page_spans=off_page_spans(output))
+                   replacement_chars=output_text.count('�'), off_page_spans=off_page_spans(output),
+                   unread_glyphs=output_text.count('(cid:'),
+                   source_script=round(source_script_share(output_text, source, target), 3) if target != source else 0,
+                   chatter=[line.strip()[:80] for line in output_text.splitlines()
+                            if CHATTER.search(line) and not CHATTER.search('\n'.join(source_pages))][:3],
+                   meaning=meaning_missing(source_pages, output_text, source, target))
         if review:
             row['review_images'] = side_by_side(source_pdf, output, Path(review), name)
         rows.append(row)
@@ -170,6 +214,14 @@ def problems(row):
         found.append(f"{row['foreign_count']} letters of another script: {row['foreign_letters']}")
     if row.get('untranslated'):
         found.append(f"{len(row['untranslated'])} lines untranslated, e.g. {row['untranslated'][0][:70]!r}")
+    if row.get('unread_glyphs'):
+        found.append(f"{row['unread_glyphs']} unread glyphs (cid)")
+    if row.get('source_script', 0) > 0.05:
+        found.append(f"{row['source_script']:.0%} of letters still in the source script")
+    if row.get('chatter'):
+        found.append(f"answer about the translation: {row['chatter'][0]!r}")
+    if row.get('meaning') and row['meaning'][1]:
+        found.append(f"meaning lost in {len(row['meaning'][1])} of {row['meaning'][0]} known sentences")
     if row.get('replacement_chars'):
         found.append(f"{row['replacement_chars']} replacement characters")
     if row.get('off_page_spans'):

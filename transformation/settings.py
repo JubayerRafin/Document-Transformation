@@ -151,6 +151,8 @@ SCHEMA = {
                             'Connection file downloaded from the site\'s Workers panel'),
         'keep_runs_hours': (float, _not_negative, [('env', 'TRANSFORMX_RUN_RETENTION_HOURS', str)], '72',
                             'Delete local job folders after this many hours (0 keeps them)'),
+        'min_free_gb': (float, _not_negative, [('env', 'TRANSFORMX_MIN_FREE_GB', str)], '5',
+                        'Stop taking jobs while the job disk has less free space than this'),
     },
     'paths': {
         'engine_python': (str, None, [('env', 'TRANSFORMX_ENGINE_PYTHON')], 'found by the start script',
