@@ -27,7 +27,10 @@ def width(text):
 
 
 def rebuild(title, translated, leader, tail):
+    # BabelDOC turns any run of 20 or more ". 。…，" in a translation into one full stop, so a dot
+    # leader is rebuilt with the middle dot, the usual contents leader in CJK documents.
     dot = next((c for c in leader if not c.isspace()), '.')
+    dot = '·' if dot in '. 。…，' else dot
     dots = sum(not c.isspace() for c in leader)
     dots = max(3, dots - (width(translated) - width(title)))
     return translated.rstrip(' .。') + ' ' + dot * dots + (' ' if tail else '') + tail

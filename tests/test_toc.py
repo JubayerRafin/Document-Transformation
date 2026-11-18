@@ -18,9 +18,12 @@ class ContentsEntryTests(unittest.TestCase):
     def test_the_rebuilt_line_keeps_its_length_leader_and_number(self):
         title, leader, tail = split('Solve wired network problems' + '.' * 60 + '183')
         line = rebuild(title, '유선 네트워크 문제 해결.', leader, tail)
-        self.assertTrue(line.startswith('유선 네트워크 문제 해결 ....'))
+        self.assertTrue(line.startswith('유선 네트워크 문제 해결 ····'))
         self.assertTrue(line.endswith(' 183'))
         self.assertLessEqual(abs(width(line) - width(title + leader + tail)), 4)
+        # BabelDOC collapses runs of 20+ ". " into one full stop; the rebuilt leader must survive it.
+        import re
+        self.assertEqual(re.sub(r'[. 。…，]{20,}', '.', line), line)
 
     def test_only_the_title_is_sent_for_translation(self):
         from transformation.llm import ollama_native
@@ -33,7 +36,7 @@ class ContentsEntryTests(unittest.TestCase):
             result, stats = ollama_native.translate_paragraph('unused', 'translategemma:12b',
                                                               'Solve fax problems' + '.' * 50 + '183', 'Korean')
         self.assertEqual(sent, ['Solve fax problems'])
-        self.assertTrue(result.startswith('팩스 문제 해결 ...') and result.endswith(' 183'))
+        self.assertTrue(result.startswith('팩스 문제 해결 ···') and result.endswith(' 183'))
         self.assertTrue(stats['contents_entry'])
 
 
