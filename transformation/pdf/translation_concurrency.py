@@ -2,10 +2,21 @@
 from contextlib import contextmanager
 from copy import copy
 from dataclasses import fields,is_dataclass
-from threading import Lock
+from threading import Lock,local
 
 _STATE_LOCK=Lock()
 _FLIGHTS={}
+# The paragraph each thread's private copy stands for. Overrides of the translation input (re-read
+# text, repaired literals, OCR-locked text) are keyed by the original paragraph; looked up with the
+# copy they were missed, so paragraphs holding a placeholder were sent with BabelDOC's own text
+# (reversed Arabic, "(cid:12)" glyphs) while the overrides were recorded as applied (2026-11-19).
+_ACTIVE=local()
+
+
+def original(paragraph):
+    """The source paragraph for a private copy being translated in this thread, else paragraph."""
+    pair=getattr(_ACTIVE,'pair',None)
+    return pair[1] if pair and pair[0] is paragraph else paragraph
 
 
 @contextmanager
@@ -31,7 +42,7 @@ def install(translator_class,engine_class):
     text uses the vendor cache after the first caller finishes, when enabled.
     """
     if getattr(translator_class,'_transformx_parallel_isolation',False):return
-    original=translator_class.translate_paragraph
+    translate=translator_class.translate_paragraph
     cached=engine_class.translate
 
     def isolated(self,paragraph,page,*args,**kwargs):
@@ -48,7 +59,11 @@ def install(translator_class,engine_class):
             kwargs=dict(kwargs)
             for key in ('title_paragraph','local_title_paragraph'):
                 if key in kwargs:kwargs[key]=ir_copy(kwargs[key])
-            result=original(self,private,private_page,*args,**kwargs)
+            _ACTIVE.pair=(private,paragraph)
+            try:
+                result=translate(self,private,private_page,*args,**kwargs)
+            finally:
+                _ACTIVE.pair=None
             if private_page.pdf_paragraph:
                 raise RuntimeError('Parallel translation produced page annotations; retry with one translation worker.')
             if getattr(private,'debug_id',None)!=getattr(paragraph,'debug_id',None):

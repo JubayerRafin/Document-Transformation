@@ -112,6 +112,20 @@ class ComplexScriptTests(unittest.TestCase):
                     for line in block.get('lines', []):
                         self.assertTrue(page.rect.contains(pymupdf.Rect(line['bbox'])), line['bbox'])
 
+    def test_a_box_under_a_point_wide_is_grown_to_hold_its_text(self):
+        # A lone danda measured 0.9 pt wide at the right edge of a slide once failed a whole document.
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, 'out.mono.pdf')
+            with pymupdf.open() as pdf:
+                pdf.new_page(width=400, height=300); pdf.save(path)
+            results = cs.draw(path, [{'page': 0, 'box': [399.4, 150, 400.3, 157], 'text': '।', 'font_size': 11.0,
+                                      'color': [0, 0, 0], 'bold': False, 'rtl': False, 'paragraph_id': 'danda'}])
+            self.assertEqual(results[0]['status'], 'drawn')
+            with pymupdf.open(path) as pdf:
+                ink = [d['rect'] for d in pdf[0].get_drawings()]
+                self.assertTrue(ink)
+                self.assertTrue(all(pdf[0].rect.contains(r) for r in ink))
+
 
 if __name__ == '__main__':
     unittest.main()

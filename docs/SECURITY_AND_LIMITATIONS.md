@@ -50,8 +50,11 @@ masked output as a draft that a person checks before it is shared.
   own text is kept as it is.
 - **Copying text from outputs.** Mixed Arabic and Latin lines can come out of copy and paste in the
   wrong order.
-- **Source scripts.** Arabic, Hindi and Bengali PDFs whose text layer is wrong (some generators
-  write one) are translated from that wrong text; scans in these scripts are not read.
+- **Source scripts.** Arabic, Hebrew, Hindi, Bengali and other shaped-script paragraphs whose
+  characters the PDF reader gets wrong (letters stored only as ActualText, as Word and LibreOffice
+  do, or right-to-left text stored in drawing order) are read again with a second reader and checked
+  before use (recorded in the run's `unmapped-text.json`). A paragraph that cannot be read either
+  way is still translated from the wrong text; scans in these scripts are not read.
 - **Page limit.** The website accepts PDFs of up to 200 pages and 50 MB; split longer documents.
 - **Glossaries.** A forced term can produce awkward compound words (German).
 - **Hosting.** The website depends on Cloudflare and Supabase; internal deployments should use the

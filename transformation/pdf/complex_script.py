@@ -194,6 +194,23 @@ def _invisible_text(page, rect, text, size, text_font, rtl):
     page.insert_text((rect.x0, min(rect.y1, rect.y0 + fitted)), line, fontsize=fitted, **options)
 
 
+def _grown(rect, record, page_rect):
+    """A box under a point wide or tall (a lone danda "।" measured as 0.9 pt) grown around its centre
+    to hold the text at its font size, kept on the page. Such a box once failed a whole Bengali
+    document (mass test, 2026-11-19)."""
+    import pymupdf
+    size = max(1.0, record.get('font_size') or 10)
+    width = max(rect.width, 0.7 * size * max(1, len(record.get('text') or '')))
+    height = max(rect.height, 1.2 * size)
+    centre = pymupdf.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
+    grown = pymupdf.Rect(centre.x - width / 2, centre.y - height / 2, centre.x + width / 2, centre.y + height / 2)
+    if grown.x1 > page_rect.x1: grown += (page_rect.x1 - grown.x1, 0, page_rect.x1 - grown.x1, 0)
+    if grown.x0 < page_rect.x0: grown += (page_rect.x0 - grown.x0, 0, page_rect.x0 - grown.x0, 0)
+    if grown.y1 > page_rect.y1: grown += (0, page_rect.y1 - grown.y1, 0, page_rect.y1 - grown.y1)
+    if grown.y0 < page_rect.y0: grown += (0, page_rect.y0 - grown.y0, 0, page_rect.y0 - grown.y0)
+    return grown & page_rect
+
+
 def draw(pdf_path, records, text_font=None):
     """Draw recorded paragraphs into the written PDF; returns per-paragraph results.
     text_font: a font file covering these scripts, for the invisible searchable text layer."""
@@ -209,6 +226,8 @@ def draw(pdf_path, records, text_font=None):
             x0, y0, x1, y1 = record['box']
             rect = pymupdf.Rect(x0, y0, x1, y1) * page.transformation_matrix
             rect.normalize()
+            if rect.width < 1 or rect.height < 1:
+                rect = _grown(rect, record, page.rect)
             if rect.is_empty or rect.width < 1 or rect.height < 1:
                 results.append({'paragraph_id': record['paragraph_id'], 'status': 'empty_box'}); continue
             # Slots are as tall as the source line (a 10 pt cell for 10 pt text): allow the extra height

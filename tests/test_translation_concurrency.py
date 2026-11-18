@@ -34,6 +34,25 @@ class ParallelTranslationTests(unittest.TestCase):
         self.assertEqual([p.debug_id for p in page.pdf_paragraph],['alpha','beta'])
         self.assertEqual(context,{'title':['source']})
 
+    def test_inputs_recorded_for_a_paragraph_are_found_from_its_private_copy(self):
+        # Overrides are keyed by the original paragraph; translation works on a copy (2026-11-19).
+        from transformation.pdf.translation_concurrency import original
+        barrier=Barrier(2)
+        class Translator:
+            def translate_paragraph(self,p,page,**kwargs):
+                barrier.wait(timeout=3)
+                p.unicode=self.inputs[id(original(p))]
+        class Engine:
+            def translate(self,text):return text
+        install(Translator,Engine)
+        paras=[Paragraph('alpha','(cid:3)lpha'),Paragraph('beta','ateb')]
+        translator=Translator();translator.inputs={id(paras[0]):'alpha re-read',id(paras[1]):'beta re-read'}
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            for f in [pool.submit(translator.translate_paragraph,p,NS(pdf_paragraph=paras)) for p in paras]:f.result()
+        self.assertEqual([p.unicode for p in paras],['alpha re-read','beta re-read'])
+        stranger=Paragraph('gamma','x')
+        self.assertIs(original(stranger),stranger)
+
     def test_page_mutations_and_identifier_changes_fail_closed(self):
         from transformation.llm.ollama_native import TRANSLATION_FAILED
         class Translator:
