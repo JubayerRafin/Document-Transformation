@@ -499,8 +499,11 @@ def main():
     record_progress('worker_thin_glyph_lines', installed=install_thin_glyphs())
     from transformation.pdf.layout_duplicates import install as install_layout_duplicates
     record_progress('worker_layout_duplicates', installed=install_layout_duplicates())
-    from transformation.pdf.font_flags import install as install_font_flags
+    from transformation.pdf.font_flags import install as install_font_flags, learn as learn_font_styles
     record_progress('worker_font_flags', installed=install_font_flags())
+    if '--files' in sys.argv:
+        # Serif or sans-serif from the source's own fonts (font_shapes.py), for choosing output fonts.
+        record_progress('worker_font_styles', fonts=learn_font_styles(sys.argv[sys.argv.index('--files') + 1]))
     from transformation.pdf.symbol_fonts import install as install_symbol_fonts
     record_progress('worker_symbol_fonts', installed=install_symbol_fonts())
     from transformation.pdf.layout_service import install as install_layout_service

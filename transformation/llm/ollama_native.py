@@ -241,6 +241,15 @@ def paragraph_messages(text, language, document_context=""):
     ]
 
 def translate_paragraph(endpoint, model, text, language, protected_values=(), document_context="", structured=False, interpret_field=False, source_language=None,terminology=None,glossary=None):
+    from transformation.llm.toc import split as toc_split, rebuild as toc_rebuild
+    entry=toc_split(text)
+    if entry:
+        # A contents line: only its title is translated; leader dots and page number are kept.
+        title,leader,tail=entry
+        translated,stats=translate_paragraph(endpoint,model,title,language,protected_values,document_context,
+            structured,interpret_field,source_language,terminology,glossary)
+        record_progress('contents_entry',source_sha256=hashlib.sha256(text.encode()).hexdigest())
+        return toc_rebuild(title,translated,leader,tail),{**stats,'contents_entry':True}
     try:
         from transformation.llm.glossary import label as glossary_label, required_terms, resolve, kept_unchanged
         glossary=resolve(glossary)
