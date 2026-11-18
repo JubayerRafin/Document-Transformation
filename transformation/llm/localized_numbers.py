@@ -49,6 +49,24 @@ def word_quantities(text,values=()):
     return result
 
 
+_ORDINAL_SMALL=('first second third fourth fifth sixth seventh eighth ninth tenth eleventh twelfth thirteenth '
+                'fourteenth fifteenth sixteenth seventeenth eighteenth nineteenth').split()
+_ORDINAL_VALUES={word:index for index,word in enumerate(_ORDINAL_SMALL,1)}
+_ORDINAL_VALUES.update({word[:-1]+'ieth':(index+2)*10 for index,word in enumerate(_TENS)})
+_ORDINAL_WORD=re.compile(r'(?<![\w-])(?:('+'|'.join(_TENS)+r')-)?('+'|'.join(sorted(_ORDINAL_VALUES,key=len,reverse=True))+r')(?![\w-])',re.I)
+
+
+def ordinal_word_quantities(text,values=()):
+    """Spelled-out ordinals ("the third consecutive quarter", "twenty-first"). Translations write
+    them as digits in every target language ("3분기", "3. Quartal", "第3四半期"); without this a
+    correct translation was rejected as adding a number (2026-11-19)."""
+    result=Counter()
+    for match in _ORDINAL_WORD.finditer(_ordinary_text(text,values)):
+        tens,word=match.group(1),match.group(2).lower()
+        result[(_VALUES[tens.lower()] if tens else 0)+_ORDINAL_VALUES[word]]+=1
+    return result
+
+
 def ordinal_quantities(text,values=()):
     result=Counter()
     for match in re.finditer(r'(?<![\w-])(\d+)(st|nd|rd|th)\b',_ordinary_text(text,values),re.I):
@@ -80,9 +98,20 @@ def month_sequence(text,values=()):
 def permits_numeric_additions(source,target,additions,values=()):
     """Every extra bare integer needs one matching ordinary source expression."""
     if not additions:return True
+    # "five percent" is written "5%" (or "5 %") in translations; each source "percent" word licenses
+    # one added N% whose N is licensed like any other number below (2026-11-19: 53 rejections).
+    percent_words=len(re.findall(r'\bper\s?cent\b',_ordinary_text(source,values),re.I))
+    adjusted=Counter()
+    for literal,count in additions.items():
+        match=re.fullmatch(r'([0-9]+)\s?%',literal)
+        used=min(count,percent_words) if match else 0
+        if used:adjusted[match[1]]+=used;percent_words-=used
+        if count-used:adjusted[literal]+=count-used
+    additions=adjusted
     if any(not re.fullmatch(r'[0-9]+',literal) for literal in additions):return False
     source_months=month_sequence(source,values)
     months=Counter(source_months);quantities=word_quantities(source,values)
+    quantities.update(ordinal_word_quantities(source,values))
     # Restrict ordinal localization to explicit Korean ordinal suffixes.
     source_ordinals=ordinal_quantities(source,values)
     target_ordinals=Counter(int(m[1]) for m in re.finditer(r'(?<![\w.])(\d+)\s*(?:번째|차)(?![A-Za-z0-9])',target,re.ASCII))
@@ -92,7 +121,8 @@ def permits_numeric_additions(source,target,additions,values=()):
     # Only permit quantity additions outside calendar-month positions.
     target_literals=Counter()
     for literal in protect_values(target,values)[1].values():
-        if re.fullmatch(r'[0-9]+',literal):target_literals[int(literal)]+=1
+        number=re.fullmatch(r'([0-9]+)(?:\s?%)?',literal)
+        if number:target_literals[int(number[1])]+=1
     normalized=Counter()
     for literal,count in additions.items():normalized[int(literal)]+=count
     localized_calendar=Counter()

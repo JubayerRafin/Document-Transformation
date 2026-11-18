@@ -88,3 +88,27 @@ class LocalizedNumberTests(unittest.TestCase):
         with patch('transformation.llm.ollama_native.chat',return_value=('6월',{})) as chat,patch('transformation.llm.ollama_native.record_progress'):
             result,_=translate('http://127.0.0.1:11434/v1','translategemma:12b','June','Korean')
         self.assertEqual(result,'6월');self.assertEqual(chat.call_count,1)
+
+
+class OrdinalWordTests(unittest.TestCase):
+    def test_spelled_out_ordinals_may_become_digits(self):
+        from transformation.llm.localized_numbers import ordinal_word_quantities
+        from transformation.llm.translation_guard import validate_candidate
+        self.assertEqual(dict(ordinal_word_quantities('the third quarter, the twenty-first day, the Second floor')),
+                         {3: 1, 21: 1, 2: 1})
+        source = ('Customer satisfaction rose for the third consecutive quarter. Costs stayed within budget, although '
+                  'prices increased in the second month. The total was JPY 769,375,000 on 03/04/2027.')
+        validate_candidate(source, '고객 만족도는 3분기 연속 상승했습니다. 2개월 차에 가격이 올랐지만 비용은 예산 범위 내였습니다. '
+                                   '총액은 JPY 769,375,000이며 날짜는 03/04/2027입니다.')
+        validate_candidate(source, 'Die Kundenzufriedenheit stieg im 3. Quartal in Folge. Im 2. Monat stiegen die Preise. '
+                                   'Gesamt: JPY 769,375,000 am 03/04/2027.')
+
+    def test_other_added_numbers_are_still_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        source = 'Prices increased in the second month. The total was JPY 769,375,000.'
+        with self.assertRaises(ValueError):   # a number with no source expression
+            validate_candidate(source, '7개월 차에 가격이 올랐습니다. 총액은 JPY 769,375,000입니다.')
+        with self.assertRaises(ValueError):   # one ordinal does not license two numbers
+            validate_candidate(source, '2개월 차와 2분기에 가격이 올랐습니다. 총액은 JPY 769,375,000입니다.')
+        with self.assertRaises(ValueError):   # protected values stay exact
+            validate_candidate(source, '2개월 차에 가격이 올랐습니다. 총액은 JPY 769,375,001입니다.')

@@ -286,6 +286,41 @@ def write_story(doc, html, user_css, archive, page_size, columns, margin):
         doc.insert_pdf(part)
 
 
+SHAPED_SOURCES = {'ar', 'hi', 'bn'}
+
+
+def office_pdf(html, lang, page_size, fonts):
+    """Arabic, Hindi and Bengali sources through LibreOffice (HTML to PDF). MuPDF's own layout
+    shapes them on screen but writes a wrong text layer for shaped glyphs (Hindi read back as
+    Batak, Bengali as Khmer), which no real document has. LibreOffice writes correct text."""
+    import shutil
+    import subprocess
+    import tempfile
+    soffice = shutil.which('soffice') or shutil.which('libreoffice')
+    if not soffice:
+        return None
+    font_dir = Path.home() / '.fonts'
+    font_dir.mkdir(exist_ok=True)
+    for name in FONT_FILES[lang]:
+        if not (font_dir / name).exists() and (fonts / name).exists():
+            shutil.copy2(fonts / name, font_dir / name)
+            subprocess.run(['fc-cache', '-f', str(font_dir)], capture_output=True)
+    direction = 'rtl' if lang == 'ar' else 'ltr'
+    width_in, height_in = page_size[0] / 72, page_size[1] / 72
+    page = (f'<!doctype html><html lang="{lang}" dir="{direction}"><head><meta charset="utf-8"><style>'
+            f'@page {{size: {width_in:.2f}in {height_in:.2f}in; margin: 0.8in;}} '
+            f'body {{font-family: "Go Noto Kurrent", sans-serif; font-size: 11pt;}} '
+            f'table {{border-collapse: collapse;}} td, th {{border: 1px solid #999; padding: 3px;}}'
+            f'</style></head><body>{html}</body></html>')
+    with tempfile.TemporaryDirectory() as folder:
+        source = Path(folder, 'doc.html')
+        source.write_text(page, encoding='utf-8')
+        subprocess.run([soffice, '--headless', '--convert-to', 'pdf:writer_web_pdf_Export', '--outdir', folder, str(source)],
+                       capture_output=True, timeout=180)
+        output = Path(folder, 'doc.pdf')
+        return pymupdf.open(stream=output.read_bytes(), filetype='pdf') if output.exists() else None
+
+
 def draw_slides(doc, rng, lang, values, fonts, palette, count):
     dark, light = palette
     regular = str(fonts / FONT_FILES['en' if lang == 'en' else lang][0])
@@ -348,10 +383,11 @@ def scanned_copy(src, rng, dpi):
     return out
 
 
-def make_document(index, rng, fonts, sources, scanned_share):
+def make_document(index, rng, fonts, sources, scanned_share, english_share=0.7):
     values = Values(rng)
     kind = KINDS[index % len(KINDS)]
-    lang = 'en' if rng.random() < 0.7 else rng.choice([s for s in sources if s != 'en'] or ['en'])
+    others = [s for s in sources if s != 'en']
+    lang = 'en' if (rng.random() < english_share or not others) else rng.choice(others)
     size_name = rng.choice(list(SIZES)) if kind != 'slides' else '16:9'
     page_size = SIZES.get(size_name, (960, 540))
     landscape = kind != 'slides' and rng.random() < 0.15
@@ -364,7 +400,15 @@ def make_document(index, rng, fonts, sources, scanned_share):
     doc = pymupdf.open()
     features = {'kind': kind, 'source_language': lang, 'page_size': size_name, 'landscape': landscape, 'columns': columns,
                 'font_size': font_size}
-    if kind == 'slides':
+    office = None
+    if lang in SHAPED_SOURCES:
+        html = body_html('report' if kind == 'slides' else kind, rng, lang, values)
+        office = office_pdf(html, lang, page_size, fonts)
+        features['made_with'] = 'libreoffice' if office else 'mupdf (text layer unreliable)'
+    if office is not None:
+        doc.insert_pdf(office)
+        office.close()
+    elif kind == 'slides':
         draw_slides(doc, rng, lang, values, fonts, palette, rng.randint(3, 6))
     else:
         archive = pymupdf.Archive(str(fonts))
@@ -455,17 +499,21 @@ def main():
     parser.add_argument('--scanned', type=float, default=0.25, help='share of documents turned into scans')
     parser.add_argument('--long', type=int, default=0, help='also write one document with this many pages')
     parser.add_argument('--edge', action='store_true', help='also write the edge-case files')
+    parser.add_argument('--english-share', type=float, default=0.7, help='share of documents written in English')
+    parser.add_argument('--name', default='', help='file name prefix (default: the set name)')
+    parser.add_argument('--seed', type=int, default=0, help='added to the set seed, for further distinct documents')
     args = parser.parse_args()
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     fonts = Path(args.fonts)
     sources = args.sources.split(',')
-    seed = 1000 if args.set == 'dev' else 900000
+    seed = (1000 if args.set == 'dev' else 900000) + args.seed
+    prefix = args.name or args.set
     manifest = {}
     for index in range(args.count):
         rng = random.Random(seed + index)
-        doc, features = make_document(index, rng, fonts, sources, args.scanned)
-        name = f'{args.set}-{index:03d}-{features["kind"]}-{features["source_language"]}{"-scan" if features.get("scanned") else ""}.pdf'
+        doc, features = make_document(index, rng, fonts, sources, args.scanned, args.english_share)
+        name = f'{prefix}-{index:03d}-{features["kind"]}-{features["source_language"]}{"-scan" if features.get("scanned") else ""}.pdf'
         doc.save(out / name, garbage=3, deflate=True)
         features['pages'] = len(doc)
         doc.close()

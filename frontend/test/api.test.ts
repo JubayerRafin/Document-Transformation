@@ -94,3 +94,25 @@ it('signs out with session cookies and CSRF, retaining retry state on failure',a
  await api.logout();const [path,init]=transport.mock.calls[1];
  expect(path).toBe('/v1/session');expect(init.method).toBe('DELETE');expect(init.credentials).toBe('same-origin');expect(init.headers.get('X-CSRF-Token')).toBe('session-csrf');expect(api.csrf).toBe('');
 });
+import { pdfFacts, MAX_PAGES } from "../src/lib/api";
+it("refuses PDFs over the page limit or with a password before upload", async () => {
+  const pdf = new File(["%PDF-1.7\n"], "manual.pdf");
+  expect(await validatePdf(pdf, async () => ({ pages: 312 }))).toBe(
+    `This PDF has 312 pages; the limit is ${MAX_PAGES}. Split it into parts of up to ${MAX_PAGES} pages.`,
+  );
+  expect(await validatePdf(pdf, async () => ({ pages: MAX_PAGES }))).toBeNull();
+  expect(await validatePdf(pdf, async () => ({ encrypted: true }))).toContain("password-protected");
+  // When pdf.js cannot read the file here, the server's own check decides.
+  expect(await validatePdf(pdf, async () => ({}))).toBeNull();
+});
+it("reads the page count with pdf.js and recognises a password", async () => {
+  const pdf = new File(["%PDF-1.7\n"], "manual.pdf");
+  const fake = (result: () => Promise<{ numPages: number; destroy: () => Promise<void> }>) => async () => ({
+    GlobalWorkerOptions: { workerSrc: "" },
+    getDocument: () => ({ promise: result() }),
+  });
+  expect(await pdfFacts(pdf, fake(async () => ({ numPages: 250, destroy: async () => {} })))).toEqual({ pages: 250 });
+  const locked = Object.assign(new Error("No password given"), { name: "PasswordException" });
+  expect(await pdfFacts(pdf, fake(async () => Promise.reject(locked)))).toEqual({ encrypted: true });
+  expect(await pdfFacts(pdf, async () => Promise.reject(new Error("no pdf.js")))).toEqual({});
+});

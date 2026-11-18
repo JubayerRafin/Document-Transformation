@@ -176,6 +176,24 @@ def fit_shaped(rect, text, max_size, min_size, color=(0.0, 0.0, 0.0)):
     return outlines, max_size * scale
 
 
+def _invisible_text(page, rect, text, size, text_font, rtl):
+    """Write the paragraph's text invisibly inside rect, smaller if needed: its unshaped widths differ
+    from the drawn outlines, and text placed past the page edge is dropped by PDF readers. A single
+    long line written when the box was too small ran off the page, so values at the end of Hindi,
+    Bengali and Arabic paragraphs could not be found or copied (checked 2026-11-19)."""
+    import pymupdf
+    options = dict(fontname='TxShaped', fontfile=str(text_font), render_mode=3)
+    align = pymupdf.TEXT_ALIGN_RIGHT if rtl else pymupdf.TEXT_ALIGN_LEFT
+    for factor in (1.0, 0.85, 0.7, 0.55, 0.42, 0.32, 0.24, 0.18):
+        if page.insert_textbox(rect, text, fontsize=max(0.5, size * factor), align=align, **options) >= 0:
+            return
+    # Still too long for the box (a tiny cell): one line, sized to the box width, inside the page.
+    line = ' '.join(text.split())
+    width = pymupdf.Font(fontfile=str(text_font)).text_length(line, fontsize=1) or 1
+    fitted = max(0.5, min(size, rect.width / width))
+    page.insert_text((rect.x0, min(rect.y1, rect.y0 + fitted)), line, fontsize=fitted, **options)
+
+
 def draw(pdf_path, records, text_font=None):
     """Draw recorded paragraphs into the written PDF; returns per-paragraph results.
     text_font: a font file covering these scripts, for the invisible searchable text layer."""
@@ -213,11 +231,7 @@ def draw(pdf_path, records, text_font=None):
                 # read right-to-left text from visual order, so RTL lines are stored that way.
                 size = max(1.0, record['font_size'] * scale)
                 stored = _visual_order(record['text']) if record['rtl'] else record['text']
-                options = dict(fontname='TxShaped', fontfile=str(text_font), fontsize=size, render_mode=3)
-                if page.insert_textbox(rect, stored, align=pymupdf.TEXT_ALIGN_RIGHT if record['rtl']
-                                       else pymupdf.TEXT_ALIGN_LEFT, **options) < 0:
-                    # Did not fit (unshaped widths differ): place it anyway; invisible text needs no fit.
-                    page.insert_text((rect.x0, rect.y0 + size), stored, **options)
+                _invisible_text(page, rect, stored, size, text_font, record['rtl'])
             results.append({'paragraph_id': record['paragraph_id'], 'status': 'drawn' if spare >= 0 else 'not_fitted',
                             'scale': round(scale, 3)})
         pdf.save(temporary, garbage=1, deflate=True)

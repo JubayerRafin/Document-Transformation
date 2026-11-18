@@ -349,7 +349,7 @@ export class ApiClient {
     });
   }
 }
-export async function validatePdf(file: File) {
+export async function validatePdf(file: File, facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts) {
   if (!/\.pdf$/i.test(file.name) || file.size < 5)
     return "Choose a PDF document.";
   if (file.size > 50_000_000) return "Choose a PDF smaller than 50 MB.";
@@ -361,7 +361,44 @@ export async function validatePdf(file: File) {
   } catch {
     return "We couldn’t read that file. Please choose it again.";
   }
+  const { pages, encrypted } = await facts(file);
+  if (encrypted)
+    return "This PDF is password-protected. Remove the password, then upload it again.";
+  if (pages !== undefined && pages > MAX_PAGES)
+    return `This PDF has ${pages} pages; the limit is ${MAX_PAGES}. Split it into parts of up to ${MAX_PAGES} pages.`;
   return null;
+}
+export const MAX_PAGES = 200;
+type PdfJs = {
+  GlobalWorkerOptions: { workerSrc: string };
+  getDocument: (src: { data: ArrayBuffer; isEvalSupported: boolean }) => {
+    promise: Promise<{ numPages: number; destroy: () => Promise<void> }>;
+  };
+};
+/**
+ * Page count and password protection, read in the browser with the site's own copy of pdf.js
+ * (published at /pdfjs/), so a file the processing server would refuse is caught before upload.
+ * Anything that cannot be read here is left to the server's own check.
+ */
+export async function pdfFacts(
+  file: File,
+  load: () => Promise<PdfJs> = () => {
+    // A runtime address, never bundled: the site serves its own copy of pdf.js.
+    const url = ["", "pdfjs", "pdf.mjs"].join("/");
+    return import(/* webpackIgnore: true */ /* turbopackIgnore: true */ /* @vite-ignore */ url) as Promise<PdfJs>;
+  },
+): Promise<{ pages?: number; encrypted?: boolean }> {
+  try {
+    const pdfjs = await load();
+    pdfjs.GlobalWorkerOptions.workerSrc = "/pdfjs/pdf.worker.mjs";
+    const doc = await pdfjs.getDocument({ data: await file.arrayBuffer(), isEvalSupported: false }).promise;
+    const pages = doc.numPages;
+    await doc.destroy();
+    return { pages };
+  } catch (error) {
+    if ((error as { name?: string })?.name === "PasswordException") return { encrypted: true };
+    return {};
+  }
 }
 export function seconds(value?: number) {
   return typeof value === "number" ? `${value.toFixed(1)} s` : "Not measured";

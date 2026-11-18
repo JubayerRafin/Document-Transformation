@@ -88,6 +88,31 @@ class ComplexScriptTests(unittest.TestCase):
                     self.assertEqual(text.count('ড্রোনগুলোর'), 1)     # only the invisible layer is text
 
 
+    def test_the_invisible_text_of_a_tight_box_stays_inside_the_page(self):
+        import os
+        font = os.environ.get('TRANSFORMX_TEST_SHAPED_FONT', str(Path.home() / '.cache/babeldoc/fonts/GoNotoKurrent-Regular.ttf'))
+        if not Path(font).exists():
+            self.skipTest('needs a font covering Devanagari')
+        text = ('तुलना के लिए, यहां समान प्रकार की जानकारी दी गई है: कर्मचारी Kim Min-jun, आईडी EMP-2024-8831, '
+                'ईमेल minjun.kim@example-corp.com, API कुंजी sk_live_4f9a-REDACT_ME.')
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, 'out.pdf')
+            with pymupdf.open() as pdf:
+                pdf.new_page(width=600, height=400); pdf.save(path)
+            # A box two lines high: the unshaped text does not fit it at full size.
+            cs.draw(path, [{'page': 0, 'box': [40, 300, 560, 326], 'text': text, 'font_size': 11.0, 'color': [0, 0, 0],
+                            'bold': False, 'rtl': False, 'paragraph_id': 'tight'}], font)
+            with pymupdf.open(path) as pdf:
+                page = pdf[0]
+                extracted = ''.join(page.get_text().split())
+                for value in ('EMP-2024-8831', 'minjun.kim@example-corp.com', 'sk_live_4f9a-REDACT_ME'):
+                    self.assertIn(value, extracted)
+                    self.assertTrue(page.search_for(value), value)
+                for block in page.get_text('dict', clip=pymupdf.Rect(-1e4, -1e4, 1e4, 1e4))['blocks']:
+                    for line in block.get('lines', []):
+                        self.assertTrue(page.rect.contains(pymupdf.Rect(line['bbox'])), line['bbox'])
+
+
 if __name__ == '__main__':
     unittest.main()
 

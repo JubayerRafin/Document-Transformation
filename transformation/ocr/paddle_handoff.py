@@ -48,6 +48,9 @@ def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=
             raise ValueError('Uploaded PDF does not match the saved OCR page image.')
         if not lines and not allow_unreadable:
             raise ValueError('No OCR text detected in the verified source image; preserve it for visual review.')
+        # One detected line across a table rule becomes one line per cell (table_rules.py).
+        from transformation.ocr.table_rules import split_at_rules
+        lines = split_at_rules(page, lines)
         regions = []
         if not lines:
             regions.append(Region('unreadable_page', 'raster_page', list(page.rect),

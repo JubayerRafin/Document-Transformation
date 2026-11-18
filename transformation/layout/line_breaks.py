@@ -45,8 +45,8 @@ def join_split_dates(document):
                 last=comps[-1].pdf_same_style_unicode_characters
                 last.unicode=last.unicode.rstrip()+q.unicode.strip()
             else:
-                from copy import deepcopy
-                comps.extend(deepcopy(q.pdf_paragraph_composition))
+                from transformation.pdf.ir_json import ir_copy
+                comps.extend(ir_copy(q.pdf_paragraph_composition))
             p.unicode = text.rstrip()+q.unicode.strip()
             b.y = min(b.y,q.box.y)
             removed.add(id(q))

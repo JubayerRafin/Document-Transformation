@@ -140,7 +140,8 @@ def check(results, sources, target, source='en', review=None):
                 hits = max(found.count(normal(value)), sum(len(page.search_for(value)) for page in doc))
                 if hits < count:
                     missing[value] = count
-        allowed = SCRIPTS.get(target, set()) | SCRIPTS.get(source, set())
+        # Scripts the source itself uses (a Greek letter in a formula) are not foreign in the output.
+        allowed = SCRIPTS.get(target, set()) | SCRIPTS.get(source, set()) | {script(c) for c in '\n'.join(source_pages)} - {None}
         foreign = [c for c in output_text if script(c) and script(c) not in allowed]
         row.update(pages=[len(source_pages) or None, len(output_pages)], values=sum(expected.values()),
                    values_missing=missing, foreign_letters=''.join(foreign[:20]), foreign_count=len(foreign),

@@ -15,6 +15,39 @@ except ImportError:
     from raster_policy import render_page
 
 
+def _run_stage(stage, arguments, out, limit, model_pool):
+    with (out/f'{stage}.log').open('w') as log:
+        if model_pool is None:
+            subprocess.run([sys.executable, '-u', *arguments], stdout=log, stderr=subprocess.STDOUT, check=True, timeout=600)
+            return
+        from contextlib import redirect_stdout,redirect_stderr
+        with redirect_stdout(log),redirect_stderr(log):
+            if stage=='detection':
+                from tools.ocr.diagnose_paddle_detector import worker
+                worker(out/'page-1.png',out,limit,'gpu:0',model_factory=model_pool.detection)
+            else:
+                from tools.ocr.recognize_paddle_boxes import main as recognize
+                recognize(arguments[1:],model_factory=model_pool.recognition)
+
+
+def _out_of_memory(exc, log):
+    """Paddle reports GPU memory exhaustion as MemoryError (also inside a subprocess's log)."""
+    text=f'{type(exc).__name__} {exc}'
+    try:text+=log.read_text(errors='replace')[-4000:]
+    except OSError:pass
+    return 'MemoryError' in text or 'out of memory' in text.lower() or 'ResourceExhausted' in text
+
+
+def _free_gpu_memory():
+    try:
+        import paddle
+        paddle.device.cuda.empty_cache()
+    except Exception:
+        pass
+    import gc
+    gc.collect()
+
+
 def run(source, output, source_language='unknown', model_pool=None):
     out = Path(output).resolve()
     out.mkdir(parents=True, exist_ok=False)
@@ -32,24 +65,26 @@ def run(source, output, source_language='unknown', model_pool=None):
     started = time.monotonic()
     try:
         detector_limit=1536 if max(size)<=1536 else 3072
-        for stage, arguments in [
-            ('detection', ['diagnose_paddle_detector.py', '--worker', str(out/'page-1.png'), '--output', str(out), '--max-side', str(detector_limit), '--device', 'gpu:0']),
-            ('recognition', ['recognize_paddle_boxes.py', '--detection', str(out), '--device', 'gpu:0', '--source-language', source_language]),
-        ]:
+        for stage in ('detection', 'recognition'):
             tick = time.monotonic()
-            arguments[0] = str(repo/arguments[0])
-            with (out/f'{stage}.log').open('w') as log:
-                if model_pool is None:
-                    subprocess.run([sys.executable, '-u', *arguments], stdout=log, stderr=subprocess.STDOUT, check=True, timeout=600)
-                else:
-                    from contextlib import redirect_stdout,redirect_stderr
-                    with redirect_stdout(log),redirect_stderr(log):
-                        if stage=='detection':
-                            from tools.ocr.diagnose_paddle_detector import worker
-                            worker(out/'page-1.png',out,detector_limit,'gpu:0',model_factory=model_pool.detection)
-                        else:
-                            from tools.ocr.recognize_paddle_boxes import main as recognize
-                            recognize(arguments[1:],model_factory=model_pool.recognition)
+            # GPU memory is shared with the model servers and other OCR runs. Running out of it is
+            # retried after freeing cached memory; detection then tries a smaller detector size
+            # (a large A3 scan failed the whole document with MemoryError, 2026-11-19).
+            limits=[detector_limit,detector_limit]+([1536] if stage=='detection' and detector_limit>1536 else [])
+            for attempt,limit in enumerate(limits):
+                arguments=(['diagnose_paddle_detector.py', '--worker', str(out/'page-1.png'), '--output', str(out), '--max-side', str(limit), '--device', 'gpu:0']
+                           if stage=='detection' else
+                           ['recognize_paddle_boxes.py', '--detection', str(out), '--device', 'gpu:0', '--source-language', source_language])
+                arguments[0] = str(repo/arguments[0])
+                try:
+                    _run_stage(stage, arguments, out, limit, model_pool)
+                    if stage=='detection':detector_limit=limit
+                    break
+                except Exception as exc:
+                    if attempt+1==len(limits) or not _out_of_memory(exc, out/f'{stage}.log'):raise
+                    report.setdefault('memory_retries',[]).append({'stage':stage,'detector_max_side':limit})
+                    _free_gpu_memory()
+                    time.sleep(3)
             report[stage+'_seconds'] = round(time.monotonic()-tick, 2)
             if stage == 'detection':
                 (out/'diagnostic.json').write_text(json.dumps({'status':'completed', 'device':'gpu:0', 'source':str(source), 'image_pixels':size, 'detector_max_side':detector_limit,'raster':raster}))

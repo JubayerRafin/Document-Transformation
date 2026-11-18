@@ -195,7 +195,9 @@ class ReportingTests(unittest.TestCase):
     def test_engine_job_records_timeout_code(self):
         from backend.engine_job import main
         with temporary_workspace() as root:
-            source=root/'source.pdf';source.write_bytes(b'synthetic')
+            import pymupdf
+            source=root/'source.pdf'
+            with pymupdf.open() as pdf:pdf.new_page();pdf.save(source)
             request=root/'request.json'
             request.write_text(json.dumps({'source':str(source),'filename':'test.pdf','profile':{},
                 'options':{'operation':'translation','source_language':'en','target_language':'ko',

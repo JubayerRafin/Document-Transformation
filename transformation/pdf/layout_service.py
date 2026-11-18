@@ -162,7 +162,19 @@ def serve(ready):
     from babeldoc.docvision.doclayout import OnnxModel
     from babeldoc.assets.assets import get_doclayout_onnx_model_path
     import hashlib
+    import threading
     started = time.monotonic()
+    # Exit with the process that started it (a worker or batch that was stopped): orphaned services
+    # stayed up to an hour holding about 1 GB of GPU memory each, and after a few restarts OCR ran
+    # out of GPU memory (2026-11-19). The OCR worker does the same (tools/ocr/persistent_worker.py).
+    parent = os.getppid()
+
+    def watch_parent():
+        while True:
+            time.sleep(2)
+            if os.getppid() != parent:
+                os._exit(0)
+    threading.Thread(target=watch_parent, daemon=True).start()
     # The same device and CPU policies a BabelDOC run applies to its own session (GPU when
     # TRANSFORMX_LAYOUT_DEVICE=cuda); without them the shared session ran on the CPU and made every
     # page slower (one-page document 7 s -> 18 s, 2026-11-19).

@@ -14,6 +14,7 @@ def normalized(text):
 def lock_ocr_regions(document,ir,evidence=None):
     """Keep verified OCR fields separate when BabelDOC merges neighboring lines."""
     from copy import deepcopy
+    from transformation.pdf.ir_json import ir_copy
     from collections import Counter
     from babeldoc.format.pdf.document_il.il_version_1 import Box,PdfParagraphComposition,PdfSameStyleCharacters
     overrides={}; slots={}; report=[] if evidence is None else evidence
@@ -38,12 +39,12 @@ def lock_ocr_regions(document,ir,evidence=None):
             observed=Counter(letter for c,_ in matches for letter in (c.char_unicode or '') if not letter.isspace())
             if expected!=observed or not matches:
                 report.append({'region_id':region['id'],'status':'blocked','reason':'Native glyph inventory does not match OCR source.'}); continue
-            paragraph=deepcopy(matches[0][1]); paragraph.debug_id='tx_ocr_'+str(index)
+            paragraph=ir_copy(matches[0][1]); paragraph.debug_id='tx_ocr_'+str(index)
             paragraph.box=Box(x=left,y=height-bottom,x2=right,y2=height-top)
             paragraph.unicode=region['text']; paragraph.vertical=False
-            paragraph.pdf_style=deepcopy(matches[0][0].pdf_style)
+            paragraph.pdf_style=ir_copy(matches[0][0].pdf_style)
             paragraph.pdf_paragraph_composition=[PdfParagraphComposition(pdf_same_style_characters=
-                PdfSameStyleCharacters(box=deepcopy(paragraph.box),pdf_style=deepcopy(paragraph.pdf_style),pdf_character=[c for c,_ in matches]))]
+                PdfSameStyleCharacters(box=deepcopy(paragraph.box),pdf_style=ir_copy(paragraph.pdf_style),pdf_character=[c for c,_ in matches]))]
             paragraph.layout_label='text'
             overrides[id(paragraph)]=region['text']; locked.append(paragraph)
             assigned.update(id(c) for c,_ in matches)

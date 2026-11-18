@@ -80,6 +80,13 @@ def cjk_punctuation(target, language):
     return _re.sub(r'([：。、，！？；）]) +(?=' + _CJK + ')', r'\1', target)
 
 
+def middle_dot(target, language):
+    """The katakana middle dot "・" is Japanese; other languages write "·". Chinese fonts map their
+    middle dot to "・" when text is extracted, and translations into English kept it (2026-11-19)."""
+    from transformation.pdf.runner import LANGUAGES
+    return target if LANGUAGES.get(language, language) == 'ja' else target.replace('・', '·')
+
+
 CLOSING = '.!?。！？．।॥؟۔…:;'
 FULL_STOPS = '.。．।۔'
 
@@ -168,12 +175,51 @@ def answer_budget(text):
     return min(4096,256+3*len(text))
 
 
+_PLACEHOLDER_RUN=r'(?:\{v\d+\}\s*)+'
+_TOKEN=r'ZXKEEP[0-9A-F]{8}X\d+XZ'
+
+
+def _edge_placeholders(text):
+    """(start, end) of the text between placeholders that sit at its edges, or None: leading ones
+    directly before a sentence (an upper-case or non-Latin letter), trailing ones after the final
+    punctuation. Placeholders inside a sentence move with its grammar and stay with the model."""
+    import re
+    start,end=0,len(text)
+    lead=re.match(r'\s*'+_PLACEHOLDER_RUN,text)
+    if lead and lead.end()<len(text):
+        following=text[lead.end()]
+        if following.isupper() or (following.isalpha() and not following.isascii()):start=lead.end()
+    trail=re.search(r'(?<=[.!?:;。！？．])\s*'+_PLACEHOLDER_RUN+r'$',text)
+    if trail and trail.start()>start:end=trail.start()
+    if (start,end)==(0,len(text)) or not any(c.isalpha() for c in text[start:end]):return None
+    return start,end
+
+
+def _unglued(text):
+    """The text as shown to the model: placeholders glued to words ("Call{v1}for", BabelDOC's
+    formula took the spaces around a phone number) get spaces, so the model keeps them whole.
+    Identifier pieces ("SEC-2024-{v1}") are not words and stay glued. Validation still compares
+    with the original text."""
+    import re
+    placeholder=r'(\{v\d+\}|'+_TOKEN+r')'
+    text=re.sub(placeholder+r'(?=[^\W\d_])',r'\1 ',text)
+    return re.sub(r'(?<![\w-])([A-Za-z][a-z]{2,})'+placeholder,r'\1 \2',text)
+
+
 def translate(endpoint,model,text,language,protected=(),context='',source='en'):
     import hashlib,time
     from transformation.llm.ollama_native import chat,record_progress,needs_no_translation
     if needs_no_translation(text,protected):
         record_progress('skipped',reason='protected_or_numeric')
         return text,{'prompt_eval_count':0,'eval_count':0,'skipped_model':True}
+    edges=_edge_placeholders(text)
+    if edges:
+        # A bullet or marker BabelDOC keeps as a formula placeholder at the start of a sentence
+        # ("{v1}All shipments ...") or after its final punctuation was dropped by the models (545 times
+        # over 43 documents, 2026-11-19). It stays where it is; only the text between is translated.
+        start,end=edges
+        result,stats=translate(endpoint,model,text[start:end],language,protected,context,source)
+        return text[:start]+result+text[end:],stats
     safe,tokens=protect_values(text,protected)
     if len(text)>1500 or len(safe)>1500:
         from transformation.llm.translation_segments import bounded_segments
@@ -214,7 +260,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         # ("HR-2024-{v1}Classification: Internal"); the model then keeps the English word. Show the
         # model a word boundary there; validation still compares with the original text.
         import re
-        current=re.sub(r'(\{v\d+\})(?=[^\W\d_])',r'\1 ',current)
+        current=_unglued(current)
         # Source relationships take precedence over optional background when
         # the model's bounded context budget truncates that background.
         import re
@@ -252,8 +298,16 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         try:
             restored=restore_values(result,tokens) if attempt==1 else result
             restored=normalize_field_layout(text,restored)
+            answer_lines=[line.strip() for line in restored.splitlines() if line.strip()]
+            if (len(text.splitlines())==1 and len(text.split())<=8 and len(answer_lines)>1
+                    and len(answer_lines)<=len([p for p in re.split(r'[,;:·|]',text) if p.strip()])):
+                # A one-line label with parts ("Yours sincerely, Emily Roberts") may come back one part
+                # per line; it was kept in English (2026-11-19). It stays one line, the layout wraps it.
+                # More lines than parts means added text, which validation still refuses.
+                restored=' '.join(answer_lines)
             restored=match_terminal_punctuation(text,restored)
             restored=cjk_punctuation(restored,language)
+            restored=middle_dot(restored,language)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
             stray=foreign_script(text,restored,language)

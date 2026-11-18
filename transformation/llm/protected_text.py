@@ -138,8 +138,30 @@ class PlaceholderIntegrityError(ValueError):
         )
 
 
+_TOKEN = re.compile(r'ZXKEEP([0-9A-F]{8})X(\d+)XZ')
+
+
+def repair_tokens(translated, replacements):
+    """Put back tokens a model damaged but left recognisable. Models dropped the "ZXKEEP" prefix
+    ("20556032X0XZ"), part of it, or the first characters of the request's hash (seen 2026-11-19,
+    59 paragraphs kept in English over 43 documents). The hash is random per request, so its tail
+    followed by X<n>XZ still names exactly one token; anything less is left for validation."""
+    for token in replacements:
+        match = _TOKEN.fullmatch(token)
+        if not match:
+            continue
+        digest, index = match.groups()
+        prefixes = '|'.join('ZXKEEP'[i:] for i in range(6))
+        damaged = re.compile(r'(?<![0-9A-Za-z])(?!(?-i:' + re.escape(token) + r'))(?:' + prefixes + r')?(?:'
+                             + '|'.join(digest[i:] for i in range(3)) + r')X' + index + r'XZ(?![0-9A-Za-z])', re.I)
+        # Every recognisable copy becomes the token again; a duplicate then fails the exact count.
+        translated = damaged.sub(token, translated)
+    return translated
+
+
 def restore_values(translated, replacements):
     """Require each placeholder exactly once, then restore its original value."""
+    translated = repair_tokens(translated, replacements)
     issues = [
         {"index": index, "token": token, "actual": translated.count(token)}
         for index, token in enumerate(replacements, start=1)

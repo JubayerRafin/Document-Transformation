@@ -106,7 +106,8 @@ def install_source_repairs(protected_values):
             Path(folder,'source-repairs.json').write_text(json.dumps(records,ensure_ascii=False,indent=2),encoding='utf-8')
             Path(folder,'source-grouping.json').write_text(json.dumps(grouping_records,ensure_ascii=False,indent=2),encoding='utf-8')
             from dataclasses import asdict
-            Path(folder,'babeldoc-source-ir.json').write_text(json.dumps(asdict(document),ensure_ascii=False),encoding='utf-8')
+            from transformation.pdf.ir_json import dumps as ir_dumps
+            Path(folder,'babeldoc-source-ir.json').write_text(ir_dumps(document),encoding='utf-8')
             external=os.environ.get('TRANSFORMX_EXTERNAL_IR_FILE')
             if external:
                 from transformation.pdf.ir_bridge import map_document

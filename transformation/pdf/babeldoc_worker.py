@@ -567,12 +567,14 @@ def main():
             mapping=map_document(document,external_ir)
             Path(folder,'ir-mapping.json').write_text(json.dumps(mapping,ensure_ascii=False,indent=2),encoding='utf-8')
         if folder:
-            Path(folder,'babeldoc-source-ir.json').write_text(json.dumps(asdict(document),ensure_ascii=False),encoding='utf-8')
+            from transformation.pdf.ir_json import dumps as ir_dumps
+            Path(folder,'babeldoc-source-ir.json').write_text(ir_dumps(document),encoding='utf-8')
         from transformation.layout.source_atoms import capture_source_atoms
         source_atoms.clear();source_atoms.update(capture_source_atoms(document))
         result=original_translate(self,document)
         if folder:
-            Path(folder,'babeldoc-transformed-ir.json').write_text(json.dumps(asdict(document),ensure_ascii=False),encoding='utf-8')
+            from transformation.pdf.ir_json import dumps as ir_dumps
+            Path(folder,'babeldoc-transformed-ir.json').write_text(ir_dumps(document),encoding='utf-8')
         return result
 
     source_atoms={}
@@ -720,6 +722,21 @@ def main():
 
     TRANSLATION_FAILED.clear()
 
+    # TRANSFORMX_BABELDOC_DEBUG=1: BabelDOC keeps its intermediate files. For investigating a document.
+    if os.environ.get('TRANSFORMX_BABELDOC_DEBUG') == '1' and '--debug' not in sys.argv:
+        sys.argv.append('--debug')
+    # BabelDOC logs only the message of a failure ("translate error: maximum recursion depth exceeded",
+    # a 50-page manual, 2026-11-19); the traceback (code locations, no document text) goes to the
+    # job log too, so a failed document can be diagnosed from its log.
+    import logging
+    import traceback
+
+    class _TracebackOnError(logging.Filter):
+        def filter(self, record):
+            if record.levelno >= logging.ERROR and 'translate error' in str(record.msg) and sys.exc_info()[0]:
+                sys.stderr.write('TransformX: traceback of the BabelDOC failure:\n' + traceback.format_exc() + '\n')
+            return True
+    logging.getLogger('babeldoc.format.pdf.high_level').addFilter(_TracebackOnError())
     try:
         record_progress('worker_vendor_starting')
         try:
