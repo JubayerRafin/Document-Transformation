@@ -501,6 +501,8 @@ def main():
     record_progress('worker_layout_duplicates', installed=install_layout_duplicates())
     from transformation.pdf.font_flags import install as install_font_flags
     record_progress('worker_font_flags', installed=install_font_flags())
+    from transformation.pdf.symbol_fonts import install as install_symbol_fonts
+    record_progress('worker_symbol_fonts', installed=install_symbol_fonts())
     from transformation.pdf.layout_service import install as install_layout_service
     install_layout_service()
     record_progress('worker_layout_service_ready', shared=bool(os.environ.get('TRANSFORMX_LAYOUT_SERVICE')))
@@ -722,6 +724,21 @@ def main():
 
     TRANSLATION_FAILED.clear()
 
+    # TRANSFORMX_TRACE_PARAGRAPHS=1: one line per paragraph BabelDOC prepares for translation
+    # (paragraph-trace.jsonl in the run folder), to find paragraphs left untranslated without an error.
+    if os.environ.get('TRANSFORMX_TRACE_PARAGRAPHS') == '1' and os.environ.get('TRANSFORMX_RUN_DIR'):
+        from babeldoc.format.pdf.document_il.midend.il_translator import ILTranslator as _Traced
+        _original_pre = _Traced.pre_translate_paragraph
+        _trace_path = Path(os.environ['TRANSFORMX_RUN_DIR'], 'paragraph-trace.jsonl')
+
+        def _traced_pre(self, paragraph, *args, **kwargs):
+            text, translate_input = _original_pre(self, paragraph, *args, **kwargs)
+            with _trace_path.open('a', encoding='utf-8') as trace:
+                trace.write(json.dumps({'paragraph_id': paragraph.debug_id, 'layout_label': paragraph.layout_label,
+                                        'prepared': text is not None, 'characters': len(paragraph.unicode or ''),
+                                        'compositions': len(paragraph.pdf_paragraph_composition or ())}) + '\n')
+            return text, translate_input
+        _Traced.pre_translate_paragraph = _traced_pre
     # TRANSFORMX_BABELDOC_DEBUG=1: BabelDOC keeps its intermediate files. For investigating a document.
     if os.environ.get('TRANSFORMX_BABELDOC_DEBUG') == '1' and '--debug' not in sys.argv:
         sys.argv.append('--debug')

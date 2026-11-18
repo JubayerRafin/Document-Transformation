@@ -2,6 +2,7 @@ import dataclasses
 import json
 import sys
 import unittest
+import unittest.mock
 from typing import Optional
 
 from transformation.pdf.ir_json import dumps, to_data
@@ -74,3 +75,28 @@ class IrJsonTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SideBySideGroupingTests(unittest.TestCase):
+    def test_a_label_and_its_value_on_one_line_are_not_joined(self):
+        from types import SimpleNamespace as NS
+        from transformation.pdf import source_grouping
+        def paragraph(text, x, y, x2, y2, pid):
+            run = NS(pdf_same_style_unicode_characters=NS(unicode=text, pdf_style=None), pdf_formula=None, pdf_line=None,
+                     pdf_same_style_characters=None, pdf_character=None)
+            return NS(box=NS(x=x, y=y, x2=x2, y2=y2), layout_label='plain text', vertical=False, unicode=text,
+                      pdf_paragraph_composition=[run], debug_id=pid)
+        label = paragraph('Email', 50, 637, 80, 646, 'a')
+        value = paragraph('emily.roberts@example.com', 210, 637, 370, 646, 'b')
+        page = NS(page_number=0, pdf_paragraph=[label, value])
+        with unittest.mock.patch.object(source_grouping, 'composition_text', side_effect=lambda p: p.unicode):
+            overrides, records = source_grouping.join_block_continuations(page, [((40, 630, 380, 650), 'Email emily.roberts@example.com')])
+        self.assertEqual(records, [])
+        self.assertEqual(len(page.pdf_paragraph), 2)
+        # A real wrapped continuation on the next line is still joined.
+        first = paragraph('The device should be stored in a', 50, 637, 300, 646, 'c')
+        second = paragraph('dry place.', 50, 625, 100, 634, 'd')
+        page = NS(page_number=0, pdf_paragraph=[first, second])
+        with unittest.mock.patch.object(source_grouping, 'composition_text', side_effect=lambda p: p.unicode):
+            overrides, records = source_grouping.join_block_continuations(page, [((40, 620, 380, 650), 'The device should be stored in a dry place.')])
+        self.assertEqual(len(records), 1)

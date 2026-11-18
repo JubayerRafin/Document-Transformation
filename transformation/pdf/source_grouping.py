@@ -1,6 +1,6 @@
 """Regroup only source-proven paragraph continuations; preserve rich glyph data."""
 import re
-from copy import deepcopy
+from transformation.pdf.ir_json import ir_copy
 
 
 def composition_text(paragraph):
@@ -35,9 +35,14 @@ def join_block_continuations(page,blocks):
         # Preserve separate complete sentences, fields, tables and headings.
         if not any(len(t.split())<=4 and t.strip()[:1].islower() for t in texts[1:]):continue
         if any(t.rstrip().endswith(('.', '!', '?', ':')) for t in texts[:-1]):continue
+        # A continuation starts on a lower line. Pieces side by side on one line are table cells or
+        # a label and its value ("Email" | "emily.roberts@example.com" was drawn as one paragraph in
+        # the label cell, 2026-11-19), never one wrapped sentence.
+        if any(min(a.box.y2,b.box.y2)-max(a.box.y,b.box.y)>0.5*min(a.box.y2-a.box.y,b.box.y2-b.box.y)
+               for a,b in zip(candidates,candidates[1:])):continue
         first=candidates[0]
         for following in candidates[1:]:
-            first.pdf_paragraph_composition.extend(deepcopy(following.pdf_paragraph_composition))
+            first.pdf_paragraph_composition.extend(ir_copy(following.pdf_paragraph_composition))
             first.box.x=min(first.box.x,following.box.x);first.box.x2=max(first.box.x2,following.box.x2)
             first.box.y=min(first.box.y,following.box.y);first.box.y2=max(first.box.y2,following.box.y2)
             removed.add(id(following))

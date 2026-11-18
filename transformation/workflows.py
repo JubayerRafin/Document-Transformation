@@ -53,6 +53,10 @@ def run_workflow(data,filename,workflow='Translation only',**options):
     options.setdefault('translation_model',DEFAULT_TRANSLATION_MODEL)
     options.setdefault('pii_model',DEFAULT_PII_MODEL)
     translate,redact=modes[workflow]
+    if str(filename).lower().endswith('.pdf'):
+        # Rotated pages came out blank; they are processed as unrotated pages that look the same.
+        from transformation.pdf.rotation import unrotated
+        data=unrotated(data)
     yield from run_pipeline(data,filename,translate=translate,redact=redact,**options)
 
 

@@ -1,6 +1,6 @@
 """Isolate pinned BabelDOC paragraph mutations during opt-in concurrency."""
 from contextlib import contextmanager
-from copy import copy,deepcopy
+from copy import copy
 from dataclasses import fields,is_dataclass
 from threading import Lock
 
@@ -38,11 +38,16 @@ def install(translator_class,engine_class):
         from transformation.llm.ollama_native import TRANSLATION_FAILED,record_progress
         with _STATE_LOCK:
             if not hasattr(self,'_transformx_commit_lock'):self._transformx_commit_lock=Lock()
-        private=deepcopy(paragraph);private_page=copy(page);private_page.pdf_paragraph=[]
-        kwargs=dict(kwargs)
-        for key in ('title_paragraph','local_title_paragraph'):
-            if key in kwargs:kwargs[key]=deepcopy(kwargs[key])
+        # ir_copy: deepcopy recursed into BabelDOC's lazy graphics instructions on dense pages. That
+        # happened before the try below, the thread pool swallowed the error, and 134 of a timetable's
+        # 262 paragraphs were left untranslated without any record (2026-11-19). Copying is now
+        # inside it, so any failure here marks the run.
+        from transformation.pdf.ir_json import ir_copy
         try:
+            private=ir_copy(paragraph);private_page=copy(page);private_page.pdf_paragraph=[]
+            kwargs=dict(kwargs)
+            for key in ('title_paragraph','local_title_paragraph'):
+                if key in kwargs:kwargs[key]=ir_copy(kwargs[key])
             result=original(self,private,private_page,*args,**kwargs)
             if private_page.pdf_paragraph:
                 raise RuntimeError('Parallel translation produced page annotations; retry with one translation worker.')

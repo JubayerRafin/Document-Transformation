@@ -157,14 +157,21 @@ class FieldLockTests(unittest.TestCase):
         self.assertTrue(all(s['min_font_size']==8 for s in slots.values()))
         self.assertTrue(all(r['status']=='mapped' for r in map_document(doc,ir)))
 
-    def test_source_disagreement_rejects_instead_of_rewriting(self):
+    def test_source_disagreement_keeps_the_page_as_it_was_instead_of_rewriting(self):
+        # The page is translated with BabelDOC's own paragraphs; the document does not fail.
         doc,ir=self.fixture(); ir['units'][0]['locked_regions'][0]['text']='AlpHa'
-        with self.assertRaisesRegex(ValueError,'association needs review'): lock_ocr_regions(doc,ir)
-        self.assertEqual(doc.page[0].pdf_paragraph[0].unicode,'Alpha Beta')
+        inputs,slots,report=lock_ocr_regions(doc,ir)
+        self.assertEqual((inputs,slots),({},{}))
+        self.assertEqual([p.unicode for p in doc.page[0].pdf_paragraph],['Alpha Beta'])
+        self.assertEqual(report[-1]['status'],'page_not_locked')
+        self.assertIn('glyph inventory',report[-1]['reason'])
 
-    def test_unassigned_glyphs_reject_instead_of_disappearing(self):
+    def test_unassigned_glyphs_keep_the_page_as_it_was_instead_of_disappearing(self):
         doc,ir=self.fixture(); ir['units'][0]['locked_regions'].pop()
-        with self.assertRaisesRegex(ValueError,'Unassociated native glyphs'): lock_ocr_regions(doc,ir)
+        inputs,slots,report=lock_ocr_regions(doc,ir)
+        self.assertEqual((inputs,slots),({},{}))
+        self.assertEqual([p.unicode for p in doc.page[0].pdf_paragraph],['Alpha Beta'])
+        self.assertIn('Unassociated native glyphs',report[-1]['reason'])
 
 
 if __name__=='__main__': unittest.main()

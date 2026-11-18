@@ -6,7 +6,7 @@ header row of a table on a dark fill came out black on dark blue in every target
 a paragraph whose recorded fill is plain black takes the colour of the source text in its box when all
 of that text has one other colour. Nothing else changes.
 """
-from copy import deepcopy
+from transformation.pdf.ir_json import ir_copy
 
 BLACK = {'', '0 g', '0 0 0 rg', '0 0 0 1 k'}
 
@@ -54,7 +54,7 @@ def restore(document, input_pdf):
                 for style in styles:
                     if style is None or style.graphic_state is None or _instruction(style) not in BLACK: continue
                     # Styles can be shared between paragraphs: give this one its own copy.
-                    style.graphic_state = deepcopy(style.graphic_state)
+                    style.graphic_state = ir_copy(style.graphic_state)
                     style.graphic_state.passthrough_per_char_instruction = instruction
                 changed.append((page.page_number + 1, paragraph.debug_id, f'#{colour:06x}'))
     return changed

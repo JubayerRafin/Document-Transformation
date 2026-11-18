@@ -30,7 +30,7 @@ def lock_ocr_regions(document,ir,evidence=None):
                 for name in ('pdf_line','pdf_formula','pdf_same_style_characters'):
                     group=getattr(composition,name,None)
                     if group is not None: characters.extend((c,paragraph) for c in group.pdf_character)
-        assigned=set(); locked=[]
+        assigned=set(); locked=[]; page_overrides={}; page_slots={}; page_report=[]
         for index,region in enumerate(unit['locked_regions']):
             bounds=region['slot_bbox']; left,top,right,bottom=bounds
             matches=[(c,p) for c,p in characters if id(c) not in assigned and c.box and
@@ -38,7 +38,7 @@ def lock_ocr_regions(document,ir,evidence=None):
             expected=Counter(c for c in region['text'] if not c.isspace())
             observed=Counter(letter for c,_ in matches for letter in (c.char_unicode or '') if not letter.isspace())
             if expected!=observed or not matches:
-                report.append({'region_id':region['id'],'status':'blocked','reason':'Native glyph inventory does not match OCR source.'}); continue
+                page_report.append({'region_id':region['id'],'status':'blocked','reason':'Native glyph inventory does not match OCR source.'}); continue
             paragraph=ir_copy(matches[0][1]); paragraph.debug_id='tx_ocr_'+str(index)
             paragraph.box=Box(x=left,y=height-bottom,x2=right,y2=height-top)
             paragraph.unicode=region['text']; paragraph.vertical=False
@@ -46,7 +46,7 @@ def lock_ocr_regions(document,ir,evidence=None):
             paragraph.pdf_paragraph_composition=[PdfParagraphComposition(pdf_same_style_characters=
                 PdfSameStyleCharacters(box=deepcopy(paragraph.box),pdf_style=ir_copy(paragraph.pdf_style),pdf_character=[c for c,_ in matches]))]
             paragraph.layout_label='text'
-            overrides[id(paragraph)]=region['text']; locked.append(paragraph)
+            page_overrides[id(paragraph)]=region['text']; locked.append(paragraph)
             assigned.update(id(c) for c,_ in matches)
             cb=region.get('metadata',{}).get('cell_bbox')
             if cb:
@@ -54,21 +54,27 @@ def lock_ocr_regions(document,ir,evidence=None):
                 right=min(cb[2]-6,max(right,region['bbox'][2])); left=max(left,cb[0]+6)
             minimum=region.get('font_policy',{}).get('minimum',8.0)
             if not 4<=minimum<=8:raise ValueError('Invalid source-relative OCR font floor.')
-            slots[(page.page_number+1,paragraph.debug_id)]={'bbox':[left,height-bottom,right,height-top],'min_font_size':minimum,
+            page_slots[(page.page_number+1,paragraph.debug_id)]={'bbox':[left,height-bottom,right,height-top],'min_font_size':minimum,
                 'source_locked_ocr':True}
-            report.append({'region_id':region['id'],'paragraph_id':paragraph.debug_id,'status':'locked','source_text':region['text']})
-        # Any native source glyph not safely associated remains in its original
-        # paragraph. Mixed partially assigned paragraphs must not duplicate glyphs.
-        if any(r['status']=='blocked' for r in report):
-            raise ValueError('OCR paragraph association needs review; see locked-region evidence.')
+            page_report.append({'region_id':region['id'],'paragraph_id':paragraph.debug_id,'status':'locked','source_text':region['text']})
+        # Every glyph must belong to exactly one locked line, or lines would be lost or doubled. When
+        # that cannot be proven, this page keeps BabelDOC's own paragraphs (translated as usual,
+        # without the per-line OCR slots) instead of failing the whole document (a scanned report,
+        # 2026-11-19). The evidence says which lines did not match.
+        problem=None
+        if any(r['status']=='blocked' for r in page_report):
+            problem='OCR line glyph inventory does not match the native page.'
         for paragraph in originals:
-            chars=[]
-            for c,p in characters:
-                if p is paragraph: chars.append(c)
+            chars=[c for c,p in characters if p is paragraph]
             # A space BabelDOC adds between two locked lines it read as one paragraph ("Iceland" and
             # "June" set in the same font and colour) carries no text and belongs to neither.
-            if chars and any(id(c) not in assigned and (c.char_unicode or '').strip() for c in chars):
-                raise ValueError('Unassociated native glyphs remain after OCR field separation.')
+            if problem is None and chars and any(id(c) not in assigned and (c.char_unicode or '').strip() for c in chars):
+                problem='Unassociated native glyphs remain after OCR field separation.'
+        report.extend(page_report)
+        if problem:
+            report.append({'page':page.page_number+1,'status':'page_not_locked','reason':problem})
+            continue
+        overrides.update(page_overrides); slots.update(page_slots)
         page.pdf_paragraph[:]=sorted(locked,key=lambda p:(-p.box.y2,p.box.x))
     return overrides,slots,report
 
