@@ -112,3 +112,30 @@ class OrdinalWordTests(unittest.TestCase):
             validate_candidate(source, '2개월 차와 2분기에 가격이 올랐습니다. 총액은 JPY 769,375,000입니다.')
         with self.assertRaises(ValueError):   # protected values stay exact
             validate_candidate(source, '2개월 차에 가격이 올랐습니다. 총액은 JPY 769,375,001입니다.')
+
+
+class CalendarTests(unittest.TestCase):
+    """Months and quarters written in words or another notation by the translation (2026-11-19)."""
+
+    def test_months_and_quarters_may_change_notation(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for source, target in [
+                ('11월 말까지 3분기 보고서를 제출하십시오.', 'Submit the third quarter report by the end of November.'),
+                ('2026年11月に第3四半期の報告書を提出してください。', 'Submit the third quarter report in November 2026.'),
+                ('请在11月底前提交第3季度报告。', 'Please submit the Q3 report before the end of November.'),
+                ('Revenue rose in Q3 2025.', '2025년 3분기에 매출이 증가했습니다.'),
+                ('Revenue rose in Q3 2025.', 'Der Umsatz stieg im 3. Quartal 2025.'),
+                ('Revenue rose in Q3 2025.', '2025年第3四半期に売上が増加しました。'),
+                ('11월 말까지 제출하십시오.', 'À soumettre avant la fin novembre.')]:
+            validate_candidate(source, target)
+
+    def test_wrong_or_missing_calendar_values_are_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for source, target in [
+                ('11월 말까지 제출하십시오.', 'Submit by the end of October.'),
+                ('11월 말까지 3분기 보고서를 제출하십시오.', 'Submit the report by the end of November.'),
+                ('Revenue rose in Q3 2025.', '2025년 2분기에 매출이 증가했습니다.'),
+                ('Revenue rose in Q3 2025.', '2025년 3분기 및 3분기에 매출이 증가했습니다.'),
+                ('총액은 5,440,000원입니다.', 'The total is KRW 5,440.')]:
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)

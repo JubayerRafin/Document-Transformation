@@ -762,6 +762,14 @@ def main():
             if exit_.code not in (None, 0): raise
         if SHAPED_PARAGRAPHS and not TRANSLATION_FAILED.is_set():
             draw_shaped_paragraphs()
+        # Copy and search give the same characters the page shows (text_layer.py).
+        try:
+            from transformation.pdf.text_layer import plain_spaces_and_hyphens
+            output_dir = Path(sys.argv[sys.argv.index('--output') + 1])
+            changed = sum(plain_spaces_and_hyphens(p) for p in output_dir.glob('*.mono.pdf'))
+            record_progress('text_layer_plain_characters', mappings=changed)
+        except Exception as error:   # never fail a translated document for its copy text
+            record_progress('text_layer_plain_characters_failed', error=type(error).__name__)
     finally:
         if TRANSLATION_FAILED.is_set():
             raise RuntimeError(

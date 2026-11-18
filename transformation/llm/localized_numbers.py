@@ -98,6 +98,8 @@ def month_sequence(text,values=()):
 def permits_numeric_additions(source,target,additions,values=()):
     """Every extra bare integer needs one matching ordinary source expression."""
     if not additions:return True
+    additions=calendar_additions(source,target,Counter(additions),values)
+    if not additions:return True
     # "five percent" is written "5%" (or "5 %") in translations; each source "percent" word licenses
     # one added N% whose N is licensed like any other number below (2026-11-19: 53 rejections).
     percent_words=len(re.findall(r'\bper\s?cent\b',_ordinary_text(source,values),re.I))
@@ -141,12 +143,75 @@ def permits_numeric_additions(source,target,additions,values=()):
     return True
 
 
+_MONTH_NAMES={  # target-language month names, January first
+    'en':'january february march april may june july august september october november december',
+    'fr':'janvier février mars avril mai juin juillet août septembre octobre novembre décembre',
+    'de':'januar februar märz april mai juni juli august september oktober november dezember',
+    'es':'enero febrero marzo abril mayo junio julio agosto septiembre octubre noviembre diciembre',
+    'pt':'janeiro fevereiro março abril maio junho julho agosto setembro outubro novembro dezembro'}
+_QUARTER_WORDS={1:r'first|1st|premier|erstes?|primer|primeiro',2:r'second|2nd|deuxième|zweites?|segundo',
+                3:r'third|3rd|troisième|drittes?|tercer|terceiro',4:r'fourth|4th|quatrième|viertes?|cuarto|quarto'}
+_QUARTER_NOUN=r'(?:quarter|trimestre|quartal)'
+
+
+def calendar_omissions(source,target,omissions,values=()):
+    """The omitted numbers a calendar expression accounts for: a source month written with digits
+    ("11월", "11月") that the translation names ("November", "novembre"), a quarter ("3분기",
+    "第3四半期", "第3季度") the translation spells out ("third quarter"), or a quarter code ("Q3")
+    the translation writes as a CJK or German quarter ("3분기", "第3四半期", "3. Quartal"). Each
+    expression accounts for one omitted number; anything else stays an omission (2026-11-19)."""
+    # The source as written (numbers included); only explicitly protected values are removed.
+    text=source
+    for value in sorted(set(values),key=len,reverse=True):text=text.replace(value,' ')
+    lowered=target.lower()
+    licensed=Counter()
+    for match in re.finditer(r'(?<!\d)(1[0-2]|0?[1-9])\s*(?:월|月)',text):
+        month=int(match[1])
+        if any(re.search(r'(?<!\w)'+names.split()[month-1]+r'(?!\w)',lowered) for names in _MONTH_NAMES.values()):
+            licensed[match[1]]+=1
+    for match in re.finditer(r'(?:第\s*)?([1-4])\s*(?:분기|四半期|季度)',text):
+        if (re.search(r'(?<!\w)(?:'+_QUARTER_WORDS[int(match[1])]+r')\s+'+_QUARTER_NOUN,lowered)
+                or re.search(r'(?<![a-z0-9])q'+match[1]+r'(?![a-z0-9])',lowered)):
+            licensed[match[1]]+=1
+    for match in re.finditer(r'(?<![A-Za-z0-9])Q([1-4])(?![A-Za-z0-9])',text):
+        n=match[1]
+        if re.search(r'(?:第\s*)?'+n+r'\s*(?:분기|四半期|季度)|(?<!\d)'+n+r'\.\s*quartal',lowered):
+            licensed['Q'+n]+=1
+    remaining=Counter()
+    for value,count in omissions.items():
+        remaining[value]=max(0,count-licensed[value])
+    return +remaining
+
+
+def calendar_additions(source,target,additions,values=()):
+    """The added literals a quarter written another way accounts for: "Q3" in the source becoming
+    "3분기" / "第3四半期" / "第3季度" / "3. Quartal" (adds the digit), or a CJK quarter becoming "Q3"
+    (adds the code). Each source quarter accounts for one addition."""
+    text=source
+    for value in sorted(set(values),key=len,reverse=True):text=text.replace(value,' ')
+    lowered=target.lower()
+    licensed=Counter()
+    for match in re.finditer(r'(?<![A-Za-z0-9])Q([1-4])(?![A-Za-z0-9])',text):
+        n=match[1]
+        if re.search(r'(?:第\s*)?'+n+r'\s*(?:분기|四半期|季度)|(?<!\d)'+n+r'\.\s*quartal',lowered):licensed[n]+=1
+    for match in re.finditer(r'(?:第\s*)?([1-4])\s*(?:분기|四半期|季度)',text):
+        if re.search(r'(?<![a-z0-9])q'+match[1]+r'(?![a-z0-9])',lowered):licensed['Q'+match[1]]+=1
+    remaining=Counter()
+    for value,count in additions.items():remaining[value]=max(0,count-licensed[value])
+    return +remaining
+
+
 def permits_numeric_omissions(source,target,omissions,values=()):
-    """Allow verified lexical side counts in Korean print-mode terminology.
+    """Allow verified lexical side counts in Korean print-mode terminology, and calendar months and
+    quarters written in words by the translation (calendar_omissions).
 
     This is a language equivalence, not a document exception. Explicit protected
     literals remain exact. Other quantities, identifiers and languages stay strict.
     """
+    if not omissions:return True
+    explicit_values=set(values)
+    calendar_free=calendar_omissions(source,target,Counter({k:v for k,v in omissions.items() if k not in explicit_values}),values)
+    omissions=Counter({k:v for k,v in omissions.items() if k in explicit_values})+calendar_free
     if not omissions:return True
     if any(value not in {'1','2'} for value in omissions):return False
     explicit=set(values)

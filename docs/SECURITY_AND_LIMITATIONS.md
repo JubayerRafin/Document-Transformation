@@ -41,15 +41,18 @@ masked output as a draft that a person checks before it is shared.
   reached yet.
 - **OCR languages.** Scanned pages are read for English, Korean, Chinese and Japanese sources.
   Arabic, Hindi and Bengali scans are not read.
-- **Korean sources.** Numbers attached to Korean words (`11월`, `3분기`, `5,440,000원`) are protected
-  as literal values, so a sentence containing one can stay untranslated or translate awkwardly
-  ("by the end of 11"). The Korean OCR model sometimes drops spaces.
+- **Korean sources.** Months and quarters (`11월`, `3분기`, `Q3`) may be written in words by the
+  translation; other numbers attached to Korean words stay protected literals, so such a sentence
+  can still translate awkwardly. The Korean OCR model sometimes drops spaces.
 - **Scanned layouts.** Very small letter-spaced labels on photos stay in the source language;
   headings rebuilt from scans are regular weight unless the scan shows clear bold; a title that
-  wraps without punctuation is translated line by line.
-- **Copying text from outputs.** In Japanese outputs the embedded font maps spaces and hyphens to
-  their non-breaking forms, so copying or searching `SEC-2024-0093` does not match although it
-  displays correctly. Mixed Arabic and Latin lines can come out of copy and paste in the wrong order.
+  wraps without punctuation is translated line by line. Text on a picture that overlaps the page's
+  own text is kept as it is.
+- **Copying text from outputs.** Mixed Arabic and Latin lines can come out of copy and paste in the
+  wrong order.
+- **Source scripts.** Arabic, Hindi and Bengali PDFs whose text layer is wrong (some generators
+  write one) are translated from that wrong text; scans in these scripts are not read.
+- **Page limit.** The website accepts PDFs of up to 200 pages and 50 MB; split longer documents.
 - **Glossaries.** A forced term can produce awkward compound words (German).
 - **Hosting.** The website depends on Cloudflare and Supabase; internal deployments should use the
   engine service instead and provide their own sign-in and storage.

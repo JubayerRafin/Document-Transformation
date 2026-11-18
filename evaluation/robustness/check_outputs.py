@@ -72,7 +72,11 @@ def untranslated_lines(source_pages, output_text, source):
     lines = []
     for page in source_pages:
         for line in page.splitlines():
-            words = re.findall(r'[A-Za-z]{2,}', line)
+            # Ordinary prose: at least five lower-case words. Names, e-mail lines and commands
+            # ("sudo setup --device /dev/ttyUSB0") correctly stay as they are.
+            words = re.findall(r'(?<![\w@./-])[a-z]{3,}(?![\w@./-])', line)
+            if re.search(r'(?:^|\s)--?\w|/\w+/|\bsudo\b', line):
+                continue
             if len(words) >= 5 and normal(line) in out:
                 lines.append(line.strip())
     return lines

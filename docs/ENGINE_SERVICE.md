@@ -157,7 +157,19 @@ document text alone as the user message.
 | `TRANSFORMX_RUN_RETENTION_HOURS` | Site worker: delete local job folders after this many hours (default 72, `0` keeps them) |
 | `TRANSFORMX_FIGURE_WORKERS` | Pictures translated at the same time (default 3; 1 when models share the GPU) |
 | `TRANSFORMX_SHARED_LAYOUT` | `0` turns off the shared page-layout model (each run then loads its own) |
-| `TRANSFORMX_PRELOAD` | `1` starts job processes from pre-loaded parents (saves import time) |
+| `TRANSFORMX_PRELOAD` | `1` starts job processes from pre-loaded parents (saves import time); restart them after a code update (`tools/gpu/restart_worker.sh`) |
+| `TRANSFORMX_TRACE_PARAGRAPHS` | `1` writes `paragraph-trace.jsonl`: every paragraph BabelDOC prepared for translation (finding text left untranslated without an error) |
+| `TRANSFORMX_BABELDOC_DEBUG` | `1` keeps BabelDOC's intermediate files. A failure's traceback is always written to the job's `process.log` |
+
+### Testing many documents
+
+`evaluation/robustness/make_corpus.py` generates varied test PDFs (reports, invoices, forms,
+contracts, slides, newsletters, manuals, papers, timetables, letters; scans, rotated pages, text in
+pictures, edge cases, long documents; English, Korean, Japanese, Chinese, Arabic, Hindi and Bengali
+sources). `evaluation/pii/pod_samples.py` runs a folder of them, `evaluation/robustness/check_outputs.py`
+checks every output (generated, page count, protected values, foreign letters, untranslated lines,
+missing glyphs, text outside the page) and `evaluation/robustness/report.py` collects a summary with
+sample source/output pairs. Use `--set heldout` for documents not used while fixing.
 
 ### Starting model servers without the site worker
 
