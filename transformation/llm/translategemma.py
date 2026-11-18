@@ -138,7 +138,9 @@ def messages(text,language,context='',source='en',model=None):
         raise ValueError('Choose an explicitly configured source and target language.')
     # Bound inputs around the model's documented 2K input context. Longer
     # regions need upstream segmentation rather than silent truncation.
-    if len(text)>1500: raise ValueError('TranslateGemma region exceeds 1500 characters; split it upstream.')
+    # Paragraphs are split at 1500 characters upstream; showing glued placeholders with spaces
+    # (_unglued) can add a few characters, which once failed a whole document (2026-11-19).
+    if len(text)>1800: raise ValueError('Translation region exceeds 1800 characters; split it upstream.')
     if len(context)>1000: context=context[:1000]
     header=(f'You are a professional {source_name} ({source}) to {language} ({target_code}) translator. '
         f'Your goal is to accurately convey the meaning and nuances of the original {source_name} text '

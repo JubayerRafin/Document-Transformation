@@ -79,3 +79,36 @@ class MiddleDotTests(unittest.TestCase):
         self.assertEqual(middle_dot('Grace Kim・grace.kim@example.com', 'English'), 'Grace Kim·grace.kim@example.com')
         self.assertEqual(middle_dot('东京・大阪', 'Chinese (Simplified)'), '东京·大阪')
         self.assertEqual(middle_dot('東京・大阪', 'Japanese'), '東京・大阪')
+
+
+class LongParagraphTests(unittest.TestCase):
+    def test_a_paragraph_just_under_the_limit_with_glued_placeholders_is_translated(self):
+        sentence = 'Call{v1}for support.'
+        text = (sentence + ' ') * 70
+        text = text[:1490]
+        self.assertLessEqual(len(text), 1500)
+        echo = lambda *a, **k: (a[2][-1]['content'].split('\n\n\n')[-1], {})   # the text, as a model would
+        with patch('transformation.llm.ollama_native.chat', side_effect=echo):
+            result, stats = translate('unused', 'translategemma:12b', text, 'Korean')
+        self.assertIn('{v1}', result)
+
+    def test_an_oversized_region_keeps_the_paragraph_instead_of_failing(self):
+        from transformation.llm.ollama_native import validation_failure
+        from transformation.llm.translategemma import messages
+        with self.assertRaises(ValueError) as caught:
+            messages('x' * 1801, 'Korean')
+        self.assertTrue(validation_failure(caught.exception))
+
+
+class ParagraphFailureScopeTests(unittest.TestCase):
+    def test_content_errors_keep_the_paragraph_and_setup_errors_still_fail(self):
+        from transformation.llm.ollama_native import validation_failure
+        for message in ('Email addresses do not match the protected source.',
+                        'Source has an indivisible token or protected span beyond the translation request limit.',
+                        'Source exceeds the bounded translation segment count.', 'Invalid scope interpretation.',
+                        'Translation region exceeds 1800 characters; split it upstream.'):
+            self.assertTrue(validation_failure(ValueError(message)), message)
+        for error in (ValueError('A model endpoint must be an http:// or https:// address.'),
+                      ValueError('Choose an explicitly configured source and target language.'),
+                      TimeoutError('timed out'), ConnectionError('refused')):
+            self.assertFalse(validation_failure(error), error)

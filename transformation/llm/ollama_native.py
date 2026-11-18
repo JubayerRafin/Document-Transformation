@@ -461,7 +461,11 @@ def validation_failure(error):
     # "Literal recovery ..." is the last retry failing the same checks; it failed whole documents
     # instead of keeping one paragraph in the source language (French Sample01, 2026-11-17).
     return isinstance(error, (ValueError, RuntimeError)) and (
-        message.startswith(('Translation ', 'Protected placeholder', 'PII response', 'Literal recovery'))
+        message.startswith(('Translation ', 'Protected placeholder', 'PII response', 'Literal recovery',
+                            # Content of one paragraph, not the server or the setup (2026-11-19):
+                            'Email addresses do not match', 'Source has an indivisible',
+                            'Source exceeds the bounded', 'Invalid field-value', 'Invalid scope',
+                            'Invalid translation audit', 'Invalid structured translation'))
         or message == 'TranslateGemma failed validation.')
 
 def install(endpoint, paragraph_mode=False, protected_values=(), document_context="", external_context=None,terminology=None,glossary=None):
