@@ -139,3 +139,33 @@ class CalendarTests(unittest.TestCase):
                 ('총액은 5,440,000원입니다.', 'The total is KRW 5,440.')]:
             with self.assertRaises(ValueError, msg=target):
                 validate_candidate(source, target)
+
+
+class SpelledCountTests(unittest.TestCase):
+    """Small counts written as the same number in words (Japanese clauses, 2026-11-19)."""
+    source = '顧客満足度は3四半期連続で上昇し、損傷があれば2営業日以内に報告してください。'
+
+    def test_the_same_count_in_words_is_accepted(self):
+        from transformation.llm.translation_guard import validate_candidate
+        validate_candidate(self.source, 'Customer satisfaction rose for three consecutive quarters; '
+                                        'report damage within two business days.')
+
+    def test_another_count_a_missing_count_or_a_count_inside_an_identifier_is_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for target in ('Customer satisfaction rose for four consecutive quarters; report damage within two business days.',
+                       'Customer satisfaction rose for consecutive quarters; report damage within two business days.'):
+            with self.assertRaises(ValueError):
+                validate_candidate(self.source, target)
+        with self.assertRaises(ValueError):
+            validate_candidate('Ref INV-2025-3', 'Ref INV-2025-three')
+
+
+class LengthTests(unittest.TestCase):
+    def test_an_answer_far_longer_than_its_source_is_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        with self.assertRaises(ValueError):
+            validate_candidate('Thi', 'Sure, please provide the Hindi text you would like me to translate. '
+                                      'I will do my best to provide an accurate translation.')
+        validate_candidate('概要', 'Overview')
+        validate_candidate('従業員は会計年度末までに年次セキュリティ研修を修了する必要があります。',
+                           'Employees must complete their annual security training by the end of the fiscal year.')

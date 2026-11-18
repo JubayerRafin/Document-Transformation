@@ -179,15 +179,20 @@ def answer_budget(text):
 
 _PLACEHOLDER_RUN=r'(?:\{v\d+\}\s*)+'
 _TOKEN=r'ZXKEEP[0-9A-F]{8}X\d+XZ'
+# A clause or list number opening a sentence ("5.1 ", "3. ", "a) ", "(iv) "): the models dropped it
+# from Japanese contract clauses (2026-11-19). A dot or a bracket is required, so a count ("3 個")
+# stays with its sentence.
+_CLAUSE=r'\d{1,3}(?:\.\d{1,3})+\.?|\d{1,3}[.)]|\(\w{1,4}\)|[A-Za-z][.)]'
 
 
 def _edge_placeholders(text):
     """(start, end) of the text between placeholders that sit at its edges, or None: leading ones
-    directly before a sentence (an upper-case or non-Latin letter), trailing ones after the final
+    (and a clause number, see _CLAUSE) directly before a sentence (an upper-case or non-Latin letter),
+    trailing ones after the final
     punctuation. Placeholders inside a sentence move with its grammar and stay with the model."""
     import re
     start,end=0,len(text)
-    lead=re.match(r'\s*'+_PLACEHOLDER_RUN,text)
+    lead=re.match(r'\s*(?:(?:'+_CLAUSE+r')\s+(?:\{v\d+\}\s*)*|'+_PLACEHOLDER_RUN+r'(?:(?:'+_CLAUSE+r')\s+)?)',text)
     if lead and lead.end()<len(text):
         following=text[lead.end()]
         if following.isupper() or (following.isalpha() and not following.isascii()):start=lead.end()

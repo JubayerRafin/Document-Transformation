@@ -34,7 +34,11 @@ class PlaceholderLayoutTests(unittest.TestCase):
         self.assertEqual(_edge_placeholders('{v1}All shipments must be inspected.'), (4, 36))
         self.assertEqual(_edge_placeholders('{v1}이사회는 승인했습니다.'), (4, 16))
         self.assertEqual(_edge_placeholders('Done. {v3}'), (0, 5))
-        for text in ('{v1} items were shipped.', 'Call {v1} for support.', 'The total was {v1}.', '{v1}', 'Due {v1}'):
+        self.assertEqual(_edge_placeholders('5.1 今四半期の売上は増加しました。'), (4, 19))
+        self.assertEqual(_edge_placeholders('{v1}3. Payment is due.'), (7, 22))
+        self.assertEqual(_edge_placeholders('(iv) The parties agree.'), (5, 23))
+        for text in ('{v1} items were shipped.', 'Call {v1} for support.', 'The total was {v1}.', '{v1}', 'Due {v1}',
+                     '3 個の荷物が届きました。', '3.5 kg were shipped.', '2024. Revenue grew.'):
             self.assertIsNone(_edge_placeholders(text), text)
 
     def test_glued_placeholders_get_spaces_but_identifiers_do_not(self):

@@ -201,6 +201,22 @@ def calendar_additions(source,target,additions,values=()):
     return +remaining
 
 
+def spelled_counts(source,target,omissions,values=()):
+    """Omissions left after small counts written as the same number in words ("3四半期連続" ->
+    "three consecutive quarters", "2営業日" -> "two business days"). Japanese contract clauses stayed
+    untranslated because every such answer was refused (mass test, 2026-11-19). Only counts up to
+    twenty, each matched by one number word of the same value that the source does not already have;
+    "3" written as "four" is still refused."""
+    if not omissions:return omissions
+    spelled=word_quantities(target,values)-word_quantities(source,values)
+    left=Counter(omissions)
+    for value,count in omissions.items():
+        if not re.fullmatch(r'[1-9]\d?',value) or int(value)>20:continue
+        taken=min(count,spelled[int(value)])
+        left[value]-=taken;spelled[int(value)]-=taken
+    return +left
+
+
 def permits_numeric_omissions(source,target,omissions,values=()):
     """Allow verified lexical side counts in Korean print-mode terminology, and calendar months and
     quarters written in words by the translation (calendar_omissions).
@@ -211,6 +227,7 @@ def permits_numeric_omissions(source,target,omissions,values=()):
     if not omissions:return True
     explicit_values=set(values)
     calendar_free=calendar_omissions(source,target,Counter({k:v for k,v in omissions.items() if k not in explicit_values}),values)
+    calendar_free=spelled_counts(source,target,calendar_free,values)
     omissions=Counter({k:v for k,v in omissions.items() if k in explicit_values})+calendar_free
     if not omissions:return True
     if any(value not in {'1','2'} for value in omissions):return False

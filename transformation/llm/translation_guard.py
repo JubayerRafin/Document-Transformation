@@ -65,6 +65,11 @@ def glued_placeholders(source):
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
+    # A fragment ("Thi", the start of "This" split off by BabelDOC) was answered with "Sure, please
+    # provide the Hindi text you would like me to translate..." and printed in the document
+    # (2026-11-19). Real translations stay within about four times the source, even CJK to English.
+    if len(target.strip()) > 6 * len(source.strip()) + 40:
+        raise ValueError('Translation is far longer than its source.')
     for piece, count in Counter(glued_placeholders(source)).items():
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')
