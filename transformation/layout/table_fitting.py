@@ -87,6 +87,15 @@ def install_table_fitting(Typesetting):
 
         if slot is None:
             return original_render(self, paragraph, page, fonts)
+        if paragraph.vertical:
+            # Slot fitting is for horizontal text. Vertical text in a table, heading or panel slot
+            # (a sideways page: a whole form failed for it, 2026-11-19) is typeset by BabelDOC as
+            # usual and listed for review.
+            results = (self._transformx_heading_fit_results if heading else self._transformx_panel_fit_results
+                       if panel else self._transformx_table_fit_results)
+            results.append({'page': key[0], 'paragraph_id': key[1], 'text': paragraph.unicode,
+                            'slot': slot['bbox'], 'status': 'vertical_text_typeset_normally', 'requires_review': True})
+            return original_render(self, paragraph, page, fonts)
 
         record = {
             "page": key[0],

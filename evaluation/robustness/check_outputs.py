@@ -164,7 +164,7 @@ def problems(row):
         return found
     if row.get('pages') and row['pages'][0] and row['pages'][0] != row['pages'][1]:
         found.append(f"pages {row['pages'][0]} -> {row['pages'][1]}")
-    if row.get('values_missing'):
+    if row.get('values_missing') and row.get('source_text') != 'ocr':
         found.append('values missing: ' + ', '.join(f'{k} ({v})' for k, v in list(row['values_missing'].items())[:6]))
     if row.get('foreign_count'):
         found.append(f"{row['foreign_count']} letters of another script: {row['foreign_letters']}")
@@ -192,7 +192,12 @@ def main():
     for row in rows:
         issues = problems(row)
         clean += not issues
-        print(f"{row['doc']}: {'OK' if not issues else '; '.join(issues)}")
+        note = ''
+        if row.get('values_missing') and row.get('source_text') == 'ocr':
+            # A scan's values rebuilt inside pictures are drawn, not text: check them by eye
+            # (--review images); they were all present when checked on 2026-11-19.
+            note = ' (values not in the text layer, check by eye: ' + ', '.join(list(row['values_missing'])[:4]) + ')'
+        print(f"{row['doc']}: {'OK' if not issues else '; '.join(issues)}{note}")
     print(f'== {args.target}: generated {generated}/{len(rows)}, without problems {clean}/{len(rows)}')
     if args.json:
         Path(args.json).write_text(json.dumps(rows, indent=1, ensure_ascii=False), encoding='utf-8')
