@@ -52,9 +52,8 @@ def validate_options(python, endpoint, source, target, translate=True, redact=Fa
         raise ValueError("Choose an available operation: translation.")
     if source == target or source not in LANGUAGES.values() or target not in LANGUAGES.values():
         raise ValueError("Choose two different supported language options.")
-    parsed = urlparse(endpoint)
-    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or parsed.username or parsed.password:
-        raise ValueError("Milestone 1 requires a local model endpoint (localhost or loopback address).")
+    from transformation.llm.endpoints import check as check_endpoint
+    check_endpoint(endpoint)
     if not Path(python).is_file():
         raise ValueError("Select the Python executable in your BabelDOC environment.")
 
@@ -172,7 +171,8 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
         from transformation.llm.ollama_native import paragraph_messages
         language = next(name for name, code in LANGUAGES.items() if code == target)
         info["translation_prompt"] = paragraph_messages("", language, document_context)[0]["content"]
-        if model.startswith('translategemma:'):
+        from transformation.llm.endpoints import is_translategemma
+        if is_translategemma(model):
             from transformation.llm.translategemma import messages
             info['translation_prompt']=messages('',language,document_context,source)[0]['content']
             info['model_options'].pop('think',None)

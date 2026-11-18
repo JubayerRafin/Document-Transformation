@@ -20,7 +20,10 @@ removes them.
 English, Korean, Japanese, Chinese (Simplified), Arabic, Hindi, Bengali, French, German, Spanish
 and Portuguese. Arabic is written right to left with proper letter shaping; Hindi and Bengali use
 shaped Indic text. Translation from English into each of the other ten has been tested on sample documents. OCR of scanned
-pages currently reads English, Chinese and Japanese only.
+pages reads English, Korean, Chinese and Japanese.
+
+Customers can set a **glossary** per language pair: required translations for their own terms,
+applied to every new translation.
 
 ## How it works
 
@@ -51,6 +54,11 @@ Browser ──> Cloudflare Worker (cloud/) ──> Supabase (jobs, files, accoun
 The website never runs the Python engine. All document processing happens on the GPU server the
 user registers, and documents stay in that user's private storage.
 
+The engine itself has no database, accounts or hosting dependency. For an internal deployment it
+runs behind its own small HTTP API (`tools/service/engine_server.py`), with model servers that can be
+local or remote (OpenAI-compatible, with API keys). See [engine, adapters and
+configuration](docs/ENGINE_SERVICE.md) and [security notes and limitations](docs/SECURITY_AND_LIMITATIONS.md).
+
 ## Repository layout
 
 | Path | Contents |
@@ -59,6 +67,7 @@ user registers, and documents stay in that user's private storage.
 | `cloud/` | Cloudflare Worker API and static site |
 | `supabase/` | Database migrations, roles and storage rules |
 | `tools/service/cloud_worker.py` | GPU server agent: claims jobs and runs the engine |
+| `tools/service/engine_server.py` | Standalone engine HTTP API (no database or accounts) |
 | `tools/gpu/` | Server setup and start scripts |
 | `extraction/` | Deep Doc Extractor integration and the shared IR |
 | `transformation/` | Translation, PII, OCR, reconstruction and validation |
@@ -96,11 +105,15 @@ bash tools/gpu/start_worker.sh
 The script starts both model servers, sizes their GPU memory for the card, and starts the worker.
 It is safe to run again; anything already running is left alone. The worker log is
 `/workspace/cloud-worker.log`. More detail: [private GPU workers](docs/PRIVATE_GPU_WORKERS.md).
+`bash tools/gpu/start_worker.sh --servers-only` starts the model servers without the site worker,
+for the [engine service](docs/ENGINE_SERVICE.md).
 
 ### Measured speed
 
 Six sample documents (8 pages: native, scanned, tables and figures), warm server, November 2026.
-Times include extraction, OCR, translation, reconstruction and checks.
+Times include extraction, OCR, translation, reconstruction and checks. On an L40S on 19 November,
+first-time translations into Korean took 12.6 s per page (10 s for repeated documents, which reuse
+cached translations); details in [engine, adapters and configuration](docs/ENGINE_SERVICE.md#speed-l40s-19-november-2026).
 
 | Job | RTX 4090 (24 GB) | L40S (48 GB) |
 |---|---|---|
@@ -152,8 +165,11 @@ the BabelDOC or PaddleOCR environment and are skipped or fail elsewhere.
 
 - Worker credentials, `*.local.json` and `.env` files are ignored by Git; never commit them.
 - Job outputs (`runs/`, `output/`, `outputs/`) stay on the machine that produced them.
-- PII masking removes the underlying text and re-checks the output, but detection can miss
-  values. Treat redacted output as needing human review before it is shared.
+- PII masking deletes the matched text and re-checks the output, but detection can miss values and
+  unrecoverability has not been independently verified: it is reviewed masking, not certified
+  secure redaction. Treat masked output as needing human review before it is shared.
+- Model servers on other machines are used only when listed explicitly; keys come from the
+  environment and are never written to job files. See [security notes](docs/SECURITY_AND_LIMITATIONS.md).
 
 ## License
 

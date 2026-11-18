@@ -2,8 +2,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "npm --prefix ../frontend run build && npm run build:studio && node ../tools/service/package_customer_frontend.mjs",
-    "build:studio": "python ../tools/service/build_cloud_frontend.py",
+    "build": "npm --prefix ../frontend run build && npm run build:assets && node ../tools/service/package_customer_frontend.mjs",
+    "build:assets": "python ../tools/service/build_cloud_assets.py",
     "test:frontend": "npm --prefix ../frontend run typecheck && npm --prefix ../frontend test",
     "pretest": "npm run build",
     "test": "node --test test/*.test.mjs",

@@ -1,7 +1,12 @@
-"""Batch-scoped, authenticated loopback service for the unchanged layout model.
+"""Authenticated loopback service for the unchanged layout model, shared by BabelDOC runs.
 
 Only the ONNX session is shared. PDF objects, translation hooks, and job state
 remain in their original isolated workers. No predictions are cached.
+
+Without it, every BabelDOC run loads the layout model onto the GPU itself (about 1 s on an L40S,
+2026-11-19), and a page with pictures runs BabelDOC once for the page and once per picture. A batch
+(shared_layout) or a long-running worker (optional_shared_layout) starts one session for all of them.
+If the service cannot be reached, a run loads the model itself as before.
 """
 import contextlib
 import json
@@ -81,6 +86,37 @@ def shared_layout(python, folder, startup_timeout=120):
                         process.wait(timeout=5)
 
 
+@contextlib.contextmanager
+def optional_shared_layout(python, folder):
+    """A shared layout session for a worker or batch when one can start (BabelDOC's Python exists and
+    TRANSFORMX_SHARED_LAYOUT is not "0"); otherwise nothing, and each run loads the model itself."""
+    if os.environ.get('TRANSFORMX_SHARED_LAYOUT') == '0' or not python or not Path(python).is_file():
+        yield None
+        return
+    stack = contextlib.ExitStack()
+    try:
+        metadata = stack.enter_context(shared_layout(python, folder))
+    except Exception as error:
+        stack.close()
+        print(f'Shared layout model unavailable ({type(error).__name__}); each run loads its own.', flush=True)
+        yield None
+        return
+    with stack:
+        yield metadata
+
+
+def ping(timeout=5):
+    """True when the shared layout service named in the environment answers."""
+    address, key = os.environ.get(ENV), os.environ.get(KEY)
+    if not address or not key:
+        return False
+    try:
+        request(json.loads(address), key, 'ping', timeout=timeout)
+        return True
+    except Exception:
+        return False
+
+
 def install(model_class=None):
     """Replace only session construction/run; retain vendor preprocessing/NMS."""
     address, key = os.environ.get(ENV), os.environ.get(KEY)
@@ -91,6 +127,9 @@ def install(model_class=None):
     address = json.loads(address)
     if len(address) != 2 or address[0] != '127.0.0.1':
         raise ValueError('Layout service must use IPv4 loopback.')
+    if not ping():
+        # The service stopped (idle limit, restart): this run loads the model itself.
+        return False
     if model_class is None:
         from babeldoc.docvision.doclayout import OnnxModel
         model_class = OnnxModel
@@ -124,12 +163,21 @@ def serve(ready):
     from babeldoc.assets.assets import get_doclayout_onnx_model_path
     import hashlib
     started = time.monotonic()
+    # The same device and CPU policies a BabelDOC run applies to its own session (GPU when
+    # TRANSFORMX_LAYOUT_DEVICE=cuda); without them the shared session ran on the CPU and made every
+    # page slower (one-page document 7 s -> 18 s, 2026-11-19).
+    from transformation.pdf.layout_cpu import install as install_layout_cpu
+    from transformation.pdf.layout_device import install as install_layout_device
+    install_layout_cpu()
+    providers = install_layout_device()
     path = get_doclayout_onnx_model_path()
     model = OnnxModel(str(path))
+    print(json.dumps({'layout_providers': providers}), flush=True)
     digest = hashlib.sha256(Path(path).read_bytes()).hexdigest()
     metadata = {'stride': model._stride, 'names': model._names}
     with Listener(('127.0.0.1', 0), authkey=bytes.fromhex(os.environ[KEY])) as listener:
-        # Bound orphan lifetime if the owning batch is interrupted abruptly.
+        # Bound orphan lifetime if the owning batch or worker is interrupted abruptly (a worker pings
+        # it every 45 s while it runs).
         listener._listener._socket.settimeout(3600)
         pending = Path(ready).with_suffix('.tmp')
         pending.write_text(json.dumps({'address': listener.address,
@@ -147,6 +195,9 @@ def serve(ready):
                         if operation == 'stop':
                             connection.send((True, None))
                             break
+                        if operation == 'ping':
+                            connection.send((True, calls))
+                            continue
                         if operation == 'metadata':
                             if payload != digest:
                                 raise ValueError('Layout model checksum differs from the batch session.')

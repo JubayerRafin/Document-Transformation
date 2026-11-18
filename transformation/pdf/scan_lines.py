@@ -8,6 +8,8 @@ line, are close together with clean background between them, are not separated b
 and were each read reliably; table cells (wide gaps or cell borders) and lines with an unread
 symbol between the pieces ("2026 · Global Edition") stay apart.
 """
+import re
+
 import numpy as np
 import pymupdf
 
@@ -99,10 +101,18 @@ LINE_GAP = 0.6     # at most this many line heights between the lines
 SAME_INK = 0.25    # colours (0-1 RGB) closer than this are the same ink
 
 
+HANGUL = re.compile(r'[가-힣]')
+NEW_ITEM = re.compile(r'^(?:[•·▪\-–*]|\d+[.)])')
+
+
 def _continues(upper, lower):
     a, b = upper['text'].strip(), lower['text'].strip()
-    if not a or not b or ':' in a or ':' in b or a[-1] in '.!?;:':
+    if not a or not b or ':' in a or ':' in b or a[-1] in '.!?;:。':
         return False
+    # Korean has no lower case: a sentence line that does not end the sentence continues below, unless
+    # the next line starts a new bullet or numbered item. Short lines (headings) never continue.
+    if HANGUL.search(a) and HANGUL.search(b):
+        return len(a) >= 12 and not NEW_ITEM.match(b)
     last = a.split()[-1].lower()
     return b[0].islower() or a[-1] in ',&-–' or last in CONNECTORS
 

@@ -9,11 +9,9 @@ import {
 } from "motion/react";
 import {
   ArrowLeft,
-  ArrowUpRight,
   BookText,
   FilePlus2,
   Files,
-  FlaskConical,
   Loader2,
   LogOut,
   Menu,
@@ -129,19 +127,6 @@ export function Workspace() {
           </m.button>
         ))}
       </nav>
-      <div className="mt-7 border-t border-border pt-6">
-        <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-[.15em] text-muted-foreground">
-          Our workspace
-        </p>
-        <a
-          href="/studio"
-          className="flex items-center gap-3 rounded-lg px-3 py-3 text-sm text-muted-foreground hover:bg-muted"
-        >
-          <FlaskConical className="size-[18px]" />
-          TransformX Studio
-          <ArrowUpRight className="ml-auto size-3.5" />
-        </a>
-      </div>
     </>
   );
   return (

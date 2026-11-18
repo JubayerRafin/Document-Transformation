@@ -356,13 +356,13 @@ export function createHandler(transport=fetch){
      return sub.endsWith('/url')?json({url:link}):Response.redirect(link,302);
     }
    }
-   if(p==='/v1/baselines'&&method==='GET')return json([]);
    throw new Fault('ENDPOINT_NOT_IMPLEMENTED',404);
   }
   if(!env.ASSETS)throw new Fault('FRONTEND_NOT_BUILT',503);
-  // Explicit document routes pair with html_handling:none. Automatic HTML
-  // canonicalization would redirect /studio.html back into /studio forever.
-  const documents={'/':'/index.html','/workspace':'/workspace.html','/workspace/':'/workspace.html','/studio':'/studio.html','/studio/':'/studio.html'};
+  // Explicit document routes pair with html_handling:none (automatic HTML canonicalization loops).
+  // The former Studio pages were removed; their old links open the workspace.
+  if(p==='/studio'||p==='/studio/'||p==='/studio.html')return Response.redirect(new URL('/workspace',url),301);
+  const documents={'/':'/index.html','/workspace':'/workspace.html','/workspace/':'/workspace.html'};
   return env.ASSETS.fetch(documents[p]?new Request(new URL(documents[p],url),request):request);
  }catch(e){return json({error:e instanceof Fault?e.message:'INTERNAL_ERROR'},e instanceof Fault?e.status:500);}
  };

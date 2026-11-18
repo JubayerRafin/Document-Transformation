@@ -40,7 +40,9 @@ def main():
     out = Path(args.out_dir).resolve(); out.mkdir(parents=True, exist_ok=True)
     from transformation.ocr.service import managed_session, prewarm
     # The OCR service only reads files inside its root, so the root is the folder holding every job.
-    with managed_session(profile['ocr_python'], out, bool(profile.get('persistent_ocr'))) as session:
+    from transformation.pdf.layout_service import optional_shared_layout
+    # Like the site worker: one OCR session and one shared layout model for all documents.
+    with managed_session(profile['ocr_python'], out, bool(profile.get('persistent_ocr'))) as session,             optional_shared_layout(profile.get('python'), out / '_layout'):
         if session: prewarm(out / '_prewarm')
         for pdf in sorted(Path(args.pdf_dir).glob('*.pdf')):
             folder = out / pdf.stem / 'job'

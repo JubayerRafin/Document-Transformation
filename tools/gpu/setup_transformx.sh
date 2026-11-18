@@ -79,7 +79,7 @@ from paddleocr import TextDetection,TextRecognition
 import hashlib
 from pathlib import Path
 report['models']={}
-for model_type,name in [(TextDetection,'PP-OCRv5_server_det'),(TextRecognition,'en_PP-OCRv5_mobile_rec'),(TextRecognition,'PP-OCRv5_server_rec')]:
+for model_type,name in [(TextDetection,'PP-OCRv5_server_det'),(TextRecognition,'en_PP-OCRv5_mobile_rec'),(TextRecognition,'PP-OCRv5_server_rec'),(TextRecognition,'korean_PP-OCRv5_mobile_rec')]:
     model=model_type(model_name=name,device='gpu:0',enable_mkldnn=False,cpu_threads=10)
     files=Path.home()/'.paddlex/official_models'/name
     report['models'][name]={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in files.glob('*.pdiparams')}

@@ -4,7 +4,7 @@ No automatic replay of a claimed job after a crash. A job whose worker stops
 reporting is marked interrupted by the application (after 2 minutes once this
 worker claims again, otherwise after 15 minutes); it must be resubmitted.
 """
-import argparse, getpass, hashlib, http.client, http.cookiejar, json, os, signal, subprocess, sys, time, uuid
+import argparse, getpass, hashlib, http.client, http.cookiejar, json, os, re, shutil, signal, subprocess, sys, time, uuid
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -249,7 +249,7 @@ def summarize_checks(result):
             'privacy_verification':'not_run' if not isinstance(privacy,dict) else 'passed' if privacy.get('passed') is True else 'failed'}
 
 PROFILE_OVERRIDES=(('pii_endpoint','TRANSFORMX_PII_ENDPOINT'),('pii_model','TRANSFORMX_PII_MODEL'),
-                   ('translation_endpoint','TRANSFORMX_TRANSLATION_ENDPOINT'),
+                   ('translation_endpoint','TRANSFORMX_TRANSLATION_ENDPOINT'),('translation_model','TRANSFORMX_TRANSLATION_MODEL'),
                    # Translation runs BabelDOC and the document engine in their own environments.
                    ('python','TRANSFORMX_BABELDOC_PYTHON'),('engine_python','TRANSFORMX_ENGINE_PYTHON'))
 # Translation concurrency suited to the model server this machine runs (a vLLM server takes 16 parallel
@@ -293,8 +293,8 @@ def pii_ready(profile,ollama_base=None,ollama_names=()):
 
 
 def translation_ready(profile,ollama_base=None,ollama_names=()):
-    """The translation model (translategemma:12b) is served at the translation endpoint (Ollama or vLLM)."""
-    return _served('Translation only','translategemma:12b',
+    """The translation model (translategemma:12b unless configured) is served at the translation endpoint."""
+    return _served('Translation only',profile.get('translation_model','translategemma:12b'),
                    profile.get('translation_endpoint','http://127.0.0.1:11434/v1'),ollama_base,ollama_names)
 
 
@@ -408,6 +408,28 @@ def keep_ocr_warm(session):
         from transformation.ocr.service import prewarm
         prewarm(session.root/'prewarm')
 
+JOB_FOLDER=re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+
+
+def clean_old_jobs(root,hours=None,now=None):
+    """Delete local job folders older than TRANSFORMX_RUN_RETENTION_HOURS (default 72; 0 keeps all).
+    Results are uploaded to the application; the local copies are for inspection only, and a GPU
+    server's disk filled up with them after a few days of tests (2026-11-18). Only folders named like a
+    job id are touched. Returns how many were deleted."""
+    if hours is None:
+        try:hours=float(os.environ.get('TRANSFORMX_RUN_RETENTION_HOURS','72'))
+        except ValueError:hours=72.0
+    if hours<=0:return 0
+    cutoff=(now or time.time())-hours*3600;removed=0
+    for folder in Path(root).iterdir():
+        try:
+            if folder.is_dir() and JOB_FOLDER.match(folder.name) and folder.stat().st_mtime<cutoff:
+                shutil.rmtree(folder);removed+=1
+        except OSError:
+            continue
+    return removed
+
+
 def _run(args,cfg,root,ocr_session=None):
     lock=(root/'worker.lock').open('a+b');lock.write(b'0');lock.flush();lock.seek(0)
     if os.name=='nt':
@@ -420,6 +442,10 @@ def _run(args,cfg,root,ocr_session=None):
         try:
             if time.monotonic()-last_check>45:
                 keep_ocr_warm(ocr_session)
+                from transformation.pdf.layout_service import ping as layout_ping
+                layout_ping()  # keeps the shared layout service from reaching its idle limit
+                removed=clean_old_jobs(root)
+                if removed:print(f'Deleted {removed} local job folder(s) past the retention period.',flush=True)
                 state=preflight(cfg);rpc(cfg,'/worker/status',{'capabilities':state});last_check=time.monotonic()
                 print('Worker ready for: '+(', '.join(state['operations']) or 'none; prerequisites missing'),flush=True)
             j=rpc(cfg,'/worker/claim').get('job')
@@ -456,11 +482,15 @@ def run(args):
     if enabled and profile.get('ocr_device')!='gpu:0':raise ValueError('Persistent OCR requires explicit GPU placement.')
     root=Path(args.root).resolve();root.mkdir(parents=True,exist_ok=True)
     from transformation.ocr.service import managed_session
-    with managed_session(profile['ocr_python'],root,enabled) as session:
+    from transformation.pdf.layout_service import optional_shared_layout
+    # One layout model for all BabelDOC runs of all jobs (pages and pictures), instead of each run
+    # loading its own; runs fall back to their own model if it stops.
+    with managed_session(profile['ocr_python'],root,enabled) as session,             optional_shared_layout(profile.get('python'),root/'layout-service') as layout:
         if session:
             # Load OCR models once at worker start, so the first job does not wait for them.
             from transformation.ocr.service import prewarm
             prewarm(root/'prewarm')
+        if layout:print('Shared layout model ready.',flush=True)
         _run(args,cfg,root,session)
 
 

@@ -25,7 +25,7 @@ node --check cloud/src/index.mjs
 python -m unittest tests.test_cloud_worker tests.test_separate_workflows
 ```
 
-`npm --prefix cloud test` rebuilds the customer frontend and Studio and then tests
+`npm --prefix cloud test` rebuilds the customer frontend and the redaction editor and then tests
 the Worker. It does not deploy. Use existing lockfiles and separate Python
 environments. BabelDOC-specific tests need the pinned BabelDOC environment;
 metric tests need evaluation dependencies. Native Office tests need a configured

@@ -50,8 +50,12 @@ class OpenAICompatibleTests(unittest.TestCase):
         with patch.dict('os.environ',self.ENV),patch('urllib.request.urlopen',return_value=BytesIO(json.dumps(response).encode())) as call:
             chat('http://127.0.0.1:11434/v1','m',[])
         self.assertTrue(call.call_args.args[0].full_url.endswith('/api/chat'))
+        # A remote server is refused unless listed, and even when listed must use https (unless the
+        # operator allows plain http on a trusted network); see transformation/llm/endpoints.py.
+        with patch.dict('os.environ',{'TRANSFORMX_OPENAI_COMPATIBLE':''}):
+            with self.assertRaisesRegex(ValueError,'not on this machine'):chat('https://example.com:8000/v1','m',[])
         with patch.dict('os.environ',{'TRANSFORMX_OPENAI_COMPATIBLE':'http://example.com:8000'}):
-            with self.assertRaisesRegex(ValueError,'loopback'):chat('http://example.com:8000/v1','m',[])
+            with self.assertRaisesRegex(ValueError,'must use https'):chat('http://example.com:8000/v1','m',[])
 
 
 if __name__=='__main__':unittest.main()

@@ -49,15 +49,18 @@ class SentencePunctuationTests(unittest.TestCase):
 
 class SingleModelOcrTests(unittest.TestCase):
     def test_repeat_reads_by_one_model_are_not_independent_agreement(self):
-        from tools.ocr.recognize_paddle_boxes import bounded_recognition,independent_literal_evidence
+        from tools.ocr.recognize_paddle_boxes import bounded_recognition,independent_literal_evidence,single_model_literal_evidence
         class Model:
             def predict(self,image):return [{'rec_text':'ID 4471-2290','rec_score':.99}]
         model=Model()
         best,review,decision,reads=bounded_recognition(np.full((20,160,3),255,np.uint8),model,lambda:model,'ko')
         self.assertTrue(review)
         self.assertEqual(decision,'sensitive_literal_single_model')
-        self.assertEqual({r['model'] for r in reads},{'PP-OCRv5_server_rec'})
+        # Korean is read by its own model; repeated views of it, without a second model reading the
+        # same digits, are not enough for a line with numbers.
+        self.assertEqual({r['model'] for r in reads},{'korean_PP-OCRv5_mobile_rec'})
         self.assertFalse(independent_literal_evidence(reads,best['text']))
+        self.assertFalse(single_model_literal_evidence(reads,best['text']))
 
     def test_english_still_uses_two_distinct_models(self):
         from tools.ocr.recognize_paddle_boxes import bounded_recognition

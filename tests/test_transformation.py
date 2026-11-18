@@ -53,7 +53,7 @@ class TransformationBoundaries(unittest.TestCase):
             validate_options(sys.executable, "http://localhost:11434/v1", "en", "ko", redact=True)
 
     def test_remote_endpoint_is_rejected(self):
-        with self.assertRaisesRegex(ValueError, "local model"):
+        with self.assertRaisesRegex(ValueError, "not on this machine"):
             validate_options(sys.executable, "https://example.com/v1", "en", "ko")
 
     def test_no_operation_is_rejected(self):

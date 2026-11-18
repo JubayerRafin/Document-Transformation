@@ -5,7 +5,7 @@
 This is an additional review step for a completed hosted PDF job, including
 translation, PII, combined, and a previous manual-redaction result. It does not
 change the existing extraction, translation, detection or reconstruction path.
-Workspace and Studio open the same `/redaction-review.html?job=<job UUID>` editor.
+The workspace opens the `/redaction-review.html?job=<job UUID>` editor.
 It uses the pinned official `pdfjs-dist` package, served locally with its worker,
 fonts, character maps and WASM resources. No document is sent to a PDF viewer CDN.
 
@@ -99,7 +99,7 @@ Run from the repository root in a normal PowerShell terminal:
 ```
 
 This runs Python engine/PII/worker regressions, frontend type checking and unit
-tests, a fresh production frontend build, Studio composition and all cloud tests.
+tests, a fresh production frontend build, the editor and pdf.js copy, and all cloud tests.
 DOM interaction tests stub PDF.js rendering; they are not browser-render evidence.
 Python tests independently exercise real native/scanned PDFs, forms, rotations,
 crop boxes, preserved unrelated pixels, version mismatch and the worker process.

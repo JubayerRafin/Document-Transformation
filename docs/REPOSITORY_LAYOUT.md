@@ -6,11 +6,11 @@
 frontend/                    Customer Next.js/TypeScript application
 cloud/
   src/                       Hosted Cloudflare API
-  ui/                        Studio source overrides and worker UI
-  test/                      Worker, asset and Studio tests
+  ui/                        Manual redaction editor
+  test/                      Worker, API and asset tests
 supabase/migrations/         Hosted PostgreSQL schema and access policies
 backend/                     Separate local FastAPI service and engine adapter
-backend/static/              Source assets also used to build Studio
+backend/static/              Local FastAPI app's own pages (local Studio)
 transformation/
   workflows.py               Translation / PII / combined entry points
   pipeline.py                Shared orchestration

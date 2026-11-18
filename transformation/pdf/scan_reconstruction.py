@@ -118,9 +118,13 @@ def available_text_box(region, regions, pixels, rules):
         limit=min(limit,edges[0]-2)
         if limit<box.x1:
             box.x1=max(box.x0+1,limit)
+    # Other lines sharing this box's height band, as plain numbers: the candidate box below overlaps
+    # one exactly when their widths overlap too. (Building a PyMuPDF rectangle for every line at every
+    # step took 7 of 9 s on a scanned page with 50 lines, 2026-11-19.)
+    others=[(r['bbox'][0],r['bbox'][2]) for r in regions if r['id']!=region['id']
+            and min(box.y1,r['bbox'][3])-max(box.y0,r['bbox'][1])>0 and r['bbox'][2]>r['bbox'][0]]
     for right in range(math.ceil(box.x1)+1,limit+1):
-        candidate=pymupdf.Rect(box.x0,box.y0,right,box.y1)
-        if any(r['id']!=region['id'] and (candidate & pymupdf.Rect(r['bbox'])).get_area()>0 for r in regions):
+        if any(min(right,rx1)-max(box.x0,rx0)>0 for rx0,rx1 in others):
             break
         strip=pixels[top:bottom,right-1:right]
         if not strip.size or rules[top:bottom,right-1:right].any():

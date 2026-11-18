@@ -48,30 +48,56 @@ def record_progress(event, **details):
         logger.warning("Could not save translation progress", exc_info=True)
 
 
-OPENAI_SERVERS_ENV = "TRANSFORMX_OPENAI_COMPATIBLE"
+from transformation.llm.endpoints import OPENAI_SERVERS_ENV  # noqa: F401  (kept for callers)
 
 
 def server_kind(base):
-    """'openai' for loopback servers listed in TRANSFORMX_OPENAI_COMPATIBLE (vLLM, SGLang,
-    llama.cpp server; comma-separated scheme://host:port), else 'ollama'."""
-    listed = {item.strip().rstrip('/') for item in os.environ.get(OPENAI_SERVERS_ENV, '').split(',') if item.strip()}
-    return "openai" if base in listed else "ollama"
+    """'openai' for servers listed in TRANSFORMX_OPENAI_COMPATIBLE (vLLM, SGLang, llama.cpp server,
+    remote OpenAI-compatible services), else 'ollama'. See transformation/llm/endpoints.py."""
+    from transformation.llm.endpoints import kind
+    return kind(base)
 
 
-def _openai_chat(base, model, messages, max_output, response_format, purpose):
+REMOTE_ATTEMPTS = 3
+TRANSIENT_HTTP = {429, 502, 503, 504}
+
+
+def _retry_delay(error, attempt):
+    """Seconds before repeating a request to a remote server: its Retry-After (at most 30 s), else 2, 4 s."""
+    try:
+        after = float(error.headers.get('Retry-After')) if error is not None and error.headers else None
+    except (TypeError, ValueError):
+        after = None
+    return min(30.0, after) if after is not None and after >= 0 else 2.0 * (attempt + 1)
+
+
+def _openai_chat(endpoint, model, messages, max_output, response_format, purpose):
     """Same contract as the Ollama path: deterministic, no thinking, schema-constrained JSON."""
-    payload = {"model": model, "messages": messages, "temperature": 0, "max_tokens": max_output,
-               "chat_template_kwargs": {"enable_thinking": False}}
+    from transformation.llm import endpoints
+    payload = {"model": model, "messages": messages, "temperature": 0, "max_tokens": max_output}
+    if endpoints.chat_template_kwargs(endpoint):
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
     if response_format is not None:
         payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "answer", "schema": response_format}}
     started = time.monotonic()
-    request = urllib.request.Request(base + "/v1/chat/completions", data=json.dumps(payload).encode(),
-                                     headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(request, timeout=600) as response:
-            result = json.load(response)
-    except urllib.error.HTTPError as exc:
-        raise ValueError(f'Model server rejected model {model} (HTTP {exc.code}): {exc.read(4096).decode("utf-8", errors="replace")}') from exc
+    request = urllib.request.Request(endpoints.url(endpoint, "/v1/chat/completions"), data=json.dumps(payload).encode(),
+                                     headers=endpoints.headers(endpoint))
+    attempts = 1 if endpoints.is_loopback(endpoint) else REMOTE_ATTEMPTS
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(request, timeout=endpoints.timeout()) as response:
+                result = json.load(response)
+            break
+        except urllib.error.HTTPError as exc:
+            # A remote gateway can be briefly busy or restarting; the request is deterministic, so it is
+            # repeated a couple of times. A local server's errors are never replayed.
+            if exc.code in TRANSIENT_HTTP and attempt + 1 < attempts:
+                time.sleep(_retry_delay(exc, attempt)); continue
+            raise ValueError(f'Model server rejected model {model} (HTTP {exc.code}): {exc.read(4096).decode("utf-8", errors="replace")}') from exc
+        except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
+            if attempt + 1 < attempts:
+                time.sleep(_retry_delay(None, attempt)); continue
+            raise
     choice = (result.get("choices") or [{}])[0] if isinstance(result, dict) else {}
     content = (choice.get("message") or {}).get("content")
     if not isinstance(content, str) or not content.strip() or choice.get("finish_reason") != "stop":
@@ -84,21 +110,22 @@ def _openai_chat(base, model, messages, max_output, response_format, purpose):
 
 
 def chat(endpoint, model, messages, max_output=4096, response_format=None, purpose=None):
+    from transformation.llm import endpoints
+    endpoints.check(endpoint)
     parsed = urlparse(endpoint)
-    if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or parsed.scheme not in {"http", "https"}:
-        raise ValueError("Only a loopback Ollama endpoint is permitted.")
     base = f"{parsed.scheme}://{parsed.netloc}"
-    # On a GPU shared by several model servers, the one about to be called gets it (see gpu_share).
+    # On a GPU shared by several model servers, the one about to be called gets it (see gpu_share;
+    # does nothing unless TRANSFORMX_GPU_SWAP lists this server).
     from transformation.llm.gpu_share import ensure
     ensure(base)
-    if server_kind(base) == "openai":
-        return _openai_chat(base, model, messages, max_output, response_format, purpose)
+    if endpoints.kind(endpoint) == "openai":
+        return _openai_chat(endpoint, model, messages, max_output, response_format, purpose)
     url = f"{base}/api/chat"
     payload = {"model": model, "messages": messages, "think": False, "stream": False,
                "options": {"temperature": 0, "num_ctx": 8192, "num_predict": max_output},
                # Keep the model resident between requests and jobs; reloading costs seconds.
                "keep_alive": os.environ.get("TRANSFORMX_OLLAMA_KEEP_ALIVE", "30m")}
-    if model.startswith('translategemma:'): payload.pop('think')
+    if _is_translategemma(model): payload.pop('think')
     if response_format is not None: payload['format']=response_format
     request = urllib.request.Request(url, data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"})
     started=time.monotonic()
@@ -107,7 +134,7 @@ def chat(endpoint, model, messages, max_output=4096, response_format=None, purpo
             from transformation.llm.http_session import post_json
             result = post_json(url, payload, timeout=600)
         else:
-            with urllib.request.urlopen(request, timeout=600) as response:
+            with urllib.request.urlopen(request, timeout=_model_timeout()) as response:
                 result = json.load(response)
     except urllib.error.HTTPError as exc:
         body=exc.read(4096).decode('utf-8',errors='replace')
@@ -127,6 +154,16 @@ def chat(endpoint, model, messages, max_output=4096, response_format=None, purpo
         **{k:result[k] for k in ('total_duration','load_duration','prompt_eval_duration','eval_duration','prompt_eval_count','eval_count')
            if isinstance(result.get(k),(int,float))})
     return text, result
+
+
+def _is_translategemma(model):
+    from transformation.llm.endpoints import is_translategemma
+    return is_translategemma(model)
+
+
+def _model_timeout():
+    from transformation.llm.endpoints import timeout
+    return timeout()
 
 
 def paragraph_messages(text, language, document_context=""):
@@ -216,7 +253,7 @@ def translate_paragraph(endpoint, model, text, language, protected_values=(), do
 def _translate_paragraph(endpoint, model, text, language, protected_values=(), document_context="", structured=False, interpret_field=False, source_language=None):
     """Protect emails and supplied values; record translation failures."""
     try:
-        if model.startswith('translategemma:'):
+        if _is_translategemma(model):
             from transformation.llm.translategemma import translate
             return translate(endpoint,model,text,language,protected_values,document_context,
                 source=source_language or os.environ.get('TRANSFORMX_SOURCE_LANGUAGE','en'))
@@ -337,7 +374,7 @@ def _translate_paragraph(endpoint, model, text, language, protected_values=(), d
             return restored, {**stats, **totals}
 
     except Exception as error:
-        if model.startswith('translategemma:') and validation_failure(error):
+        if _is_translategemma(model) and validation_failure(error):
             # Every retry changed a protected value (a number, code or name). Keep this paragraph in
             # the source language, exact, and flag the run for review rather than failing the whole
             # document for one paragraph. Server, timeout and configuration errors still fail it.

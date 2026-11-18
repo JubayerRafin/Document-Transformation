@@ -5,7 +5,9 @@ without relocating referenced files or changing existing commands.
 
 ## Product and deployment
 
-- [Customer frontend](CUSTOMER_FRONTEND.md): Next export, Studio composition and checks.
+- [Engine, adapters and configuration](ENGINE_SERVICE.md): engine service API, every setting, OCR languages, speed.
+- [Security notes and known limitations](SECURITY_AND_LIMITATIONS.md).
+- [Customer frontend](CUSTOMER_FRONTEND.md): Next export, publishing and checks.
 - [Cloud setup](CLOUD_SETUP.md): initial Cloudflare/Supabase setup procedure; inspect current deployment records separately.
 - [Private processing workers](PRIVATE_GPU_WORKERS.md): ownership, registration and job routing.
 - [Server execution](SERVER_EXECUTION.txt): full Python processing on a connected server.

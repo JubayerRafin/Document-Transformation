@@ -1,12 +1,10 @@
-// Compose the static Next.js customer app with the unchanged legacy Studio.
+// Publish the static Next.js customer app into cloud/public with its exact inline-script CSP hashes.
 import {readFile,writeFile,mkdir,cp,readdir} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const source=path.join(root,'frontend/out'),target=path.join(root,'cloud/public');
-const studio=await readFile(path.join(target,'index.html'));
-await writeFile(path.join(target,'studio.html'),studio);
 await cp(source,target,{recursive:true});
 // Static Next documents contain inline hydration scripts. Authorize their exact
 // bytes with hashes, never an unrestricted inline-script policy.
@@ -22,4 +20,4 @@ for(const file of await readdir(source)){
 }
 await mkdir(path.join(root,'cloud/generated'),{recursive:true});
 await writeFile(path.join(root,'cloud/generated/frontend-csp.json'),JSON.stringify(policies,null,2)+'\n');
-console.log('Customer app packaged; Studio retained as studio.html; exact hydration CSP hashes generated.');
+console.log('Customer app packaged; exact hydration CSP hashes generated.');
