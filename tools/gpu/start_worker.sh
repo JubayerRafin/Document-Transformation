@@ -11,15 +11,23 @@ set -euo pipefail
 servers_only=0
 if [ "${1:-}" = "--servers-only" ]; then servers_only=1; shift; fi
 app="$(cd "$(dirname "$0")/../.." && pwd)"
-config="${1:-$app/configs/gpu.worker.local.json}"
 python="${TRANSFORMX_PYTHON:-/workspace/paddle-env/bin/python}"
 log="${TRANSFORMX_WORKER_LOG:-/workspace/cloud-worker.log}"
+[ -x "$python" ] || { echo "GPU Python not found: $python (run tools/gpu/setup_transformx.sh pii first)."; exit 1; }
+
+# configs/transformx.toml (or $TRANSFORMX_SETTINGS), if present: its values become environment
+# defaults here, so everything below sees them. Variables already set in the environment win.
+settings_env=$(cd "$app" && PYTHONPATH="$app" "$python" -m transformation.settings env) || {
+  echo "Fix the settings file first (python -m transformation.settings check)."; exit 1; }
+eval "$settings_env"
+config="${1:-${TRANSFORMX_WORKER_CONFIG:-$app/configs/gpu.worker.local.json}}"
+# A model server set to another machine is used as it is; only local ones are started here.
+local_server() { case "${1:-}" in ""|http://127.0.0.1:"$2"*|http://localhost:"$2"*) return 0;; *) return 1;; esac; }
 
 if [ "$servers_only" = 0 ]; then
   [ -f "$config" ] || { echo "Worker config not found: $config (download it from the site's Workers panel)."; exit 1; }
   chmod 600 "$config"
 fi
-[ -x "$python" ] || { echo "GPU Python not found: $python (run tools/gpu/setup_transformx.sh pii first)."; exit 1; }
 
 if ! curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
   # Same settings as setup_transformx.sh: parallel requests, flash attention, 8-bit KV cache.
@@ -63,7 +71,8 @@ wait_for() {  # port, log
   echo "vLLM on port $1 did not start; see $2."; exit 1
 }
 
-if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$vllm_model/config.json" ]; then
+if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && local_server "${TRANSFORMX_PII_ENDPOINT:-}" 8000 \
+    && [ -x "$vllm" ] && [ -f "$vllm_model/config.json" ]; then
   if ! curl -fsS http://127.0.0.1:8000/v1/models >/dev/null 2>&1; then
     [ "$shared" = 1 ] && curl -fsS -X POST "http://127.0.0.1:8010/sleep?level=1" >/dev/null 2>&1 || true
     # Loopback only. MTP drafts tokens ahead (lossless with greedy decoding) for about 1.5x faster
@@ -80,7 +89,8 @@ if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$vl
   echo "PII model $vllm_name served by vLLM."
 fi
 
-if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$tg_model/config.json" ]; then
+if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && local_server "${TRANSFORMX_TRANSLATION_ENDPOINT:-}" 8010 \
+    && [ -x "$vllm" ] && [ -f "$tg_model/config.json" ]; then
   if ! curl -fsS http://127.0.0.1:8010/v1/models >/dev/null 2>&1; then
     # Port 8010: RunPod images proxy 8001 to 8000. The PII server sleeps while this one claims memory.
     [ "$shared" = 1 ] && curl -fsS -X POST "http://127.0.0.1:8000/sleep?level=1" >/dev/null 2>&1 || true
@@ -98,13 +108,15 @@ if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [
   marker=""; [ "$tg_level" = 2 ] && marker="#2"
   servers="${servers:+$servers,}http://127.0.0.1:8010$marker"
   # A vLLM translation server serves many requests at once (measured: 16 parallel calls).
-  export TRANSFORMX_TRANSLATION_ENDPOINT=http://127.0.0.1:8010/v1 TRANSFORMX_TRANSLATION_WORKERS=16 TRANSFORMX_TRANSLATION_QPS=64
+  export TRANSFORMX_TRANSLATION_ENDPOINT=http://127.0.0.1:8010/v1 \
+    TRANSFORMX_TRANSLATION_WORKERS="${TRANSFORMX_TRANSLATION_WORKERS:-16}" TRANSFORMX_TRANSLATION_QPS="${TRANSFORMX_TRANSLATION_QPS:-64}"
   echo "Translation model translategemma:12b served by vLLM."
 fi
 
 if [ -n "$servers" ]; then
   plain="${servers//#2/}"   # addresses without the sleep-level marker
-  export TRANSFORMX_OPENAI_COMPATIBLE="$plain"
+  # Keep remote servers listed in the settings file or the environment.
+  export TRANSFORMX_OPENAI_COMPATIBLE="$plain${TRANSFORMX_OPENAI_COMPATIBLE:+,$TRANSFORMX_OPENAI_COMPATIBLE}"
   if [ "$shared" = 1 ]; then
     for server in ${plain//,/ }; do
       curl -fsS "$server/is_sleeping" >/dev/null 2>&1 || { echo "$server runs without sleep mode; stop it and run this script again."; exit 1; }

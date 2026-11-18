@@ -48,7 +48,7 @@ def _translate_piece(endpoint,model,core,language,values,source,digest,index,bud
     limit=min(budget,2 if len(core)<=80 and len(core.split())<=8 else 1)
     if limit<=0:raise ValueError('Literal recovery exceeds its bounded request budget.')
     for number in range(1,limit+1):
-        prompt=messages(core,language,source=source)
+        prompt=messages(core,language,source=source,model=model)
         if number==2:
             prompt[0]['content']=('The final source is a natural-language connecting text fragment '
                 'between protected values, not a name or code. Translate only that fragment into '

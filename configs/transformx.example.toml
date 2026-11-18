@@ -1,0 +1,97 @@
+# TransformX settings
+#
+# Copy this file to configs/transformx.toml (or point $TRANSFORMX_SETTINGS at your copy) and change
+# what you need. Every setting is optional: leave a line out (or commented) to keep the default.
+#
+#   python -m transformation.settings check   validate this file and test the model servers
+#   python -m transformation.settings show    settings in effect and where each one came from
+#
+# What wins, lowest first: built-in defaults < the site's worker connection file < this file <
+# environment variables (so Docker can override one value without editing the file).
+#
+# API keys never go in this file. Put each key in its own file, readable only by the service user,
+# and name the file here (key_file). Relative paths are relative to the application folder.
+
+[translation]
+# Base URL of an OpenAI-compatible server. Default: the local vLLM server the start script runs.
+# endpoint = "http://127.0.0.1:8010/v1"
+# endpoint = "https://api.openai.com/v1"            # also list it in [models] remote_servers
+# Model name as that server knows it. A name containing "translategemma" gets its prompt format.
+# model = "translategemma:12b"
+# key_file = "/run/secrets/translation_key"
+# Requests sent at the same time, and the per-second limit (lower them for a rate-limited API).
+# parallel_requests = 16
+# requests_per_second = 64
+
+# Name of the default model in the website's "Translation model" list.
+# label = "Standard (this server)"
+
+# More translation models users may choose per job (website upload form, engine service
+# ?translation_model=<name>). Each needs endpoint and model; the default stays [translation] above.
+# Users see only the label, and a note when text goes to another machine; addresses and keys stay here.
+# [translation_models.openai]
+# label = "OpenAI GPT-5 mini"
+# endpoint = "https://api.openai.com/v1"
+# model = "gpt-5-mini"
+# key_file = "/run/secrets/openai_key"
+# requests_per_second = 5
+
+[pii]
+# endpoint = "http://127.0.0.1:8000/v1"
+# model = "qwen3.5-9b-fp8"
+# key_file = "/run/secrets/pii_key"
+
+[models]
+# Model servers on other machines. A remote endpoint above is refused unless it is listed here.
+# remote_servers = ["https://api.openai.com/v1"]
+# Remote servers must use https:// unless this is true (trusted internal network only).
+# allow_http_remote = false
+# Key for any other listed remote server (never sent to servers on this machine).
+# remote_key_file = "/run/secrets/model_key"
+# timeout_seconds = 600
+# Reasoning models on remote servers (OpenAI GPT-5, o-series): keep their thinking short so the
+# answer fits its token budget. Not sent to servers on this machine.
+# reasoning_effort = "minimal"
+# vLLM's "no thinking" switch: "auto" sends it to local servers only; "on" / "off" force it.
+# no_thinking_switch = "auto"
+
+[ocr]
+# device = "gpu:0"           # or "cpu"
+# keep_loaded = true         # keep OCR models in memory between jobs
+# reuse_results = true       # reuse OCR results for a page already seen
+
+[output]
+# tables = "auto"
+# page_mode = "document"     # "document" (one run) or "page" (page by page)
+# figures = "ocr-slots"      # "ocr-slots" or "babeldoc": how text inside pictures is translated
+# job_timeout_seconds = 3600
+
+[performance]
+# figure_workers = 3         # pictures translated at the same time (1 when models share the GPU)
+# shared_layout = true       # one page-layout model shared by all jobs
+# preload = true             # start job processes from pre-loaded parents
+
+[service]
+# The engine service (tools/service/engine_server.py), for internal deployments such as Docker.
+# host = "127.0.0.1"         # "0.0.0.0" inside a container
+# port = 8080
+# key_file = "/run/secrets/service_key"   # without it: no sign-in, put a proxy with sign-in in front
+# parallel_jobs = 1
+# keep_jobs_hours = 24
+# max_upload_mb = 50
+# jobs_folder = "runs/engine-service"
+
+[worker]
+# The site worker (tools/service/cloud_worker.py), only when the hosted website is used.
+# connection_file = "configs/gpu.worker.local.json"   # downloaded from the site's Workers panel
+# keep_runs_hours = 72       # 0 keeps job folders
+
+[paths]
+# Python environments; the start script finds them on a standard GPU server.
+# engine_python = "/workspace/transformx-engine/bin/python"
+# babeldoc_python = "/workspace/transformx-babeldoc/bin/python"
+# ocr_python = "/workspace/paddle-env/bin/python"
+
+# [engine_options]
+# Advanced: engine options passed as they are (see docs/ENGINE_SERVICE.md).
+# translation_workers = 16

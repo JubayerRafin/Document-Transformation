@@ -71,19 +71,57 @@ def _retry_delay(error, attempt):
     return min(30.0, after) if after is not None and after >= 0 else 2.0 * (attempt + 1)
 
 
+# Request fields a remote model refused once (HTTP 400 naming them), remembered per server and model
+# for the rest of the process: newer OpenAI models take only their default temperature and want
+# max_completion_tokens; some older servers know only max_tokens.
+_REFUSED_FIELDS = {}
+_REFUSED_LOCK = Lock()
+
+
+def _openai_payload(endpoint, model, messages, max_output, response_format, refused):
+    from transformation.llm import endpoints
+    remote = not endpoints.is_loopback(endpoint)
+    # Local vLLM gets exactly the request it always had; remote servers get the current OpenAI name.
+    limit_field = "max_completion_tokens" if remote else "max_tokens"
+    if limit_field in refused:
+        limit_field = "max_tokens" if limit_field == "max_completion_tokens" else "max_completion_tokens"
+    payload = {"model": model, "messages": messages, limit_field: max_output}
+    if "temperature" not in refused:
+        payload["temperature"] = 0
+    if endpoints.chat_template_kwargs(endpoint):
+        payload["chat_template_kwargs"] = {"enable_thinking": False}
+    effort = endpoints.reasoning_effort(endpoint)
+    if effort:
+        payload["reasoning_effort"] = effort
+    if response_format is not None:
+        payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "answer", "schema": response_format}}
+    return payload
+
+
+def _refused_field(body, payload):
+    """The request field a 400 answer says is unsupported, if it is one we can leave out or rename."""
+    text = body.lower()
+    if not any(word in text for word in ("unsupported", "not supported", "does not support")):
+        return None
+    for field in ("temperature", "max_tokens", "max_completion_tokens"):
+        # Quoted, as OpenAI-style errors name the parameter ("'max_tokens'", "param": "max_tokens").
+        if field in payload and any(f"{q}{field}{q}" in text for q in ("'", '"', "`")):
+            return field
+    return None
+
+
 def _openai_chat(endpoint, model, messages, max_output, response_format, purpose):
     """Same contract as the Ollama path: deterministic, no thinking, schema-constrained JSON."""
     from transformation.llm import endpoints
-    payload = {"model": model, "messages": messages, "temperature": 0, "max_tokens": max_output}
-    if endpoints.chat_template_kwargs(endpoint):
-        payload["chat_template_kwargs"] = {"enable_thinking": False}
-    if response_format is not None:
-        payload["response_format"] = {"type": "json_schema", "json_schema": {"name": "answer", "schema": response_format}}
     started = time.monotonic()
-    request = urllib.request.Request(endpoints.url(endpoint, "/v1/chat/completions"), data=json.dumps(payload).encode(),
-                                     headers=endpoints.headers(endpoint))
     attempts = 1 if endpoints.is_loopback(endpoint) else REMOTE_ATTEMPTS
-    for attempt in range(attempts):
+    attempt = adjusted = 0
+    while True:
+        with _REFUSED_LOCK:
+            refused = set(_REFUSED_FIELDS.get((endpoint, model), ()))
+        payload = _openai_payload(endpoint, model, messages, max_output, response_format, refused)
+        request = urllib.request.Request(endpoints.url(endpoint, "/v1/chat/completions"),
+                                         data=json.dumps(payload).encode(), headers=endpoints.headers(endpoint))
         try:
             with urllib.request.urlopen(request, timeout=endpoints.timeout()) as response:
                 result = json.load(response)
@@ -92,11 +130,20 @@ def _openai_chat(endpoint, model, messages, max_output, response_format, purpose
             # A remote gateway can be briefly busy or restarting; the request is deterministic, so it is
             # repeated a couple of times. A local server's errors are never replayed.
             if exc.code in TRANSIENT_HTTP and attempt + 1 < attempts:
-                time.sleep(_retry_delay(exc, attempt)); continue
-            raise ValueError(f'Model server rejected model {model} (HTTP {exc.code}): {exc.read(4096).decode("utf-8", errors="replace")}') from exc
+                time.sleep(_retry_delay(exc, attempt)); attempt += 1; continue
+            body = exc.read(4096).decode("utf-8", errors="replace")
+            field = _refused_field(body, payload) if exc.code == 400 and adjusted < 2 else None
+            if field:
+                # The server named a field this model does not take: send the request without it (or
+                # with the other name for the length limit), and remember that for later requests.
+                with _REFUSED_LOCK:
+                    _REFUSED_FIELDS.setdefault((endpoint, model), set()).add(field)
+                record_progress('model_request_adjusted', model=model, field=field)
+                adjusted += 1; continue
+            raise ValueError(f'Model server rejected model {model} (HTTP {exc.code}): {body}') from exc
         except (urllib.error.URLError, ConnectionError, TimeoutError) as exc:
             if attempt + 1 < attempts:
-                time.sleep(_retry_delay(None, attempt)); continue
+                time.sleep(_retry_delay(None, attempt)); attempt += 1; continue
             raise
     choice = (result.get("choices") or [{}])[0] if isinstance(result, dict) else {}
     content = (choice.get("message") or {}).get("content")
@@ -253,7 +300,11 @@ def translate_paragraph(endpoint, model, text, language, protected_values=(), do
 def _translate_paragraph(endpoint, model, text, language, protected_values=(), document_context="", structured=False, interpret_field=False, source_language=None):
     """Protect emails and supplied values; record translation failures."""
     try:
-        if _is_translategemma(model):
+        if _is_translategemma(model) or not structured:
+            # Every model translates paragraphs through the same checked path: long paragraphs split,
+            # answer budget, exact protected values, script and punctuation checks, literal recovery,
+            # and the paragraph kept in its source language (flagged) when every attempt fails.
+            # Only structured field translation (picture labels with context) uses the JSON path below.
             from transformation.llm.translategemma import translate
             return translate(endpoint,model,text,language,protected_values,document_context,
                 source=source_language or os.environ.get('TRANSFORMX_SOURCE_LANGUAGE','en'))
@@ -318,7 +369,14 @@ def _translate_paragraph(endpoint, model, text, language, protected_values=(), d
         for attempt in (1, 2):
             started = time.monotonic()
             record_progress("request_started", source_sha256=source_hash, attempt=attempt)
-            translated, stats = chat(endpoint, model, messages)
+            # Structured answers are held to their JSON shape by the server (vLLM and OpenAI both
+            # constrain output to a schema), not only by the instructions.
+            shape = None
+            if structured:
+                keys = ('meaning', 'label', 'value') if field_parts else ('meaning', 'translation')
+                shape = {'type': 'object', 'properties': {key: {'type': 'string'} for key in keys},
+                         'required': list(keys), 'additionalProperties': False}
+            translated, stats = chat(endpoint, model, messages, response_format=shape)
             record_progress("request_completed", source_sha256=source_hash, attempt=attempt,
                             seconds=round(time.monotonic() - started, 2),
                             prompt_tokens=stats.get("prompt_eval_count", 0),
@@ -374,7 +432,16 @@ def _translate_paragraph(endpoint, model, text, language, protected_values=(), d
             return restored, {**stats, **totals}
 
     except Exception as error:
-        if _is_translategemma(model) and validation_failure(error):
+        if structured and str(error) == 'Model failed structured translation validation.':
+            # The model did not return the JSON shape twice (a general chat model, 2026-11-19). The
+            # label is translated as plain text through the checked path instead of failing the
+            # document; that path keeps it in the source language if it fails too.
+            record_progress('structured_fallback', source_sha256=hashlib.sha256(text.encode()).hexdigest())
+            from transformation.llm.translategemma import translate
+            result, stats = translate(endpoint, model, text, language, protected_values, document_context,
+                                      source=source_language or os.environ.get('TRANSFORMX_SOURCE_LANGUAGE', 'en'))
+            return result, {**stats, 'structured_fallback': True}
+        if validation_failure(error):
             # Every retry changed a protected value (a number, code or name). Keep this paragraph in
             # the source language, exact, and flag the run for review rather than failing the whole
             # document for one paragraph. Server, timeout and configuration errors still fail it.

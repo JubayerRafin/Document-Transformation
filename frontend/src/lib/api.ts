@@ -123,6 +123,8 @@ const FAILURES: Record<string, string> = {
     "A selected sensitive value was still found in the output, so it was blocked.",
   MANUAL_REDACTION_FAILED:
     "The selected areas could not be removed and verified, so no redacted copy was released.",
+  TRANSLATION_MODEL_UNAVAILABLE:
+    "The chosen translation model is no longer set up on this server. Choose another model and start again.",
 };
 export function failureMessage(code?: string) {
   return (
@@ -151,7 +153,19 @@ export type Worker = {
   enabled: boolean;
   online: boolean;
   ready: boolean;
-  capabilities?: { gpu?: string; operations?: Operation[]; note?: string };
+  capabilities?: {
+    gpu?: string;
+    operations?: Operation[];
+    note?: string;
+    /** Translation models this server offers (its settings file); "default" is its own. */
+    translation_models?: TranslationModel[];
+  };
+};
+export type TranslationModel = {
+  id: string;
+  label: string;
+  /** Runs on another machine: document text is sent there. */
+  external?: boolean;
 };
 export type JobEvent = {
   id: number;
@@ -172,6 +186,8 @@ export type TransformOptions = {
   pii_style?: PiiStyle;
   /** Detected values that should stay visible (e.g. the customer's own company name). */
   pii_keep?: string[];
+  /** One of the chosen server's translation models; omitted for its default. */
+  translation_model?: string;
 };
 export type PiiStyle = "box" | "label" | "pseudonym";
 export const PII_CATEGORIES = [

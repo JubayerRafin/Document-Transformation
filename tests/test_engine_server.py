@@ -112,6 +112,39 @@ class EngineServerTests(unittest.TestCase):
         self.assertEqual(self.call('GET', '/v1/jobs/' + '0' * 32), (404, {'error': 'NOT_FOUND'}))
         self.assertEqual(self.seen, [])
 
+    def test_a_job_can_choose_a_translation_model_from_the_settings_file(self):
+        import os
+        from unittest.mock import patch
+        settings_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(settings_dir.cleanup)
+        key = Path(settings_dir.name) / 'openai_key'
+        key.write_text('sk-test-not-real', encoding='utf-8')
+        path = Path(settings_dir.name) / 'transformx.toml'
+        path.write_text('[translation]\nlabel = "Standard"\n[translation_models.openai]\nlabel = "GPT"\n'
+                        'endpoint = "https://api.example/v1"\nmodel = "gpt-5-mini"\n'
+                        f'key_file = {json.dumps(str(key))}\nrequests_per_second = 5\n', encoding='utf-8')
+        envs = []
+        with patch.dict(os.environ, {'TRANSFORMX_SETTINGS': str(path), 'TRANSFORMX_TRANSLATION_API_KEY': 'local-key'}):
+            self.start()
+            original = self.service.runner
+            self.service.runner = lambda folder, request, profile, env: (envs.append(env), original(folder, request, profile, env))[1]
+            self.assertEqual(self.call('GET', '/v1/translation-models')[1],
+                             [{'id': 'default', 'label': 'Standard'}, {'id': 'openai', 'label': 'GPT'}])
+            self.assertEqual(self.call('POST', '/v1/jobs?translation_model=other', PDF)[1], {'error': 'UNKNOWN_TRANSLATION_MODEL'})
+            job_id = self.call('POST', '/v1/jobs?translation_model=openai&target_language=de', PDF)[1]['job_id']
+            self.wait_for(job_id, 'generated')
+            default_id = self.call('POST', '/v1/jobs?target_language=de', PDF)[1]['job_id']
+            self.wait_for(default_id, 'generated')
+        chosen, default = self.seen
+        self.assertEqual((chosen['profile']['translation_endpoint'], chosen['profile']['translation_model'],
+                          chosen['profile']['engine_options']['translation_qps']), ('https://api.example/v1', 'gpt-5-mini', 5))
+        self.assertNotIn('sk-test-not-real', json.dumps(chosen))       # the key never goes into request.json
+        self.assertNotIn('translation_endpoint', default['profile'])
+        self.assertEqual(envs[0]['TRANSFORMX_TRANSLATION_API_KEY_FILE'], str(key))
+        self.assertNotIn('TRANSFORMX_TRANSLATION_API_KEY', envs[0])    # the default key is not sent elsewhere
+        self.assertIn('https://api.example/v1', envs[0]['TRANSFORMX_OPENAI_COMPATIBLE'])
+        self.assertEqual(envs[1]['TRANSFORMX_TRANSLATION_API_KEY'], 'local-key')
+
     def test_a_running_job_can_be_cancelled_and_its_files_removed(self):
         self.start(delay=1.0)
         job_id = self.call('POST', '/v1/jobs', PDF)[1]['job_id']

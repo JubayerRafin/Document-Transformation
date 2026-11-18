@@ -3,6 +3,7 @@
 Prompt format: https://ollama.com/library/translategemma:12b
 """
 from transformation.llm.protected_text import protect_values,restore_values,PlaceholderIntegrityError
+from transformation.llm.endpoints import is_translategemma
 
 
 import unicodedata
@@ -118,7 +119,11 @@ def normalize_field_layout(source, target):
     return target
 
 
-def messages(text,language,context='',source='en'):
+def messages(text,language,context='',source='en',model=None):
+    """TranslateGemma's documented format: one user message, instructions then the text. Any other
+    chat model (model given, not TranslateGemma: OpenAI, Qwen, ...) gets the same instructions as a
+    system message and the document text alone as the user message, which keeps document text apart
+    from instructions."""
     from transformation.pdf.runner import LANGUAGES
     source_name=next((name for name,code in LANGUAGES.items() if code==source),source)
     target_code=LANGUAGES.get(language,language)
@@ -139,9 +144,17 @@ def messages(text,language,context='',source='en'):
     if 'ZXKEEP' in text:
         header+='Copy every ZXKEEP placeholder unchanged exactly once in its corresponding position; never translate it or append a token list. '
     if context: header+='Background for disambiguation only; do not translate or add it: '+context+'\n'
+    if model is not None and not is_translategemma(model):
+        header+=(f'The user message is the {source_name} text to translate. Reply with only its {language} '
+                 'translation, without any additional explanations, commentary, quotes or Markdown.')
+        return [{'role':'system','content':header},{'role':'user','content':text}]
     header+=(f'Produce only the {language} translation, without any additional explanations or commentary. '
              f'Please translate the following {source_name} text into {language}:\n\n\n')
     return [{'role':'user','content':header+text}]
+
+
+def _backend(model):
+    return 'translategemma' if is_translategemma(model) else 'chat_model'
 
 
 TRUNCATED=('Model server returned an empty, incomplete, or truncated answer.',  # vLLM (OpenAI API)
@@ -183,7 +196,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             review|=stats.get('recovery_review_required',False)
         result=''.join(output)
         validate_candidate(text,result,protected)
-        return result,{**totals,'translation_backend':'translategemma','segments':len(segments),
+        return result,{**totals,'translation_backend':_backend(model),'segments':len(segments),
                        'recovery_review_required':review}
     from transformation.llm.role_bindings import prompt_evidence
     if len(tokens)==1 and safe.strip()==next(iter(tokens)):
@@ -210,7 +223,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         # Retry a failed standalone heading without the neighboring document
         # prose that the model expanded into its answer. Successful first calls
         # and all non-heading retries retain their existing request path.
-        prompt=messages(current,language,'' if isolated_heading else prompt_evidence(current,protected if attempt==2 else ())+context,source)
+        prompt=messages(current,language,'' if isolated_heading else prompt_evidence(current,protected if attempt==2 else ())+context,source,model)
         if attempt==2:
             import json
             prefix=('The previous translation failed exact preservation checks. '
@@ -251,13 +264,13 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                           or len(text.split())<=SHORT_LABEL_WORDS):
                 # Mostly another language, or a short label: the source reads better than that.
                 record_progress('translation_kept_source',source_sha256=digest,reason='foreign_script',script=stray,model=model)
-                return text,{**totals,'translation_backend':'translategemma','kept_source_requires_review':True}
+                return text,{**totals,'translation_backend':_backend(model),'kept_source_requires_review':True}
             if stray:
                 # A second answer still mixes in a word of another script: keep it (the literals are
                 # exact) and flag it.
                 record_progress('foreign_script_kept',source_sha256=digest,script=stray,model=model)
-                return restored,{**stats,**totals,'translation_backend':'translategemma','foreign_script_review_required':True}
-            return restored,{**stats,**totals,'translation_backend':'translategemma'}
+                return restored,{**stats,**totals,'translation_backend':_backend(model),'foreign_script_review_required':True}
+            return restored,{**stats,**totals,'translation_backend':_backend(model)}
         except (PlaceholderIntegrityError,ValueError) as error:
             failure_reason=str(error)
             record_progress('validation_failed',source_sha256=digest,attempt=attempt,model=model,reason=str(error))
@@ -277,7 +290,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                     from transformation.llm.translation_recovery import recover_literals
                     recovered,recovery_stats=recover_literals(endpoint,model,text,language,protected,source)
                     for key in totals: totals[key]+=recovery_stats.get(key,0)
-                    return recovered,{**totals,'translation_backend':'translategemma',
+                    return recovered,{**totals,'translation_backend':_backend(model),
                                       'recovery':'source_literal_segments','recovery_review_required':True}
                 raise
     raise RuntimeError('TranslateGemma failed validation.')

@@ -12,6 +12,7 @@ import pymupdf
 from transformation.llm.protected_text import normalize_protected_values
 from transformation.progress import read_progress
 
+# Models the engine was first validated with; every model now uses the paragraph path (see run_pdf).
 PARAGRAPH_MODELS = {
     "qwen2.5:3b", "transformx-qwen2.5-3b",
     "transformx-qwen2.5-3b:latest", "qwen3.5:9b",
@@ -80,9 +81,11 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
     from transformation.llm.policy import validate_terminology, context_with_terms
     terminology = validate_terminology(terminology)
     document_context = context_with_terms(document_context, terminology)
-    paragraph_mode = model in PARAGRAPH_MODELS
-    if (protected_values or document_context) and not paragraph_mode:
-        raise ValueError("Protected values and document context require a configured single-paragraph model, such as qwen3.5:9b.")
+    # Every model translates paragraph by paragraph through TransformX's own transport (API keys,
+    # retries, protected values, checks), whatever name its server gives it ("gpt-5-mini",
+    # "google/translategemma-12b-it"). BabelDOC's built-in OpenAI client is never used: it has no API
+    # key setting here and does not protect values.
+    paragraph_mode = True
     with pymupdf.open(stream=data, filetype="pdf") as doc:
         if doc.needs_pass or not len(doc):
             raise ValueError("Use an unencrypted PDF containing at least one page.")
@@ -168,15 +171,14 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
         env.pop("TRANSFORMX_OLLAMA_NATIVE_ENDPOINT", None)
     info["translation_prompt"] = translation_prompt(target)
     if paragraph_mode:
-        from transformation.llm.ollama_native import paragraph_messages
         language = next(name for name, code in LANGUAGES.items() if code == target)
-        info["translation_prompt"] = paragraph_messages("", language, document_context)[0]["content"]
         from transformation.llm.endpoints import is_translategemma
+        from transformation.llm.translategemma import messages
+        # Paragraphs of every model go through translategemma.translate; this is the prompt it sends.
+        info['translation_prompt']=messages('',language,document_context,source,model)[0]['content']
+        info['model_options']['translation_backend']='translategemma' if is_translategemma(model) else 'chat_model'
         if is_translategemma(model):
-            from transformation.llm.translategemma import messages
-            info['translation_prompt']=messages('',language,document_context,source)[0]['content']
             info['model_options'].pop('think',None)
-            info['model_options']['translation_backend']='translategemma'
     info['translation_qps']=translation_qps
     info['translation_workers']=translation_workers
     info['requested_translation_workers']=translation_workers

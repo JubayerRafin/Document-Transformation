@@ -23,7 +23,7 @@ MANUAL_LIMIT_SECONDS=600
 UPLOAD_RETRY_DELAYS=(5,15,30,60,120)
 # Must match FAILURE_CODES in cloud/src/index.mjs. Engine free text is never uploaded.
 FAILURE_CODES={'ENGINE_FAILED','ENGINE_TIMEOUT','INPUT_REJECTED','OUTPUT_INVALID','RESULT_UPLOAD_FAILED',
-               'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED'}
+               'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED','TRANSLATION_MODEL_UNAVAILABLE'}
 
 
 class JobFailure(Exception):
@@ -298,9 +298,47 @@ def translation_ready(profile,ollama_base=None,ollama_names=()):
                    profile.get('translation_endpoint','http://127.0.0.1:11434/v1'),ollama_base,ollama_names)
 
 
+class _environment:
+    """Run a block with os.environ replaced (the worker loop is single-threaded here)."""
+    def __init__(self,env):self.env=env
+    def __enter__(self):self.saved=dict(os.environ);os.environ.clear();os.environ.update(self.env)
+    def __exit__(self,*a):os.environ.clear();os.environ.update(self.saved)
+
+
+def translation_models(profile,translation_ok):
+    """The translation models users may choose on the website: the default one (when this server
+    translates) and each [translation_models.<id>] in transformx.toml whose server answers and serves
+    its model. Only ids and labels leave this server; addresses and keys never do."""
+    from transformation import settings
+    try:choices=settings.translation_choices()
+    except Exception:return []
+    from transformation.llm.endpoints import is_loopback
+    default_endpoint=profile.get('translation_endpoint','http://127.0.0.1:11434/v1')
+    # external: document text goes to another machine (shown to the user before they choose it).
+    offered=[{'id':'default','label':choices[0]['label'],'external':not is_loopback(default_endpoint)}] if translation_ok else []
+    for choice in choices[1:]:
+        with _environment(settings.choice_environment(choice)):
+            ready=_served('Translation only',choice['model'],choice['endpoint'],None,())
+        if ready:offered.append({'id':choice['id'],'label':choice['label'],'external':not is_loopback(choice['endpoint'])})
+    return offered
+
+
+def job_translation(cfg,options):
+    """(profile, environment) for a job: the chosen translation model's server, model and key file,
+    or this server's default. A choice this server does not offer fails the job before it starts."""
+    from transformation import settings
+    wanted=options.get('translation_model') or 'default'
+    choices={c['id']:c for c in settings.translation_choices()}
+    if options.get('operation')=='pii' or wanted=='default':
+        return cfg['engine_profile'],None
+    if wanted not in choices:raise JobFailure('TRANSLATION_MODEL_UNAVAILABLE','The chosen translation model is not configured on this server.')
+    choice=choices[wanted]
+    return settings.choice_profile(choice,cfg['engine_profile']),settings.choice_environment(choice)
+
+
 def preflight(cfg):
     """Advertise installed prerequisites, not a claim that inference was GPU-verified."""
-    capabilities={'ready':False,'operations':[],'gpu':'','models':[],'note':''}
+    capabilities={'ready':False,'operations':[],'gpu':'','models':[],'note':'','translation_models':[]}
     try:
         gpu=subprocess.check_output(['nvidia-smi','--query-gpu=name','--format=csv,noheader'],timeout=10,text=True).strip()
         if not gpu:raise RuntimeError('No allocated NVIDIA GPU visible.')
@@ -316,6 +354,10 @@ def preflight(cfg):
             names=[]
         capabilities['models']=names[:20]
         if translation_ready(cfg['engine_profile'],OLLAMA_BASE,names):capabilities['operations'].append('translation')
+        capabilities['translation_models']=translation_models(cfg['engine_profile'],'translation' in capabilities['operations'])
+        # A server whose own translation model is down can still translate with a remote one.
+        if capabilities['translation_models'] and 'translation' not in capabilities['operations']:
+            capabilities['operations'].append('translation')
         if pii_ready(cfg['engine_profile'],OLLAMA_BASE,names):capabilities['operations'].append('pii')
         if len(capabilities['operations'])==2:capabilities['operations'].append('combined')
         if capabilities['operations']:capabilities['operations'].append('manual_redaction')
@@ -359,15 +401,18 @@ def execute(cfg,j,root):
         deliver(cfg,j,output.read_bytes(),metrics)
         return
     request=folder/'request.json';events=folder/'engine-events.jsonl';terminal=folder/'terminal.json'
+    # The chosen translation model (website selector): its server and model in the job's profile, its
+    # key file only in the job process's environment (never in request.json).
+    profile,job_env=job_translation(cfg,j['options'])
     request.write_text(json.dumps({'source':str(source),'filename':j['filename'],'options':j['options'],
-        'profile':cfg['engine_profile']}),encoding='utf8')
+        'profile':profile}),encoding='utf8')
     started=time.monotonic()
     progress=progress_reporter(events,lambda stage,seconds:heartbeat(cfg,j,stage,seconds))
     # All parsing/reconstruction and inference execute on this server. The
     # engine enforces timeout_seconds itself; the worker stops it shortly after.
     limit=run_limit(cfg['engine_profile'])+DEADLINE_GRACE_SECONDS
     with (folder/'process.log').open('w',encoding='utf8') as log:
-        process=spawn([engine_python(cfg),'-u','-m','backend.engine_job',str(request),str(events),str(terminal)],cwd=PROJECT,stdout=log,stderr=subprocess.STDOUT)
+        process=spawn([engine_python(cfg),'-u','-m','backend.engine_job',str(request),str(events),str(terminal)],cwd=PROJECT,stdout=log,stderr=subprocess.STDOUT,env=job_env)
         supervise(process,limit,progress,interval=STAGE_CHECK_SECONDS)
     try:result=json.loads(terminal.read_text(encoding='utf8')) if terminal.exists() else {}
     except ValueError:result={}
@@ -471,8 +516,14 @@ def _run(args,cfg,root,ocr_session=None):
             print('Job failed ('+code+'); see private worker-errors.log.',flush=True)
 
 def run(args):
+    from transformation import settings
+    # transformx.toml sets environment defaults first, so the connection file can come from it too.
+    settings.apply()
+    args.config=args.config or os.environ.get('TRANSFORMX_WORKER_CONFIG') or 'configs/gpu.worker.local.json'
     cfg=json.loads(Path(args.config).read_text(encoding='utf8'));origin(cfg['url'])
-    profile=apply_profile_overrides(cfg.setdefault('engine_profile',{}))
+    # The site's connection file < transformx.toml < environment variables.
+    settings.apply(cfg.setdefault('engine_profile',{}))
+    profile=apply_profile_overrides(cfg['engine_profile'])
     for key in ('python','ocr_python'):profile.setdefault(key,sys.executable)
     run_limit(profile)
     enabled=profile.get('persistent_ocr',False)
@@ -498,7 +549,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);sub=p.add_subparsers(dest='action',required=True)
     reg=sub.add_parser('register');reg.add_argument('--url',required=True);reg.add_argument('--email',required=True);reg.add_argument('--name',required=True)
     for parser in (reg,):parser.add_argument('--config',default='configs/gpu.worker.local.json')
-    worker=sub.add_parser('run');worker.add_argument('--config',default='configs/gpu.worker.local.json');worker.add_argument('--root',default='runs/cloud-worker')
+    worker=sub.add_parser('run');worker.add_argument('--config',default=None);worker.add_argument('--root',default='runs/cloud-worker')
     args=p.parse_args()
     if args.action=='register':register(args)
     else:run(args)

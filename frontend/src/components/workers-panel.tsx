@@ -188,6 +188,14 @@ export function WorkersPanel({
                     {w.capabilities?.operations?.join(", ") ||
                       "Capabilities not reported"}
                   </p>
+                  {(w.capabilities?.translation_models?.length ?? 0) > 1 && (
+                    <p className="mb-0 mt-1 text-xs text-muted-foreground">
+                      Translation models:{" "}
+                      {w.capabilities?.translation_models
+                        ?.map((m) => m.label + (m.external ? " (outside service)" : ""))
+                        .join(", ")}
+                    </p>
+                  )}
                 </div>
                 <Badge
                   className={

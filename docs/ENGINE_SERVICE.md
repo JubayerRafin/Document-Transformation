@@ -36,8 +36,9 @@ python tools/service/engine_server.py --config configs/engine.json --root /data/
 | Method and path | Purpose |
 |---|---|
 | `GET /health` | `{"status": "ok", "queued": n, "running": job id or null}`; no sign-in needed |
-| `POST /v1/jobs` | Body: the PDF (`Content-Type: application/pdf`, at most 50 MB). Query: `operation` (`translation`, `pii`, `combined`), `source_language`, `target_language`, `pii_categories` (comma-separated), `pii_style` (`box` or `label`). Optional header `X-TransformX-Options`: JSON with `terminology` (`{"term": "required translation"}`), `protected_values` and `document_context`. Returns `202 {"job_id": ...}`. |
+| `POST /v1/jobs` | Body: the PDF (`Content-Type: application/pdf`, at most 50 MB). Query: `operation` (`translation`, `pii`, `combined`), `source_language`, `target_language`, `pii_categories` (comma-separated), `pii_style` (`box` or `label`), `translation_model` (a name from `/v1/translation-models`). Optional header `X-TransformX-Options`: JSON with `terminology` (`{"term": "required translation"}`), `protected_values` and `document_context`. Returns `202 {"job_id": ...}`. |
 | `GET /v1/jobs` | All jobs with status and creation time |
+| `GET /v1/translation-models` | Translation models a job may choose (`id`, `label`); see the settings file |
 | `GET /v1/jobs/{id}` | `status` (`queued`, `running`, `generated`, `failed`), current `stage`, `failure_code`, `warnings`, `seconds` |
 | `GET /v1/jobs/{id}/result` | The output PDF once `generated` |
 | `DELETE /v1/jobs/{id}` | Cancels a queued or running job and deletes its files |
@@ -52,11 +53,69 @@ curl -H "Authorization: Bearer $KEY" -H "Content-Type: application/pdf" --data-b
 Jobs run one at a time on the GPU; others wait in a queue. Errors are returned as
 `{"error": "CODE"}` with an HTTP status; document contents never appear in error messages.
 
+## Settings file
+
+One file controls the whole system: `configs/transformx.toml` (or the file named by
+`TRANSFORMX_SETTINGS`). Copy [`configs/transformx.example.toml`](../configs/transformx.example.toml),
+which explains every setting, and change what you need. The site worker, the engine service, the
+start script and the test harness all read it. Without a file everything works from environment
+variables as before.
+
+```bash
+cp configs/transformx.example.toml configs/transformx.toml
+python -m transformation.settings check   # validate the file, key files and model servers
+python -m transformation.settings show    # settings in effect and where each came from
+```
+
+What wins, lowest first: built-in defaults < the site's worker connection file < `transformx.toml`
+< environment variables, so a container can override one value without editing the file. Keys never
+go in the file: each `key_file` names a file holding the key. `check` names every mistake at once
+(unknown setting, wrong type, missing key file, a server that does not answer, a model it does not
+serve) and `show` never prints keys.
+
+Using an OpenAI-compatible server on another machine for translation:
+
+```toml
+[translation]
+endpoint = "https://api.openai.com/v1"
+model = "gpt-5-mini"
+key_file = "/run/secrets/openai_key"
+requests_per_second = 5
+
+[models]
+remote_servers = ["https://api.openai.com/v1"]
+```
+
+### Letting users choose the translation model
+
+Each `[translation_models.<name>]` section adds a model users can pick for a job; `[translation]`
+stays the default. On the website the upload form then shows a **Translation model** list for that
+GPU server (the Workers panel lists them too); the engine service takes `?translation_model=<name>`
+and lists the choices at `GET /v1/translation-models`.
+
+```toml
+[translation]
+label = "Standard (this server)"
+
+[translation_models.openai]
+label = "OpenAI GPT-5 mini"
+endpoint = "https://api.openai.com/v1"
+model = "gpt-5-mini"
+key_file = "/run/secrets/openai_key"
+requests_per_second = 5
+```
+
+The worker offers a model only while its server answers and serves it (checked every 45 s). Only
+the name and whether text leaves the machine reach the website; addresses and keys stay on the
+server. A job's chosen server and key file are given to that job's process only, and the default
+model's key is never sent to another server. Users see a notice before choosing a model on another
+machine.
+
 ## Configuration reference
 
-The engine profile (`engine_profile` in the JSON config) says where the Python environments are and
-which engine options to use. Everything below is read from the environment, so keys and addresses
-never need to be written into job files.
+The sections below list the environment variables behind each setting. The engine profile
+(`engine_profile` in a JSON config) says where the Python environments are and which engine options
+to use; keys and addresses never need to be written into job files.
 
 ### Model servers
 
@@ -74,6 +133,19 @@ never need to be written into job files.
 
 Remote servers get up to two retries on 429, 502, 503 and 504 and on dropped connections; requests
 to local servers are never repeated.
+
+Requests to remote servers use OpenAI's current fields (`max_completion_tokens`; `reasoning_effort`
+when `TRANSFORMX_REASONING_EFFORT` / `models.reasoning_effort` is set). When a model refuses a field
+(for example a fixed temperature, which newer OpenAI models do not accept), the request is sent again
+without it once and that model is not sent it again. Local servers get exactly the request they
+always had.
+
+Every translation model goes through the same checked path: long paragraphs are split, each answer
+has a length budget, protected values must come back exactly, answers in a third script are
+rejected, and a paragraph that still fails after a retry is kept in its source language and flagged
+for review instead of failing the document. TranslateGemma gets its documented prompt format; any
+other chat model (OpenAI, Qwen, ...) gets the same instructions as a system message, with the
+document text alone as the user message.
 
 ### Engine service and worker
 

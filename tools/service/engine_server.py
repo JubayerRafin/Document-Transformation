@@ -81,6 +81,13 @@ def job_options(query, header):
         raise Problem(400, 'INVALID_PII_STYLE')
     options = {'operation': operation, 'source_language': source, 'target_language': target, 'output_format': 'pdf',
                'protected_values': [], 'document_context': '', 'pii_categories': categories, 'pii_style': style}
+    # One of the translation models in transformx.toml ([translation_models.<id>]); default: [translation].
+    model = q.get('translation_model', 'default')
+    if model != 'default' and operation != 'pii':
+        from transformation import settings
+        if model not in {c['id'] for c in settings.translation_choices()}:
+            raise Problem(400, 'UNKNOWN_TRANSLATION_MODEL')
+        options['translation_model'] = model
     if header:
         try:
             extra = json.loads(header)
@@ -140,8 +147,13 @@ class Service:
         folder = self.root / 'jobs' / job_id
         folder.mkdir(parents=True)
         (folder / 'source.pdf').write_bytes(data)
+        profile = self.profile
+        if options.get('translation_model'):
+            from transformation import settings
+            choice = {c['id']: c for c in settings.translation_choices()}[options['translation_model']]
+            profile = settings.choice_profile(choice, self.profile)
         (folder / 'request.json').write_text(json.dumps({'source': str(folder / 'source.pdf'), 'filename': 'source.pdf',
-                                                         'options': options, 'profile': self.profile}), encoding='utf-8')
+                                                         'options': options, 'profile': profile}), encoding='utf-8')
         (folder / 'status.json').write_text(json.dumps({'status': 'queued', 'created': time.time()}), encoding='utf-8')
         self.pending.put(job_id)
         return job_id
@@ -208,6 +220,14 @@ class Service:
             try:
                 self._set(folder, 'running')
                 env = dict(os.environ)
+                model = json.loads((folder / 'request.json').read_text(encoding='utf-8'))['options'].get('translation_model')
+                if model:
+                    # The chosen model's server and key file reach only this job's process.
+                    from transformation import settings
+                    choice = {c['id']: c for c in settings.translation_choices()}.get(model)
+                    if choice is None:
+                        raise RuntimeError('translation model no longer configured')
+                    env = settings.choice_environment(choice, env)
                 if self.ocr_session:
                     self.ocr_session.ensure()
                     env['TRANSFORMX_OCR_SERVICE_PID'] = str(self.ocr_session.process.pid)
@@ -280,6 +300,9 @@ def handler(service):
                     raise Problem(401, 'UNAUTHORISED')
                 if parts == ['v1', 'jobs'] and method == 'GET':
                     return self._send(200, service.jobs())
+                if parts == ['v1', 'translation-models'] and method == 'GET':
+                    from transformation import settings
+                    return self._send(200, [{'id': c['id'], 'label': c['label']} for c in settings.translation_choices()])
                 if parts == ['v1', 'jobs'] and method == 'POST':
                     length = int(self.headers.get('Content-Length') or 0)
                     if length <= 0 or length > MAX_BYTES:
@@ -318,13 +341,24 @@ def handler(service):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--config', default=str(APP / 'configs/engine.json'),
-                        help='JSON with an "engine_profile" object (the same profile the site worker uses)')
-    parser.add_argument('--root', default=str(APP / 'runs/engine-service'), help='folder for job files')
-    parser.add_argument('--host', default='127.0.0.1')
-    parser.add_argument('--port', type=int, default=8080)
+                        help='optional JSON with an "engine_profile" object (the same profile the site worker '
+                             'uses); transformx.toml can set everything instead')
+    parser.add_argument('--root', help='folder for job files (default: service.jobs_folder or runs/engine-service)')
+    parser.add_argument('--host', help='default: service.host or 127.0.0.1')
+    parser.add_argument('--port', type=int, help='default: service.port or 8080')
+    parser.add_argument('--settings', help='transformx.toml (default: $TRANSFORMX_SETTINGS or configs/transformx.toml)')
     args = parser.parse_args()
     from tools.service.cloud_worker import apply_profile_overrides
-    profile = apply_profile_overrides(json.loads(Path(args.config).read_text(encoding='utf-8')).get('engine_profile', {}))
+    from transformation import settings
+    # Engine profile JSON < transformx.toml < environment variables.
+    profile = json.loads(Path(args.config).read_text(encoding='utf-8')).get('engine_profile', {})         if Path(args.config).is_file() else {}
+    settings.apply(profile, args.settings)
+    profile = apply_profile_overrides(profile)
+    args.root = args.root or os.environ.get('TRANSFORMX_SERVICE_ROOT') or str(APP / 'runs/engine-service')
+    args.host = args.host or os.environ.get('TRANSFORMX_SERVICE_HOST') or '127.0.0.1'
+    args.port = args.port or int(os.environ.get('TRANSFORMX_SERVICE_PORT') or 8080)
+    global MAX_BYTES
+    MAX_BYTES = int(float(os.environ.get('TRANSFORMX_SERVICE_MAX_MB') or MAX_BYTES / 1_000_000) * 1_000_000)
     for key in ('python', 'ocr_python'):
         profile.setdefault(key, sys.executable)
     root = Path(args.root).resolve()

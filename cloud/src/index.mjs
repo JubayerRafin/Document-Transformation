@@ -3,7 +3,7 @@ import {manualRoute} from './manual-redaction.mjs';
 const BUCKET='transformx-private', MAX=50_000_000;
 // Reasons a worker may report. Free text from the engine never reaches the API.
 export const FAILURE_CODES=['ENGINE_FAILED','ENGINE_TIMEOUT','INPUT_REJECTED','OUTPUT_INVALID','RESULT_UPLOAD_FAILED',
- 'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED'];
+ 'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED','TRANSLATION_MODEL_UNAVAILABLE'];
 // Running jobs heartbeat every ~10 s; silence this long means the worker stopped.
 const STALE_SECONDS=900;
 const CHECK_COUNTS=['known_sensitive_residuals','partial_name_residuals','geometry_blockers','layout_review_candidates','uninspected_content','scan_acceptance_blockers','translation_errors'];
@@ -48,7 +48,7 @@ const json=(x,status=200)=>new Response(JSON.stringify(x),{status,headers:{'Cont
 export const sha=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
 export function options(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw new Fault('INVALID_OPTIONS');
- const allowed=['operation','source_language','target_language','output_format','protected_values','document_context','pii_categories','worker_id','pii_style','pii_keep'];
+ const allowed=['operation','source_language','target_language','output_format','protected_values','document_context','pii_categories','worker_id','pii_style','pii_keep','translation_model'];
  if(Object.keys(raw).some(k=>!allowed.includes(k)))throw new Fault('UNKNOWN_OPTION');
  const o={operation:'translation',source_language:'en',target_language:'ko',output_format:'pdf',protected_values:[],document_context:'',pii_categories:[],...raw};
  if(!['translation','pii','combined'].includes(o.operation)||o.output_format!=='pdf')throw new Fault('INVALID_OPERATION');
@@ -59,7 +59,17 @@ export function options(raw){
  if(!Array.isArray(o.pii_categories)||o.pii_categories.some(v=>!categories.includes(v))||(o.operation!=='translation'&&!o.pii_categories.length))throw new Fault('INVALID_PII_CATEGORIES');
  if(o.pii_style!==undefined&&!['box','label','pseudonym'].includes(o.pii_style))throw new Fault('INVALID_PII_STYLE');
  if(o.pii_keep!==undefined&&(!Array.isArray(o.pii_keep)||o.pii_keep.length>100||o.pii_keep.some(v=>typeof v!=='string'||!v.trim()||v.length>200)))throw new Fault('INVALID_PII_KEEP');
+ // The translation model a GPU worker offers (its transformx.toml); 'default' is the worker's own.
+ if(o.translation_model!==undefined&&(typeof o.translation_model!=='string'||!MODEL_ID.test(o.translation_model)))throw new Fault('INVALID_TRANSLATION_MODEL');
+ if(o.operation==='pii'||o.translation_model==='default')delete o.translation_model;
  return o;
+}
+export const MODEL_ID=/^[a-z0-9][a-z0-9_-]{0,31}$/;
+// Translation models a worker reports: ids and names only (addresses and keys stay on the server).
+export function translationModels(raw){
+ if(!Array.isArray(raw))return [];
+ return raw.filter(m=>m&&typeof m==='object'&&typeof m.id==='string'&&MODEL_ID.test(m.id)&&typeof m.label==='string')
+  .slice(0,9).map(m=>({id:m.id,label:m.label.slice(0,80),external:m.external===true}));
 }
 const LANGUAGE=/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/;
 // A customer glossary: the account's required translations for its own terms. Limits match the
@@ -169,7 +179,8 @@ export function createHandler(transport=fetch){
     if(!c||typeof c!=='object'||!Array.isArray(c.operations)||c.operations.some(o=>!['translation','pii','combined','manual_redaction'].includes(o)))throw new Fault('INVALID_CAPABILITIES');
     const capabilities={ready:c.ready===true,operations:[...new Set(c.operations)],
       gpu:typeof c.gpu==='string'?c.gpu.slice(0,150):'',note:typeof c.note==='string'?c.note.slice(0,300):'',
-      models:Array.isArray(c.models)?c.models.filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,100)):[]};
+      models:Array.isArray(c.models)?c.models.filter(x=>typeof x==='string').slice(0,20).map(x=>x.slice(0,100)):[],
+      translation_models:translationModels(c.translation_models)};
     await patch('tx_workers','?id=eq.'+w.id,{capabilities});return json({status:'recorded'});
    }
    if(p==='/worker/claim'&&method==='POST'){
@@ -292,8 +303,11 @@ export function createHandler(transport=fetch){
     const f=await request.formData(),file=f.get('file');if(!file||typeof file==='string'||!safeName(file.name)||file.size>MAX||file.size<5)throw new Fault('INVALID_PDF');
     let o;try{o=options(JSON.parse(f.get('options')));}catch(e){if(e instanceof Fault)throw e;throw new Fault('INVALID_OPTIONS');}
     const assigned=o.worker_id;if(!uuid(assigned))throw new Fault('SELECT_GPU_WORKER');
-    const ws=await db('tx_workers','?id=eq.'+assigned+'&owner=eq.'+u.id+'&enabled=eq.true&select=id');
+    const ws=await db('tx_workers','?id=eq.'+assigned+'&owner=eq.'+u.id+'&enabled=eq.true&select=id,capabilities');
     if(!ws[0])throw new Fault('WORKER_NOT_OWNED_OR_DISABLED',403);
+    // A chosen translation model must be one this worker offers right now.
+    if(o.translation_model&&!translationModels(ws[0].capabilities?.translation_models).some(m=>m.id===o.translation_model))
+     throw new Fault('TRANSLATION_MODEL_NOT_OFFERED');
     delete o.worker_id;
     const bytes=await file.arrayBuffer();if(new TextDecoder().decode(bytes.slice(0,5))!=='%PDF-')throw new Fault('INVALID_PDF');
     const hash=await sha(bytes),requestHash=await sha(new TextEncoder().encode(JSON.stringify([file.name,hash,o,assigned])));

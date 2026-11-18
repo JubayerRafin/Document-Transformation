@@ -49,9 +49,25 @@ def split_compounds(source, target):
     return re.sub(r'(?<![\w-])([A-Za-z0-9]+)-([^\W\d_]{2,})(?![\w-])', split, target)
 
 
+# BabelDOC can replace the end of a value with a formula placeholder ("SEC-2024-{v1}" for
+# "SEC-2024-0093"). The visible start and the placeholder are one value: a translation that moves the
+# placeholder elsewhere splits it ("SEC-2024 분류: 내부 0093", a general chat model, 2026-11-19), yet
+# both pieces are still present. Only identifier-like starts are held together: letters or digits
+# with a separator and at least one digit ("SEC-2024-", "2024-03-", "HR-2024-").
+GLUED_PLACEHOLDER = re.compile(r'(?<![\w-])([A-Za-z0-9]+(?:[-_/.:][A-Za-z0-9]+)*[-_/.:]?)(\{v\d+\})')
+
+
+def glued_placeholders(source):
+    return [m.group(0) for m in GLUED_PLACEHOLDER.finditer(source)
+            if re.search(r'\d', m.group(1)) and re.search(r'[-_/.:]', m.group(1))]
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
+    for piece, count in Counter(glued_placeholders(source)).items():
+        if target.count(piece) < count:
+            raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.localized_numbers import permits_numeric_additions,permits_numeric_omissions
     actual=literal_inventory(split_compounds(source,source_unit_spacing(source,target,values)),values)
     def preserved(source):

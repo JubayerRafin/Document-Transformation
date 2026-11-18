@@ -56,8 +56,11 @@ user registers, and documents stay in that user's private storage.
 
 The engine itself has no database, accounts or hosting dependency. For an internal deployment it
 runs behind its own small HTTP API (`tools/service/engine_server.py`), with model servers that can be
-local or remote (OpenAI-compatible, with API keys). See [engine, adapters and
-configuration](docs/ENGINE_SERVICE.md) and [security notes and limitations](docs/SECURITY_AND_LIMITATIONS.md).
+local or remote (OpenAI-compatible, with API keys). One settings file,
+[`configs/transformx.toml`](configs/transformx.example.toml), controls model servers, OCR, output,
+the engine service and the worker; `python -m transformation.settings check` validates it. See
+[engine, adapters and configuration](docs/ENGINE_SERVICE.md) and [security notes and
+limitations](docs/SECURITY_AND_LIMITATIONS.md).
 
 ## Repository layout
 
@@ -105,8 +108,11 @@ bash tools/gpu/start_worker.sh
 The script starts both model servers, sizes their GPU memory for the card, and starts the worker.
 It is safe to run again; anything already running is left alone. The worker log is
 `/workspace/cloud-worker.log`. More detail: [private GPU workers](docs/PRIVATE_GPU_WORKERS.md).
+After updating the code on the server, run `bash tools/gpu/restart_worker.sh`: it waits for the
+running job, then restarts the worker and its pre-loaded job processes so they use the new code.
 `bash tools/gpu/start_worker.sh --servers-only` starts the model servers without the site worker,
-for the [engine service](docs/ENGINE_SERVICE.md).
+for the [engine service](docs/ENGINE_SERVICE.md). Both read `configs/transformx.toml` when it exists;
+a model server set there to another machine is used instead of starting the local one.
 
 ### Measured speed
 

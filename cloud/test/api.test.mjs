@@ -86,3 +86,14 @@ test('a full history uses one batched artifact request rather than exceeding Wor
  assert.ok(requests[0][0].includes('job_id=in.('));for(const j of jobs)assert.ok(requests[0][0].includes(j.id));
  assert.ok(f.calls.find(c=>c[0].includes('/tx_jobs'))[0].includes('owner=eq.'+owner));
 });
+test('translation model choices are ids only; the default and PII-only jobs carry none',async()=>{
+ const {options,translationModels}=await import('../src/index.mjs');
+ assert.equal(options({translation_model:'openai'}).translation_model,'openai');
+ assert.equal('translation_model' in options({translation_model:'default'}),false);
+ assert.equal('translation_model' in options({operation:'pii',pii_categories:['Names'],translation_model:'openai'}),false);
+ for(const bad of ['../x','OpenAI','a'.repeat(33),'',7])assert.throws(()=>options({translation_model:bad}),/INVALID_TRANSLATION_MODEL/);
+ // A worker's report keeps only id, name and whether text leaves its server: never an address or key.
+ assert.deepEqual(translationModels([{id:'default',label:'Standard'},{id:'openai',label:'GPT',external:true,endpoint:'https://x',key:'sk'},
+   {id:'Bad Id',label:'x'},{id:'nolabel'}]),[{id:'default',label:'Standard',external:false},{id:'openai',label:'GPT',external:true}]);
+ assert.deepEqual(translationModels('not a list'),[]);
+});

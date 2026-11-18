@@ -134,6 +134,13 @@ def chat_template_kwargs(endpoint):
     return is_loopback(endpoint)
 
 
+def reasoning_effort(endpoint):
+    """TRANSFORMX_REASONING_EFFORT (for example "minimal" or "low"), sent to remote servers only:
+    a reasoning model otherwise spends the answer's token budget thinking before it translates."""
+    value = os.environ.get('TRANSFORMX_REASONING_EFFORT', '').strip()
+    return value if value and not is_loopback(endpoint) else None
+
+
 def is_translategemma(model):
     """TranslateGemma needs its own prompt format, whatever name the server gives it
     ('translategemma:12b' locally, 'google/translategemma-12b-it' elsewhere)."""

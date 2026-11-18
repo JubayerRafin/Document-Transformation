@@ -8,7 +8,7 @@ class StructuredTranslationTests(unittest.TestCase):
     def test_field_value_interpreted_independently_before_translation(self):
         responses=iter([('{"value_kind":"professional position"}',{'prompt_eval_count':8,'eval_count':4}),
                         ('{"label":"Position","value":"Research Engineer"}',{'prompt_eval_count':10,'eval_count':5})])
-        def reply(endpoint,model,messages):
+        def reply(endpoint,model,messages,**kwargs):
             if 'value_kind' in messages[0]['content']:
                 self.assertEqual(messages[1]['content'],'Research Engineer')
             else:
@@ -21,7 +21,7 @@ class StructuredTranslationTests(unittest.TestCase):
         self.assertEqual(stats['prompt_eval_count'],18)
 
     def test_timestamp_placeholder_retains_temporal_type(self):
-        def reply(endpoint,model,messages):
+        def reply(endpoint,model,messages,**kwargs):
             self.assertIn('timestamp (a time, not a location)',messages[0]['content'])
             source=json.loads(messages[1]['content'])['source']
             return json.dumps({'meaning':'recorded time','translation':source}),{}
@@ -69,7 +69,7 @@ class StructuredTranslationTests(unittest.TestCase):
             call.assert_not_called()
 
     def test_field_structure_and_roman_placeholder_roundtrip(self):
-        def reply(endpoint,model,messages):
+        def reply(endpoint,model,messages,**kwargs):
             source=json.loads(messages[1]['content'])
             self.assertIn('field',source)
             self.assertNotIn(' IV',source['field']['value'])
@@ -78,11 +78,17 @@ class StructuredTranslationTests(unittest.TestCase):
             output,_=translate_paragraph('unused','model','Role: Research Engineer IV','Korean',structured=True)
         self.assertEqual(output,'Translated role: Research Engineer IV')
 
-    def test_invalid_json_retries_and_rejects(self):
-        with patch('transformation.llm.ollama_native.chat',return_value=('invalid',{})) as call:
-            with self.assertRaisesRegex(ValueError,'structured translation'):
-                translate_paragraph('unused','model','Column label','German',structured=True)
-            self.assertEqual(call.call_count,2)
+    def test_invalid_json_retries_then_translates_as_plain_text(self):
+        # Two answers that are not the JSON shape: the label is translated through the plain checked
+        # path instead of failing the document.
+        with patch('transformation.llm.ollama_native.chat',side_effect=[('invalid',{}),('invalid',{}),('Spaltenbeschriftung',{})]) as call:
+            output,stats=translate_paragraph('unused','model','Column label','German',structured=True)
+        self.assertEqual(call.call_count,3)
+        self.assertEqual(output,'Spaltenbeschriftung')
+        self.assertTrue(stats['structured_fallback'])
+        # The structured requests asked the server for the JSON shape.
+        shape=call.call_args_list[0].kwargs['response_format']
+        self.assertEqual(shape['required'],['meaning','translation'])
 
     def test_unchanged_abbreviation_retries_without_mapping(self):
         responses=[(json.dumps({'meaning':'A code label','translation':'ABC'}),{}),
@@ -94,6 +100,8 @@ class StructuredTranslationTests(unittest.TestCase):
 
     def test_missing_field_placeholder_is_not_silently_restored(self):
         with patch('transformation.llm.ollama_native.chat',return_value=(json.dumps({'label':'Role','value':'Engineer'}),{})) as call:
-            with self.assertRaises(ValueError):
-                translate_paragraph('unused','model','Role: Engineer III','Korean',structured=True)
+            output,stats=translate_paragraph('unused','model','Role: Engineer III','Korean',structured=True)
             self.assertEqual(call.call_count,2)
+        # Never patched into the wrong answer: the field stays as written and is flagged for review.
+        self.assertEqual(output,'Role: Engineer III')
+        self.assertTrue(stats['kept_source_requires_review'])

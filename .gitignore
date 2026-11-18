@@ -9,6 +9,7 @@ experiments/
 evaluation-results/
 .streamlit/secrets.toml
 configs/*.local.json
+configs/transformx.toml
 cloud/.dev.vars
 cloud/node_modules/
 cloud/.wrangler/

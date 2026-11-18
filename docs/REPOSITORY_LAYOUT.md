@@ -33,7 +33,7 @@ tools/
   ui/                        UI-related helper tools
 tests/                       Unit/regression tests and synthetic fixtures
 ui/                          Streamlit interface and shared product copy rules
-configs/                     Example configs; *.local.json remains private
+configs/                     Example configs (transformx.example.toml: the settings file); *.local.json and transformx.toml stay private
 config/                      Earlier extraction/evaluation defaults
 docs/                        Setup, module maps, evaluation and design decisions
 .agents/skills/              Repository-specific task instructions

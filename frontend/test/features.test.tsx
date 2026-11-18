@@ -46,6 +46,60 @@ it("submits a selected PDF using the exact selected server and mode", async () =
   });
   expect(submitted).toHaveBeenCalledWith(job.id);
 });
+it("offers the server's translation models and sends the chosen one", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id }),
+    withModels = {
+      ...worker,
+      capabilities: {
+        ...worker.capabilities,
+        translation_models: [
+          { id: "default", label: "Standard (this server)", external: false },
+          { id: "openai", label: "OpenAI GPT-5 mini", external: true },
+        ],
+      },
+    };
+  render(
+    <LazyMotion features={domAnimation}>
+      <UploadPanel api={api} workers={[withModels]} onSubmitted={vi.fn()} onServers={vi.fn()} onError={vi.fn()} />
+    </LazyMotion>,
+  );
+  // No selector until a server with more than one model is chosen.
+  expect(screen.queryByLabelText("Translation model")).not.toBeInTheDocument();
+  await u.upload(
+    screen.getByLabelText("Choose a PDF"),
+    new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
+  );
+  await screen.findByText("test.pdf");
+  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
+  const select = screen.getByLabelText("Translation model");
+  expect(select).toHaveValue("default");
+  await u.selectOptions(select, "openai");
+  // The user is told that text leaves the server before starting.
+  expect(screen.getByText(/document's text is sent there/i)).toBeVisible();
+  await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
+  await u.click(screen.getByRole("button", { name: /Start transformation/i }));
+  await waitFor(() => expect(submit).toHaveBeenCalled());
+  expect(submit.mock.calls[0][1]).toMatchObject({ translation_model: "openai" });
+});
+it("sends no model choice for the default model or for PII only", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
+  upload(api);
+  await u.upload(
+    screen.getByLabelText("Choose a PDF"),
+    new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
+  );
+  await screen.findByText("test.pdf");
+  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
+  expect(screen.queryByLabelText("Translation model")).not.toBeInTheDocument();
+  await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
+  await u.click(screen.getByRole("button", { name: /Start transformation/i }));
+  await waitFor(() => expect(submit).toHaveBeenCalled());
+  expect(submit.mock.calls[0][1]).not.toHaveProperty("translation_model");
+});
 it("shows category controls for PII and translation controls for combined", async () => {
   const u = userEvent.setup();
   upload();

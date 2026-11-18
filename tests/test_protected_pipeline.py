@@ -14,6 +14,9 @@ from transformation.pdf.runner import run_pdf
 
 
 class ProtectedPipelineTests(unittest.TestCase):
+    def setUp(self):
+        TRANSLATION_FAILED.clear()
+
     def tearDown(self):
         TRANSLATION_FAILED.clear()
 
@@ -47,7 +50,7 @@ class ProtectedPipelineTests(unittest.TestCase):
         translator = self.translator(["Kim Min-jun", "2024-03-18"])
         source = "Kim Min-jun / Kim Min-jun / 2024-03-18 / privacy@example.com"
 
-        def reply(endpoint, model, messages):
+        def reply(endpoint, model, messages, **kwargs):
             protected = messages[1]["content"]
             for value in ("Kim Min-jun", "2024-03-18", "privacy@example.com"):
                 self.assertNotIn(value, protected)
@@ -101,39 +104,41 @@ class ProtectedPipelineTests(unittest.TestCase):
             self.assertEqual(json.loads(context_file.read_text(encoding="utf-8")), "Employee onboarding form")
             self.assertEqual(events[-1]["document_context"], "Employee onboarding form")
 
-    def test_unsupported_path_fails_before_subprocess(self):
+    def test_any_model_name_gets_the_protected_paragraph_path(self):
+        # A model of any name (an OpenAI or gateway model) is not refused for protected values; the
+        # input is still checked before anything starts.
         with patch("transformation.pdf.runner.subprocess.Popen") as launch:
-            with self.assertRaisesRegex(ValueError, "single-paragraph"):
+            with self.assertRaisesRegex(Exception, "(?i)pdf|document|stream"):
                 list(run_pdf(b"", "test.pdf", python=sys.executable,
-                             model="other-model", protected_values=["Kim Min-jun"]))
+                             model="gpt-5-mini", protected_values=["Kim Min-jun"]))
             launch.assert_not_called()
 
-    def test_missing_token_retry_recovers_and_counts_both_calls(self):
-        token = "ZXKEEPTESTX0XZ"
-        with patch("transformation.llm.ollama_native.protect_values", return_value=(token, {token: "Kim Min-jun"})), \
-             patch("transformation.llm.ollama_native.chat", side_effect=[
-                 ("missing", {"prompt_eval_count": 10, "eval_count": 2}),
-                 (token, {"prompt_eval_count": 20, "eval_count": 3}),
-             ]) as call, self.assertLogs("transformation.llm.ollama_native", level="INFO") as logs:
-            result, stats = translate_paragraph("http://localhost:11434", "test", "Kim Min-jun", "Korean")
-        self.assertEqual(result, "Kim Min-jun")
+    def test_missing_value_retry_recovers_and_counts_both_calls(self):
+        # Any chat model (not only TranslateGemma) goes through the checked path: a first answer that
+        # drops a protected value is retried from the original text with the value named.
+        with patch("transformation.llm.ollama_native.chat", side_effect=[
+                 ("오늘 연락하세요", {"prompt_eval_count": 10, "eval_count": 2}),
+                 ("오늘 Kim Min-jun에게 연락하세요", {"prompt_eval_count": 20, "eval_count": 3}),
+             ]) as call:
+            result, stats = translate_paragraph("http://localhost:11434", "test", "Contact Kim Min-jun today",
+                                                "Korean", protected_values=("Kim Min-jun",))
+        self.assertEqual(result, "오늘 Kim Min-jun에게 연락하세요")
         self.assertEqual(call.call_count, 2)
-        self.assertEqual(stats["prompt_eval_count"], 30)
-        self.assertEqual(stats["eval_count"], 5)
+        self.assertEqual((stats["prompt_eval_count"], stats["eval_count"]), (30, 5))
         self.assertFalse(TRANSLATION_FAILED.is_set())
-        self.assertIn("Required tokens", call.call_args.args[2][0]["content"])
-        self.assertTrue(any('"actual": 0' in line for line in logs.output))
+        retry = call.call_args.args[2]
+        self.assertIn("failed exact preservation checks", retry[0]["content"])
+        self.assertIn("Kim Min-jun", retry[0]["content"])
 
-    def test_failed_retry_keeps_run_failed(self):
-        token = "ZXKEEPTESTX0XZ"
-        with patch("transformation.llm.ollama_native.protect_values", return_value=(token, {token: "Kim Min-jun"})), \
-             patch("transformation.llm.ollama_native.chat", return_value=(token + " " + token, {})) as call, \
-             self.assertLogs("transformation.llm.ollama_native", level="WARNING"):
-            with self.assertRaises(PlaceholderIntegrityError) as caught:
-                translate_paragraph("http://localhost:11434", "test", "Kim Min-jun", "Korean")
-        self.assertEqual(call.call_count, 2)
-        self.assertEqual(caught.exception.issues[0]["actual"], 2)
-        self.assertTrue(TRANSLATION_FAILED.is_set())
+    def test_a_paragraph_that_keeps_losing_a_value_is_flagged_not_fatal(self):
+        with patch("transformation.llm.ollama_native.chat", return_value=("오늘 연락하세요", {})):
+            result, stats = translate_paragraph("http://localhost:11434", "test", "Contact Kim Min-jun today",
+                                                "Korean", protected_values=("Kim Min-jun",))
+        # The value is never lost: the paragraph comes back recovered or in its source language,
+        # flagged for review, and the document does not fail.
+        self.assertIn("Kim Min-jun", result)
+        self.assertTrue(stats.get("kept_source_requires_review") or stats.get("recovery_review_required"))
+        self.assertFalse(TRANSLATION_FAILED.is_set())
 
     def test_transport_failure_is_not_retried(self):
         with patch("transformation.llm.ollama_native.chat", side_effect=TimeoutError("timeout")) as call:
