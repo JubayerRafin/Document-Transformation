@@ -8,6 +8,7 @@ from tools.evaluation.compare_batches import aggregates, measure
 
 
 class CompareBatchTests(unittest.TestCase):
+    @unittest.skipUnless(__import__('importlib.util').util.find_spec('skimage'), 'needs scikit-image (requirements-evaluation.txt)')
     def test_missing_output_page_is_not_scored_as_preserved(self):
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'source.pdf'

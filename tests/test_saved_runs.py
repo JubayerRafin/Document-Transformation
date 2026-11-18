@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from temp_workspace import temporary_workspace
+from tests.temp_workspace import temporary_workspace
 import unittest
 from extraction.saved_runs import discover_saved_runs
 

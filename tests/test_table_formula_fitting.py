@@ -1,3 +1,7 @@
+import importlib.util
+import unittest
+if importlib.util.find_spec('babeldoc') is None:
+    raise unittest.SkipTest('needs BabelDOC (requirements-transformation.txt)')
 import unittest
 from types import SimpleNamespace as NS
 

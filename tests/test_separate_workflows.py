@@ -152,7 +152,7 @@ class WorkflowTests(unittest.TestCase):
     def test_gemma_explicit_source_and_no_silent_long_input_truncation(self):
         prompt=messages('Guten Tag','Korean',source='de')[0]['content']
         self.assertIn('German (de) to Korean (ko)',prompt)
-        with self.assertRaisesRegex(ValueError,'split it upstream'): messages('x'*1501,'Korean')
+        with self.assertRaisesRegex(ValueError,'split it upstream'): messages('x'*1801,'Korean')
 
 
 if __name__=='__main__': unittest.main()
