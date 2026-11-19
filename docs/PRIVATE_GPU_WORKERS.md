@@ -36,6 +36,9 @@ Transfer `gpu.worker.local.json` privately to `configs/` on the server, then:
 bash tools/gpu/start_worker.sh
 ```
 
+After updating the code, restart with `bash tools/gpu/restart_worker.sh` (it waits for a running
+job, then restarts the worker and its pre-loaded job processes so no job mixes old and new code).
+
 The start script launches the PII model server (port 8000) and the translation
 model server (port 8010) on loopback, gives each a fixed amount of GPU memory,
 and starts the agent with the matching environment. On cards under 40 GB the two

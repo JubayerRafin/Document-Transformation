@@ -21,14 +21,13 @@ No Node server, Next API routes, new database tables or new API endpoints are
 introduced. Supabase Auth, PostgreSQL, Storage and outbound GPU agents retain
 their existing roles. Local FastAPI and Streamlit remain separate applications.
 
-`/studio` continues to serve the legacy control structure and JavaScript, with
-the new dark theme in `cloud/ui/studio.css` and an invitation welcome screen in
-`cloud/ui/studio-welcome.html`. Its existing IDs, actions and API behavior remain.
-The original builder remains `tools/service/build_cloud_frontend.py`. The new
-packager saves its output as `studio.html`, overlays the static customer app,
-and generates exact SHA-256 CSP hashes for Next's inline hydration scripts.
-Studio and API routes keep their existing script policy. Never deploy stale
-HTML with hashes from a different build.
+The former Studio page was removed from the site (2026-11-19); `/studio` now
+redirects to `/workspace`. `tools/service/build_cloud_assets.py` copies the manual
+redaction editor and pdf.js into `cloud/public` (and deletes files left from Studio),
+then `tools/service/package_customer_frontend.mjs` overlays the static customer app
+and generates exact SHA-256 CSP hashes for Next's inline hydration scripts. Never
+deploy stale HTML with hashes from a different build. The local FastAPI app keeps
+its own Studio page for local experiments.
 
 ## Install and verify (repository root)
 
@@ -86,8 +85,8 @@ held in memory. It is not a substitute for authenticated end-to-end testing.
 - Private servers: existing registration and revocation APIs; one-time private
   JSON configuration is held in memory only. This is the same engine profile as
   the legacy registration screen, not automatic infrastructure provisioning.
-- Review: generated output is labeled for review; approval and evaluation tools
-  remain in Studio. PII quality evaluation is still pending.
+- Review: generated output is labeled for review. PII quality evaluation is
+  still pending.
 
 ## Rollback
 
@@ -99,9 +98,8 @@ worker credentials or baseline results. Keep frontend lockfiles with the source.
 Cloudflare route handling: keep `cloud/wrangler.jsonc` assets
 `html_handling: "none"` with the explicit document mapping in
 `cloud/src/index.mjs`. The default asset canonicalization redirects `.html` to
-extensionless paths and otherwise loops when Studio is internally rewritten.
-Both workspace and Studio accept extensionless, trailing-slash and `.html`
-URLs. Hydration CSP hashes must match customer document aliases as well.
+extensionless paths and loops with internally rewritten documents. The workspace
+accepts extensionless, trailing-slash and `.html` URLs. Hydration CSP hashes must match customer document aliases as well.
 
 
 Motion behavior: the landing page lazily loads GSAP/ScrollTrigger for hero and
@@ -110,8 +108,7 @@ PDF illustration includes a decorative scan and transitions when switching
 translation/redaction/review. The pause control stops decorative loops and
 reverts GSAP; OS reduced-motion preferences skip them. Workspace navigation,
 mobile navigation, headings and view changes use Motion, with small CSS card
-entrances. Studio uses CSS entrances and hover feedback without changing its
-legacy API/actions. `frontend/test/animation.test.tsx` checks GSAP initialization,
+entrances. `frontend/test/animation.test.tsx` checks GSAP initialization,
 pause cleanup and reduced-motion behavior; rendered animation must also be
 checked in the deployed browser. None of these animations report real processing
 progress or introduce new endpoints.
@@ -124,7 +121,7 @@ textures, fonts or document data. Pixel ratio is capped at 1.5 and rendering at
 30fps. The pause control, hidden tabs and off-screen visibility stop animation;
 resize, media changes and unmount release renderer resources. A lost/unsupported
 WebGL context retains the static illustration. Keep this enhancement out of the
-workspace/Studio processing routes. Reference:
+workspace processing routes. Reference:
 https://threejs.org/docs/#WebGLRenderer
 
 
@@ -145,11 +142,11 @@ retry; successful logout changes links to Sign in. No new backend route is used.
 
 
 Brand identity: `frontend/public/transformx-mark.svg` is the canonical original
-TransformX document/X mark. `brand.tsx`, Next metadata and the cloud Studio
-builder use it; the Studio builder copies it into the published assets. The
+TransformX document/X mark. `brand.tsx`, Next metadata and the manual
+redaction editor use it. The
 new palette uses navy #07131F, surface #0D2032, HP-inspired blue #0096D6,
 action sky #54C7F4 and cyan #6FE3F2. Use dark #051A29 text on sky action buttons.
-Landing, workspace, Studio and both WebGL/SVG hero art share this direction.
+Landing, workspace and both WebGL/SVG hero art share this direction.
 The HP logo is not used. Export SVG/PNG wordmarks, monochrome mark and a brand
 board with `node tools/service/export_brand_assets.mjs <output-directory>`.
 The exporter uses the installed Sharp dependency. Semantic warning/error states

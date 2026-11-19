@@ -3,16 +3,31 @@
 # already running is left alone. Run setup_transformx.sh once on a new pod first.
 #
 # usage: bash tools/gpu/start_worker.sh [config path, default configs/gpu.worker.local.json]
+#        bash tools/gpu/start_worker.sh --servers-only
 # The config is the gpu.worker.local.json downloaded from the site's Workers panel.
+# --servers-only starts the model servers and writes their settings (endpoints, model names, no
+# keys) to /workspace/servers.env, without the site worker: for running the engine some other way.
 set -euo pipefail
+servers_only=0
+if [ "${1:-}" = "--servers-only" ]; then servers_only=1; shift; fi
 app="$(cd "$(dirname "$0")/../.." && pwd)"
-config="${1:-$app/configs/gpu.worker.local.json}"
 python="${TRANSFORMX_PYTHON:-/workspace/paddle-env/bin/python}"
 log="${TRANSFORMX_WORKER_LOG:-/workspace/cloud-worker.log}"
-
-[ -f "$config" ] || { echo "Worker config not found: $config (download it from the site's Workers panel)."; exit 1; }
 [ -x "$python" ] || { echo "GPU Python not found: $python (run tools/gpu/setup_transformx.sh pii first)."; exit 1; }
-chmod 600 "$config"
+
+# configs/transformx.toml (or $TRANSFORMX_SETTINGS), if present: its values become environment
+# defaults here, so everything below sees them. Variables already set in the environment win.
+settings_env=$(cd "$app" && PYTHONPATH="$app" "$python" -m transformation.settings env) || {
+  echo "Fix the settings file first (python -m transformation.settings check)."; exit 1; }
+eval "$settings_env"
+config="${1:-${TRANSFORMX_WORKER_CONFIG:-$app/configs/gpu.worker.local.json}}"
+# A model server set to another machine is used as it is; only local ones are started here.
+local_server() { case "${1:-}" in ""|http://127.0.0.1:"$2"*|http://localhost:"$2"*) return 0;; *) return 1;; esac; }
+
+if [ "$servers_only" = 0 ]; then
+  [ -f "$config" ] || { echo "Worker config not found: $config (download it from the site's Workers panel)."; exit 1; }
+  chmod 600 "$config"
+fi
 
 if ! curl -fsS http://127.0.0.1:11434/api/version >/dev/null 2>&1; then
   # Same settings as setup_transformx.sh: parallel requests, flash attention, 8-bit KV cache.
@@ -56,7 +71,8 @@ wait_for() {  # port, log
   echo "vLLM on port $1 did not start; see $2."; exit 1
 }
 
-if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$vllm_model/config.json" ]; then
+if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && local_server "${TRANSFORMX_PII_ENDPOINT:-}" 8000 \
+    && [ -x "$vllm" ] && [ -f "$vllm_model/config.json" ]; then
   if ! curl -fsS http://127.0.0.1:8000/v1/models >/dev/null 2>&1; then
     [ "$shared" = 1 ] && curl -fsS -X POST "http://127.0.0.1:8010/sleep?level=1" >/dev/null 2>&1 || true
     # Loopback only. MTP drafts tokens ahead (lossless with greedy decoding) for about 1.5x faster
@@ -73,7 +89,8 @@ if [ "${TRANSFORMX_PII_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$vl
   echo "PII model $vllm_name served by vLLM."
 fi
 
-if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [ -f "$tg_model/config.json" ]; then
+if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && local_server "${TRANSFORMX_TRANSLATION_ENDPOINT:-}" 8010 \
+    && [ -x "$vllm" ] && [ -f "$tg_model/config.json" ]; then
   if ! curl -fsS http://127.0.0.1:8010/v1/models >/dev/null 2>&1; then
     # Port 8010: RunPod images proxy 8001 to 8000. The PII server sleeps while this one claims memory.
     [ "$shared" = 1 ] && curl -fsS -X POST "http://127.0.0.1:8000/sleep?level=1" >/dev/null 2>&1 || true
@@ -91,13 +108,15 @@ if [ "${TRANSFORMX_TRANSLATION_SERVER:-auto}" != ollama ] && [ -x "$vllm" ] && [
   marker=""; [ "$tg_level" = 2 ] && marker="#2"
   servers="${servers:+$servers,}http://127.0.0.1:8010$marker"
   # A vLLM translation server serves many requests at once (measured: 16 parallel calls).
-  export TRANSFORMX_TRANSLATION_ENDPOINT=http://127.0.0.1:8010/v1 TRANSFORMX_TRANSLATION_WORKERS=16 TRANSFORMX_TRANSLATION_QPS=64
+  export TRANSFORMX_TRANSLATION_ENDPOINT=http://127.0.0.1:8010/v1 \
+    TRANSFORMX_TRANSLATION_WORKERS="${TRANSFORMX_TRANSLATION_WORKERS:-16}" TRANSFORMX_TRANSLATION_QPS="${TRANSFORMX_TRANSLATION_QPS:-64}"
   echo "Translation model translategemma:12b served by vLLM."
 fi
 
 if [ -n "$servers" ]; then
   plain="${servers//#2/}"   # addresses without the sleep-level marker
-  export TRANSFORMX_OPENAI_COMPATIBLE="$plain"
+  # Keep remote servers listed in the settings file or the environment.
+  export TRANSFORMX_OPENAI_COMPATIBLE="$plain${TRANSFORMX_OPENAI_COMPATIBLE:+,$TRANSFORMX_OPENAI_COMPATIBLE}"
   if [ "$shared" = 1 ]; then
     for server in ${plain//,/ }; do
       curl -fsS "$server/is_sleeping" >/dev/null 2>&1 || { echo "$server runs without sleep mode; stop it and run this script again."; exit 1; }
@@ -130,6 +149,13 @@ if [ -x /workspace/transformx-babeldoc/bin/python ] && [ -x /workspace/transform
 fi
 # Engine and BabelDOC job processes start from pre-loaded parents (transformation/preload.py).
 export TRANSFORMX_PRELOAD="${TRANSFORMX_PRELOAD:-1}"
+
+if [ "$servers_only" = 1 ]; then
+  # Settings for the engine on this machine; API keys are never written here.
+  env | grep '^TRANSFORMX_' | grep -v '_API_KEY' | sort > "${TRANSFORMX_SERVERS_ENV:-/workspace/servers.env}"
+  echo "Model servers ready; settings in ${TRANSFORMX_SERVERS_ENV:-/workspace/servers.env}."
+  exit 0
+fi
 
 if pgrep -f "$worker_pattern" >/dev/null; then
   echo "Worker already running (log: $log)."

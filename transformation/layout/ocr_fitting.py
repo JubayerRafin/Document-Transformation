@@ -40,6 +40,17 @@ def source_fit_policy(region,page):
     glyphs=[font.glyph_bbox(ord(c)) for c in text if c.isalnum() and font.has_glyph(ord(c))]
     if not glyphs:return fallback
     ink_height=float(np.median([g.height for g in glyphs]))
+    hangul=[c for c in text if '가'<=c<='힣']
+    if hangul:
+        # A Hangul syllable is drawn as separate parts ("매" is ㅁ and ㅐ), so the median ink blob is a
+        # fragment and estimated Korean lines at under half their size (16 pt bullets as 6.6 pt,
+        # 2026-11-19). Korean lines are measured by the height of the line's ink against a full
+        # syllable's height instead.
+        rows=np.nonzero(ink.sum(axis=1)>max(1,ink.shape[1]*.005))[0]
+        boxes=[font.glyph_bbox(ord(c)) for c in hangul if font.has_glyph(ord(c))]
+        if len(rows)<3 or not boxes:return fallback
+        measured_ink_height=float(rows[-1]-rows[0]+1)/scale
+        ink_height=float(max(g.height for g in boxes))
     if ink_height<=0:return fallback
     estimate=measured_ink_height/ink_height
     if not math.isfinite(estimate) or estimate<4:return fallback

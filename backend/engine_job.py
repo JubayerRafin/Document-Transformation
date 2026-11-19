@@ -15,9 +15,26 @@ def local_cache_options(options,cfg,folder):
     return options
 
 
+def input_problem(source):
+    """INPUT_REJECTED for a file the engine cannot work on (not a PDF, damaged, password-protected
+    or without pages), so callers that do not check it themselves (engine service, test harness)
+    report the real reason instead of ENGINE_FAILED."""
+    try:
+        import pymupdf
+        with pymupdf.open(source,filetype='pdf') as pdf:
+            if not pdf.is_pdf or pdf.needs_pass or not len(pdf):return 'INPUT_REJECTED'
+    except Exception:
+        return 'INPUT_REJECTED'
+    return None
+
+
 def main():
     request_path,events_path,terminal_path=map(Path,sys.argv[1:4])
     request=json.loads(request_path.read_text(encoding='utf8'))
+    rejected=input_problem(request['source'])
+    if rejected:
+        terminal_path.write_text(json.dumps({'status':'failed','stage':'failed','failure_code':rejected}),encoding='utf8')
+        return
     if request['profile'].get('ocr_device'):
         os.environ['TRANSFORMX_OCR_DEVICE']=request['profile']['ocr_device']
     from transformation.workflows import run_workflow
@@ -36,7 +53,7 @@ def main():
     if cfg.get('execution_remote'):options['execution_remote']=cfg['execution_remote']
     else:
         options=local_cache_options(options,cfg,folder)
-        for key in ('python','ocr_python','translation_endpoint','pii_endpoint','pii_model'):
+        for key in ('python','ocr_python','translation_endpoint','pii_endpoint','pii_model','translation_model'):
             if key in cfg:options[key]=cfg[key]
     probe=options.pop('performance_probe',False)
     if type(probe) is not bool:raise ValueError('performance_probe must be boolean.')

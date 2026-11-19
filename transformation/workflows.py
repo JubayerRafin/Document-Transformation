@@ -21,15 +21,17 @@ def check_models(workflow,translation_model=DEFAULT_TRANSLATION_MODEL,pii_model=
                        if workflow!='PII only' else ('Visual document understanding',pii_model,pii_endpoint))
     seen={}
     for role,model,endpoint in choices:
+        from transformation.llm import endpoints
+        endpoints.check(endpoint)
         parsed=urlparse(endpoint)
-        if parsed.hostname not in {'localhost','127.0.0.1','::1'} or parsed.scheme not in {'http','https'}:
-            raise ValueError('Use a loopback Ollama endpoint or SSH tunnel.')
-        from transformation.llm.ollama_native import server_kind
-        base=f'{parsed.scheme}://{parsed.netloc}';kind=server_kind(base)
+        base=endpoints.root(endpoint) if endpoints.kind(endpoint)=='openai' else f'{parsed.scheme}://{parsed.netloc}'
+        kind=endpoints.kind(endpoint)
         url=base+('/v1/models' if kind=='openai' else '/api/tags')
         if url not in seen:
             try:
-                with urllib.request.urlopen(url,timeout=5) as response:
+                auth=endpoints.headers(endpoint) if kind=='openai' else {}
+                target=urllib.request.Request(url,headers=auth) if 'Authorization' in auth else url
+                with urllib.request.urlopen(target,timeout=15 if kind=='openai' and not endpoints.is_loopback(endpoint) else 5) as response:
                     listing=json.load(response)
                     seen[url]={m['id'] for m in listing['data']} if kind=='openai' else {m['name'] for m in listing['models']}
             except (OSError,ValueError,KeyError,TypeError) as exc:
@@ -51,6 +53,13 @@ def run_workflow(data,filename,workflow='Translation only',**options):
     options.setdefault('translation_model',DEFAULT_TRANSLATION_MODEL)
     options.setdefault('pii_model',DEFAULT_PII_MODEL)
     translate,redact=modes[workflow]
+    if str(filename).lower().endswith('.pdf'):
+        # Rotated pages came out blank; they are processed as unrotated pages that look the same.
+        from transformation.pdf.rotation import unrotated
+        data=unrotated(data)
+        # Scanned pages a degree or two off level are turned level before OCR (see deskew).
+        from transformation.pdf.deskew import deskewed
+        data=deskewed(data)
     yield from run_pipeline(data,filename,translate=translate,redact=redact,**options)
 
 

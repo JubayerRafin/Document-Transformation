@@ -75,12 +75,15 @@ def install_source_repairs(protected_values):
         overrides,records={},[]
         from transformation.layout.panels import group_panels, PANEL_SLOTS
         PANEL_SLOTS.clear()
-        panel_records=[];grouping_records=[]
+        panel_records=[];grouping_records=[];unmapped_records=[]
         with pymupdf.open(self.translation_config.input_file) as pdf:
             for page in document.page:
                 source=pdf[page.page_number]
                 if source.rotation or source.cropbox != source.mediabox or source.mediabox.x0 or source.mediabox.y0:
                     continue
+                from transformation.pdf.unmapped_text import repair_page as reread_unmapped
+                reread,notes=reread_unmapped(page,source)
+                overrides.update(reread);unmapped_records.extend(notes)
                 blocks=[((b[0],source.rect.height-b[3],b[2],source.rect.height-b[1]),b[4])
                         for b in source.get_text('blocks') if b[6]==0]
                 from types import SimpleNamespace
@@ -104,9 +107,11 @@ def install_source_repairs(protected_values):
         if folder:
             Path(folder,'panel-grouping.json').write_text(json.dumps(panel_records,ensure_ascii=False,indent=2),encoding='utf-8')
             Path(folder,'source-repairs.json').write_text(json.dumps(records,ensure_ascii=False,indent=2),encoding='utf-8')
+            Path(folder,'unmapped-text.json').write_text(json.dumps(unmapped_records,ensure_ascii=False,indent=2),encoding='utf-8')
             Path(folder,'source-grouping.json').write_text(json.dumps(grouping_records,ensure_ascii=False,indent=2),encoding='utf-8')
             from dataclasses import asdict
-            Path(folder,'babeldoc-source-ir.json').write_text(json.dumps(asdict(document),ensure_ascii=False),encoding='utf-8')
+            from transformation.pdf.ir_json import dumps as ir_dumps
+            Path(folder,'babeldoc-source-ir.json').write_text(ir_dumps(document),encoding='utf-8')
             external=os.environ.get('TRANSFORMX_EXTERNAL_IR_FILE')
             if external:
                 from transformation.pdf.ir_bridge import map_document
@@ -114,9 +119,11 @@ def install_source_repairs(protected_values):
         return original_translate(self,document)
 
     def get_input(self,paragraph,*args,**kwargs):
-        locked=getattr(self,'_transformx_locked_inputs',{}).get(id(paragraph))
+        from transformation.pdf.translation_concurrency import original
+        key=id(original(paragraph))
+        locked=getattr(self,'_transformx_locked_inputs',{}).get(key)
         if locked is not None: return self.TranslateInput(locked,[],paragraph.pdf_style)
-        text=getattr(self,'_transformx_source_overrides',{}).get(id(paragraph))
+        text=getattr(self,'_transformx_source_overrides',{}).get(key)
         if text is not None:
             return self.TranslateInput(text,[],paragraph.pdf_style)
         return original_input(self,paragraph,*args,**kwargs)

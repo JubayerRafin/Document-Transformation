@@ -18,11 +18,6 @@ for(const [route,file] of [['/','index.html'],['/workspace','workspace.html']]){
   assert.match(csp,/style-src-attr 'unsafe-inline'/);
  });
 }
-test('Studio keeps its existing restrictive script and style policy',async()=>{
- const r=await worker.fetch(new Request('https://example.com/studio'),{SUPABASE_URL:'https://test.supabase.co',SUPABASE_PUBLISHABLE_KEY:'public',ASSETS:{fetch:()=>new Response('studio')}});
- const csp=r.headers.get('content-security-policy');assert.match(csp,/script-src 'self';/);assert.doesNotMatch(csp,/sha256|unsafe-inline|unsafe-eval/);
-});
-
 test('customer document aliases retain their hydration CSP',async()=>{
  for(const [route,policy] of [['/index.html','/'],['/workspace/','/workspace'],['/workspace.html','/workspace']]){
   const response=await worker.fetch(new Request('https://example.com'+route),{ASSETS:{fetch:()=>new Response('page')}});

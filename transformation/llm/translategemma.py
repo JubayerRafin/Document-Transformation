@@ -3,6 +3,7 @@
 Prompt format: https://ollama.com/library/translategemma:12b
 """
 from transformation.llm.protected_text import protect_values,restore_values,PlaceholderIntegrityError
+from transformation.llm.endpoints import is_translategemma
 
 
 import unicodedata
@@ -79,6 +80,13 @@ def cjk_punctuation(target, language):
     return _re.sub(r'([：。、，！？；）]) +(?=' + _CJK + ')', r'\1', target)
 
 
+def middle_dot(target, language):
+    """The katakana middle dot "・" is Japanese; other languages write "·". Chinese fonts map their
+    middle dot to "・" when text is extracted, and translations into English kept it (2026-11-19)."""
+    from transformation.pdf.runner import LANGUAGES
+    return target if LANGUAGES.get(language, language) == 'ja' else target.replace('・', '·')
+
+
 CLOSING = '.!?。！？．।॥؟۔…:;'
 FULL_STOPS = '.。．।۔'
 
@@ -118,7 +126,11 @@ def normalize_field_layout(source, target):
     return target
 
 
-def messages(text,language,context='',source='en'):
+def messages(text,language,context='',source='en',model=None):
+    """TranslateGemma's documented format: one user message, instructions then the text. Any other
+    chat model (model given, not TranslateGemma: OpenAI, Qwen, ...) gets the same instructions as a
+    system message and the document text alone as the user message, which keeps document text apart
+    from instructions."""
     from transformation.pdf.runner import LANGUAGES
     source_name=next((name for name,code in LANGUAGES.items() if code==source),source)
     target_code=LANGUAGES.get(language,language)
@@ -126,7 +138,9 @@ def messages(text,language,context='',source='en'):
         raise ValueError('Choose an explicitly configured source and target language.')
     # Bound inputs around the model's documented 2K input context. Longer
     # regions need upstream segmentation rather than silent truncation.
-    if len(text)>1500: raise ValueError('TranslateGemma region exceeds 1500 characters; split it upstream.')
+    # Paragraphs are split at 1500 characters upstream; showing glued placeholders with spaces
+    # (_unglued) can add a few characters, which once failed a whole document (2026-11-19).
+    if len(text)>1800: raise ValueError('Translation region exceeds 1800 characters; split it upstream.')
     if len(context)>1000: context=context[:1000]
     header=(f'You are a professional {source_name} ({source}) to {language} ({target_code}) translator. '
         f'Your goal is to accurately convey the meaning and nuances of the original {source_name} text '
@@ -139,9 +153,17 @@ def messages(text,language,context='',source='en'):
     if 'ZXKEEP' in text:
         header+='Copy every ZXKEEP placeholder unchanged exactly once in its corresponding position; never translate it or append a token list. '
     if context: header+='Background for disambiguation only; do not translate or add it: '+context+'\n'
+    if model is not None and not is_translategemma(model):
+        header+=(f'The user message is the {source_name} text to translate. Reply with only its {language} '
+                 'translation, without any additional explanations, commentary, quotes or Markdown.')
+        return [{'role':'system','content':header},{'role':'user','content':text}]
     header+=(f'Produce only the {language} translation, without any additional explanations or commentary. '
              f'Please translate the following {source_name} text into {language}:\n\n\n')
     return [{'role':'user','content':header+text}]
+
+
+def _backend(model):
+    return 'translategemma' if is_translategemma(model) else 'chat_model'
 
 
 TRUNCATED=('Model server returned an empty, incomplete, or truncated answer.',  # vLLM (OpenAI API)
@@ -155,12 +177,96 @@ def answer_budget(text):
     return min(4096,256+3*len(text))
 
 
+_PLACEHOLDER_RUN=r'(?:\{v\d+\}\s*)+'
+_TOKEN=r'ZXKEEP[0-9A-F]{8}X\d+XZ'
+# A clause or list number opening a sentence ("5.1 ", "3. ", "a) ", "(iv) "): the models dropped it
+# from Japanese contract clauses (2026-11-19). A dot or a bracket is required, so a count ("3 個")
+# stays with its sentence.
+_CLAUSE=r'\d{1,3}(?:\.\d{1,3})+\.?|\d{1,3}[.)]|\(\w{1,4}\)|[A-Za-z][.)]'
+
+
+def _edge_placeholders(text):
+    """(start, end) of the text between placeholders that sit at its edges, or None: leading ones
+    (and a clause number, see _CLAUSE) directly before a sentence (an upper-case or non-Latin letter),
+    trailing ones after the final
+    punctuation. Placeholders inside a sentence move with its grammar and stay with the model."""
+    import re
+    start,end=0,len(text)
+    lead=re.match(r'\s*(?:(?:'+_CLAUSE+r')\s+(?:\{v\d+\}\s*)*|'+_PLACEHOLDER_RUN+r'(?:(?:'+_CLAUSE+r')\s+)?)',text)
+    if lead and lead.end()<len(text):
+        following=text[lead.end()]
+        if following.isupper() or (following.isalpha() and not following.isascii()):start=lead.end()
+    trail=re.search(r'(?<=[.!?:;。！？．])\s*'+_PLACEHOLDER_RUN+r'$',text)
+    if trail and trail.start()>start:end=trail.start()
+    if (start,end)==(0,len(text)) or not any(c.isalpha() for c in text[start:end]):return None
+    return start,end
+
+
+SEPARATORS = (' · ', ' | ', ' • ', ' ; ', '; ', ' / ')
+
+
+def single_line(source, answer):
+    """A one-line source's translation on one line. Line breaks the model put between fields are
+    dropped when the page is set, so "Bank · IBAN ... · Payment terms" came out as "BankIBAN ...98결제"
+    (invoice, 2026-11-19). The source's own separator is put back when the parts match; a longer
+    sentence gets spaces. Short labels are left to the stricter check on added lines."""
+    if '\n' in source.strip() or '\n' not in answer.strip():
+        return answer
+    lines = [line.strip() for line in answer.splitlines() if line.strip()]
+    for separator in SEPARATORS:
+        if source.count(separator) == len(lines) - 1:
+            return separator.join(lines)
+    return ' '.join(lines) if len(source.split()) > 8 else answer
+
+
+def without_source_echo(source, answer):
+    """The answer without a copy of the whole source appended after the translation.
+
+    TranslateGemma sometimes ends with "Source: <the original>"; the Korean manual then printed the
+    translation followed by the English sentence (HP printer manual, 2026-11-19). Only a verbatim copy
+    of the entire source (12 characters or more) at the very end is removed, with a short label
+    ("Source:", "원문:") just before it; anything else is left to validation."""
+    import re
+    words = source.split()
+    if len(' '.join(words)) < 12:
+        return answer
+    match = None
+    for match in re.finditer(r'\s+'.join(map(re.escape, words)), answer):
+        pass
+    if match is None or answer[match.end():].strip():
+        return answer
+    head = answer[:match.start()].rstrip()
+    head = re.sub(r'(?:^|\n)[^\S\n]*[(\[]?[^\W\d_][^\n:：]{0,24}[:：][^\S\n]*$', '', head).rstrip()
+    if not any(c.isalpha() for c in head) or ' '.join(head.split()) == ' '.join(words):
+        return answer
+    return head
+
+
+def _unglued(text):
+    """The text as shown to the model: placeholders glued to words ("Call{v1}for", BabelDOC's
+    formula took the spaces around a phone number) get spaces, so the model keeps them whole.
+    Identifier pieces ("SEC-2024-{v1}") are not words and stay glued. Validation still compares
+    with the original text."""
+    import re
+    placeholder=r'(\{v\d+\}|'+_TOKEN+r')'
+    text=re.sub(placeholder+r'(?=[^\W\d_])',r'\1 ',text)
+    return re.sub(r'(?<![\w-])([A-Za-z][a-z]{2,})'+placeholder,r'\1 \2',text)
+
+
 def translate(endpoint,model,text,language,protected=(),context='',source='en'):
     import hashlib,time
     from transformation.llm.ollama_native import chat,record_progress,needs_no_translation
     if needs_no_translation(text,protected):
         record_progress('skipped',reason='protected_or_numeric')
         return text,{'prompt_eval_count':0,'eval_count':0,'skipped_model':True}
+    edges=_edge_placeholders(text)
+    if edges:
+        # A bullet or marker BabelDOC keeps as a formula placeholder at the start of a sentence
+        # ("{v1}All shipments ...") or after its final punctuation was dropped by the models (545 times
+        # over 43 documents, 2026-11-19). It stays where it is; only the text between is translated.
+        start,end=edges
+        result,stats=translate(endpoint,model,text[start:end],language,protected,context,source)
+        return text[:start]+result+text[end:],stats
     safe,tokens=protect_values(text,protected)
     if len(text)>1500 or len(safe)>1500:
         from transformation.llm.translation_segments import bounded_segments
@@ -183,7 +289,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             review|=stats.get('recovery_review_required',False)
         result=''.join(output)
         validate_candidate(text,result,protected)
-        return result,{**totals,'translation_backend':'translategemma','segments':len(segments),
+        return result,{**totals,'translation_backend':_backend(model),'segments':len(segments),
                        'recovery_review_required':review}
     from transformation.llm.role_bindings import prompt_evidence
     if len(tokens)==1 and safe.strip()==next(iter(tokens)):
@@ -201,7 +307,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         # ("HR-2024-{v1}Classification: Internal"); the model then keeps the English word. Show the
         # model a word boundary there; validation still compares with the original text.
         import re
-        current=re.sub(r'(\{v\d+\})(?=[^\W\d_])',r'\1 ',current)
+        current=_unglued(current)
         # Source relationships take precedence over optional background when
         # the model's bounded context budget truncates that background.
         import re
@@ -210,7 +316,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         # Retry a failed standalone heading without the neighboring document
         # prose that the model expanded into its answer. Successful first calls
         # and all non-heading retries retain their existing request path.
-        prompt=messages(current,language,'' if isolated_heading else prompt_evidence(current,protected if attempt==2 else ())+context,source)
+        prompt=messages(current,language,'' if isolated_heading else prompt_evidence(current,protected if attempt==2 else ())+context,source,model)
         if attempt==2:
             import json
             prefix=('The previous translation failed exact preservation checks. '
@@ -239,8 +345,18 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         try:
             restored=restore_values(result,tokens) if attempt==1 else result
             restored=normalize_field_layout(text,restored)
+            restored=without_source_echo(text,restored)
+            restored=single_line(text,restored)
+            answer_lines=[line.strip() for line in restored.splitlines() if line.strip()]
+            if (len(text.splitlines())==1 and len(text.split())<=8 and len(answer_lines)>1
+                    and len(answer_lines)<=len([p for p in re.split(r'[,;:·|]',text) if p.strip()])):
+                # A one-line label with parts ("Yours sincerely, Emily Roberts") may come back one part
+                # per line; it was kept in English (2026-11-19). It stays one line, the layout wraps it.
+                # More lines than parts means added text, which validation still refuses.
+                restored=' '.join(answer_lines)
             restored=match_terminal_punctuation(text,restored)
             restored=cjk_punctuation(restored,language)
+            restored=middle_dot(restored,language)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
             stray=foreign_script(text,restored,language)
@@ -251,13 +367,13 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                           or len(text.split())<=SHORT_LABEL_WORDS):
                 # Mostly another language, or a short label: the source reads better than that.
                 record_progress('translation_kept_source',source_sha256=digest,reason='foreign_script',script=stray,model=model)
-                return text,{**totals,'translation_backend':'translategemma','kept_source_requires_review':True}
+                return text,{**totals,'translation_backend':_backend(model),'kept_source_requires_review':True}
             if stray:
                 # A second answer still mixes in a word of another script: keep it (the literals are
                 # exact) and flag it.
                 record_progress('foreign_script_kept',source_sha256=digest,script=stray,model=model)
-                return restored,{**stats,**totals,'translation_backend':'translategemma','foreign_script_review_required':True}
-            return restored,{**stats,**totals,'translation_backend':'translategemma'}
+                return restored,{**stats,**totals,'translation_backend':_backend(model),'foreign_script_review_required':True}
+            return restored,{**stats,**totals,'translation_backend':_backend(model)}
         except (PlaceholderIntegrityError,ValueError) as error:
             failure_reason=str(error)
             record_progress('validation_failed',source_sha256=digest,attempt=attempt,model=model,reason=str(error))
@@ -277,7 +393,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                     from transformation.llm.translation_recovery import recover_literals
                     recovered,recovery_stats=recover_literals(endpoint,model,text,language,protected,source)
                     for key in totals: totals[key]+=recovery_stats.get(key,0)
-                    return recovered,{**totals,'translation_backend':'translategemma',
+                    return recovered,{**totals,'translation_backend':_backend(model),
                                       'recovery':'source_literal_segments','recovery_review_required':True}
                 raise
     raise RuntimeError('TranslateGemma failed validation.')

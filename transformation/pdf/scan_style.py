@@ -51,10 +51,29 @@ def latin_font(text, bold=False, italic=False):
     return None
 
 
-def _crop(page, bbox, scale=4.0):
+SCALE = 4.0
+WHOLE_PAGE_PIXELS = 40_000_000  # render the page once at this size or below, else line by line
+
+
+def render(page, scale=SCALE):
+    """The whole page as an RGB array at scale, or None when it would be too large."""
+    if page.rect.get_area() * scale * scale > WHOLE_PAGE_PIXELS:
+        return None
+    # Rendered from a separate copy of the document: a full-page render changes how MuPDF caches the
+    # decoded scan, which shifted the size measurements made afterwards on the same page (2026-11-19).
+    with pymupdf.open(stream=page.parent.tobytes(), filetype='pdf') as copy:
+        pix = copy[page.number].get_pixmap(matrix=pymupdf.Matrix(scale, scale), colorspace=pymupdf.csRGB, alpha=False)
+    return np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, 3)
+
+
+def _crop(page, bbox, scale=SCALE, rendered=None):
     clip = pymupdf.Rect(bbox) & page.rect
     if clip.is_empty or clip.get_area() * scale * scale > 3_000_000:
         return None
+    if rendered is not None:
+        x0, y0 = int(round((clip.x0 - page.rect.x0) * scale)), int(round((clip.y0 - page.rect.y0) * scale))
+        x1, y1 = int(round((clip.x1 - page.rect.x0) * scale)), int(round((clip.y1 - page.rect.y0) * scale))
+        return rendered[y0:y1, x0:x1].astype(float)
     pix = page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), clip=clip, colorspace=pymupdf.csRGB, alpha=False)
     return np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width, 3).astype(float)
 
@@ -68,9 +87,10 @@ def _profile_peak(mask, shear):
     return float(np.sum(np.bincount(shifted).astype(float) ** 2))
 
 
-def measure(page, bbox, background):
-    """Ink colour (0-255 RGB), stroke-width ratio and slant gain of one text box, or None."""
-    pixels = _crop(page, bbox)
+def measure(page, bbox, background, rendered=None):
+    """Ink colour (0-255 RGB), stroke-width ratio and slant gain of one text box, or None.
+    rendered: the page from render(), to cut the box from instead of rendering it again."""
+    pixels = _crop(page, bbox, rendered=rendered)
     if pixels is None or min(pixels.shape[:2]) < 6:
         return None
     distance = np.max(np.abs(pixels - np.asarray(background, float)), axis=2)
@@ -120,7 +140,10 @@ def ink_color(color, background):
 
 def page_styles(page, items):
     """Style for each (bbox, background, text) of one page: {'ink', 'bold', 'italic', 'evidence'}."""
-    found = [measure(page, bbox, background) for bbox, background, _ in items]
+    # One render of the page for all lines (about 50 separate renders took 3.5 s on a scanned page,
+    # 2026-11-19).
+    rendered = render(page) if items else None
+    found = [measure(page, bbox, background, rendered) for bbox, background, _ in items]
     usable = lambda m, text: m and m['letter_px'] >= MIN_LETTER_PX and sum(c.isalnum() for c in text) >= 3
     weighable = [m['width_ratio'] for m, (_, _, text) in zip(found, items)
                  if usable(m, text) and m['letter_px'] >= BOLD_LETTER_PX]

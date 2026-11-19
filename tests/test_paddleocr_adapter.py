@@ -7,8 +7,14 @@ from pathlib import Path
 
 from tools.ocr.adapt_paddleocr import html_table_to_cells
 
+ROOT = Path(__file__).resolve().parents[1]
+# Saved raw PaddleOCR results of earlier experiments; experiments/ is kept out of git.
+SAVED_RAW = (ROOT / 'experiments' / 'paddleocr-raw-nowarp').is_dir() and (ROOT / 'samples' / 'Sample02.pdf').is_file()
+SAVED_DEWARPED = (ROOT / 'experiments' / 'paddleocr-raw' / 'run_manifest.json').is_file()
+
 
 class PaddleAdapterTests(unittest.TestCase):
+    @unittest.skipUnless(SAVED_RAW, 'saved experiment results not present')
     def test_explicit_paths_reproduce_saved_prediction_without_overwrite(self):
         root = Path(__file__).resolve().parents[1]
         with tempfile.TemporaryDirectory(dir=root / 'runs') as temp:
@@ -31,6 +37,7 @@ class PaddleAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Merged cells"):
             html_table_to_cells('<table><tr><td colspan="2">X</td></tr></table>')
 
+    @unittest.skipUnless(SAVED_DEWARPED, 'saved experiment results not present')
     def test_dewarped_coordinates_rejected_by_default(self):
         root = Path(__file__).resolve().parents[1]
         result = subprocess.run([sys.executable, "tools/ocr/adapt_paddleocr.py", "paddleocr-raw"], cwd=root, capture_output=True, text=True)

@@ -59,6 +59,10 @@ class ComplexScriptTests(unittest.TestCase):
         self.assertEqual(cs.colour('0.122 0.306 0.475 rg 1 g'), [1.0, 1.0, 1.0])
         self.assertEqual(cs.colour('0 g 0.18 0.455 0.71 rg /GS0 gs 0 0 m 1 0 l h W n'), [0.18, 0.455, 0.71])
         self.assertEqual(cs.colour('0.2 0.2 0.2 rg 1 0 0 RG 0.5 G'), [0.2, 0.2, 0.2])
+        # BabelDOC's lazy, string-like instruction (it has no str methods of its own).
+        lazy = type('LazyPassthroughInstruction', (), {'materialize': lambda self: '0.5 0.25 1 rg'})()
+        self.assertEqual(cs.colour(lazy), [0.5, 0.25, 1.0])
+        self.assertEqual(cs.colour(None), [0.0, 0.0, 0.0])
 
     def test_drawn_paragraphs_are_outlines_in_their_box_with_a_correct_invisible_text_layer(self):
         import os
@@ -86,6 +90,45 @@ class ComplexScriptTests(unittest.TestCase):
                     if importlib.util.find_spec('bidi'):              # requirements-transformation.txt
                         self.assertIn('مرحبا', text)
                     self.assertEqual(text.count('ড্রোনগুলোর'), 1)     # only the invisible layer is text
+
+
+    def test_the_invisible_text_of_a_tight_box_stays_inside_the_page(self):
+        import os
+        font = os.environ.get('TRANSFORMX_TEST_SHAPED_FONT', str(Path.home() / '.cache/babeldoc/fonts/GoNotoKurrent-Regular.ttf'))
+        if not Path(font).exists():
+            self.skipTest('needs a font covering Devanagari')
+        text = ('तुलना के लिए, यहां समान प्रकार की जानकारी दी गई है: कर्मचारी Kim Min-jun, आईडी EMP-2024-8831, '
+                'ईमेल minjun.kim@example-corp.com, API कुंजी sk_live_4f9a-REDACT_ME.')
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, 'out.pdf')
+            with pymupdf.open() as pdf:
+                pdf.new_page(width=600, height=400); pdf.save(path)
+            # A box two lines high: the unshaped text does not fit it at full size.
+            cs.draw(path, [{'page': 0, 'box': [40, 300, 560, 326], 'text': text, 'font_size': 11.0, 'color': [0, 0, 0],
+                            'bold': False, 'rtl': False, 'paragraph_id': 'tight'}], font)
+            with pymupdf.open(path) as pdf:
+                page = pdf[0]
+                extracted = ''.join(page.get_text().split())
+                for value in ('EMP-2024-8831', 'minjun.kim@example-corp.com', 'sk_live_4f9a-REDACT_ME'):
+                    self.assertIn(value, extracted)
+                    self.assertTrue(page.search_for(value), value)
+                for block in page.get_text('dict', clip=pymupdf.Rect(-1e4, -1e4, 1e4, 1e4))['blocks']:
+                    for line in block.get('lines', []):
+                        self.assertTrue(page.rect.contains(pymupdf.Rect(line['bbox'])), line['bbox'])
+
+    def test_a_box_under_a_point_wide_is_grown_to_hold_its_text(self):
+        # A lone danda measured 0.9 pt wide at the right edge of a slide once failed a whole document.
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder, 'out.mono.pdf')
+            with pymupdf.open() as pdf:
+                pdf.new_page(width=400, height=300); pdf.save(path)
+            results = cs.draw(path, [{'page': 0, 'box': [399.4, 150, 400.3, 157], 'text': '।', 'font_size': 11.0,
+                                      'color': [0, 0, 0], 'bold': False, 'rtl': False, 'paragraph_id': 'danda'}])
+            self.assertEqual(results[0]['status'], 'drawn')
+            with pymupdf.open(path) as pdf:
+                ink = [d['rect'] for d in pdf[0].get_drawings()]
+                self.assertTrue(ink)
+                self.assertTrue(all(pdf[0].rect.contains(r) for r in ink))
 
 
 if __name__ == '__main__':

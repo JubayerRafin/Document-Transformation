@@ -55,3 +55,10 @@ test('busy worker revocation is refused by the atomic RPC',async()=>{
 test('idle owned worker can be revoked',async()=>{
  const f=fixture();assert.equal((await f.auth('/v1/workers/'+wid+'/revoke',{method:'POST'})).status,200);
 });
+test('a translation model choice must be one the chosen worker offers, before any PDF is stored',async()=>{
+ const f=fixture(),form=new FormData();form.append('file',new Blob(['%PDF-test'],{type:'application/pdf'}),'test.pdf');
+ form.append('options',JSON.stringify({worker_id:wid,translation_model:'openai'}));
+ const r=await f.auth('/v1/jobs',{method:'POST',headers:{'Idempotency-Key':'test-key-123'},body:form});
+ assert.equal(r.status,400);assert.equal((await r.json()).error,'TRANSLATION_MODEL_NOT_OFFERED');
+ assert.equal(f.calls.some(c=>c[0].includes('/storage/')||c[1].method==='POST'),false);
+});

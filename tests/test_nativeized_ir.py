@@ -65,3 +65,20 @@ class RefreshTests(unittest.TestCase):
             self.assertEqual(events[-1]['status'],'generated',events[-1].get('error'))
             self.assertIn('--no-dual',process.call_args.args[0])
             self.assertFalse(events[-1]['bilingual_output_requested'])
+            self.assertNotIn('--skip-scanned-detection',process.call_args.args[0])
+
+    def test_a_scan_rebuilt_by_our_ocr_skips_babeldocs_scan_detector(self):
+        import sys
+        from transformation.pdf.runner import run_pdf
+        with temporary_workspace() as root:
+            path,_=self.fixture(root)
+            def launch(command,**kwargs):
+                output=Path(command[command.index('--output')+1]);
+                (output/'fixture.ko.mono.pdf').write_bytes(path.read_bytes())
+                process=unittest.mock.MagicMock();process.poll.return_value=0;process.returncode=0
+                return process
+            rebuilt={'units':[{'number':1,'regions':[],'locked_regions':[],'preserve_source_only':False}]}
+            with patch('transformation.pdf.runner.subprocess.check_output',return_value='0.6.4'),                 patch('transformation.pdf.runner.subprocess.Popen',side_effect=launch) as process,                 patch('transformation.validation.quality.review_signals'):
+                list(run_pdf(path.read_bytes(),'unseen.pdf',python=sys.executable,model='translategemma:12b',
+                             root=root/'runs',babeldoc_dual_output=False,external_ir=rebuilt))
+            self.assertIn('--skip-scanned-detection',process.call_args.args[0])

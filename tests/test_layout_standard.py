@@ -27,11 +27,15 @@ class LayoutMetricTests(unittest.TestCase):
         metric=match_boxes([],[],.5)
         self.assertIsNone(metric['f1'])
 
+    @unittest.skipUnless(__import__('importlib.util').util.find_spec('skimage'), 'needs scikit-image (requirements-evaluation.txt)')
+
     def test_ssim_detects_erased_content(self):
         image=np.zeros((30,30),dtype=np.uint8)
         blank=np.full((30,30),255,dtype=np.uint8)
         self.assertEqual(ssim(image,image)['score'],1)
         self.assertLess(ssim(image,blank)['score'],.1)
+
+    @unittest.skipUnless(__import__('importlib.util').util.find_spec('skimage'), 'needs scikit-image (requirements-evaluation.txt)')
 
     def test_ssim_does_not_resize_or_score_tiny_crops(self):
         self.assertIsNone(ssim(np.zeros((30,30),dtype=np.uint8),np.zeros((31,30),dtype=np.uint8))['score'])

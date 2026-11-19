@@ -14,10 +14,33 @@ import numpy as np
 import pymupdf
 
 
+def jpeg_scan(page):
+    """Whether the page's pictures are stored as JPEG (as scanners and phones write them)."""
+    try:
+        filters = [info[8] for info in page.get_images(full=True)]
+    except Exception:
+        return False
+    return bool(filters) and all(f in ('DCTDecode', 'JPXDecode') for f in filters)
+
+
 def background(crop):
+    """(background colour, share of the box border that is plain background).
+
+    Letters of the line itself or of a tightly set neighbouring line cross the border of a line's
+    box; on a densely set scanned page that made ordinary paper look like artwork and lines were
+    left untranslated (Chinese newsletter scan, 2026-11-19). Border pixels in the tone of the text
+    ink are therefore not counted, as long as they are a minority of the border: a photo or a
+    gradient behind the text still counts as artwork."""
     edge = np.concatenate([crop[0], crop[-1], crop[:, 0], crop[:, -1]])
     color = np.median(edge, axis=0)
-    agreement = float(np.mean(np.max(abs(edge.astype(float) - color), axis=1) < 45))
+    plain = np.max(abs(edge.astype(float) - color), axis=1) < 45
+    agreement = float(np.mean(plain))
+    if agreement < 1:
+        tone = edge.reshape(len(edge), -1).astype(float).mean(axis=1)
+        ink = float(np.percentile(crop.reshape(-1, crop.shape[-1] if crop.ndim == 3 else 1).astype(float).mean(axis=1), 2))
+        inked = (tone < float(np.mean(color)) - 80) & (abs(tone - ink) < 70)
+        if 0 < inked.mean() <= 0.35:
+            agreement = max(agreement, float(np.mean(plain[~inked])))
     return color.astype(np.uint8), agreement
 
 
@@ -118,9 +141,13 @@ def available_text_box(region, regions, pixels, rules):
         limit=min(limit,edges[0]-2)
         if limit<box.x1:
             box.x1=max(box.x0+1,limit)
+    # Other lines sharing this box's height band, as plain numbers: the candidate box below overlaps
+    # one exactly when their widths overlap too. (Building a PyMuPDF rectangle for every line at every
+    # step took 7 of 9 s on a scanned page with 50 lines, 2026-11-19.)
+    others=[(r['bbox'][0],r['bbox'][2]) for r in regions if r['id']!=region['id']
+            and min(box.y1,r['bbox'][3])-max(box.y0,r['bbox'][1])>0 and r['bbox'][2]>r['bbox'][0]]
     for right in range(math.ceil(box.x1)+1,limit+1):
-        candidate=pymupdf.Rect(box.x0,box.y0,right,box.y1)
-        if any(r['id']!=region['id'] and (candidate & pymupdf.Rect(r['bbox'])).get_area()>0 for r in regions):
+        if any(min(right,rx1)-max(box.x0,rx0)>0 for rx0,rx1 in others):
             break
         strip=pixels[top:bottom,right-1:right]
         if not strip.size or rules[top:bottom,right-1:right].any():
@@ -438,6 +465,11 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 record['style'] = {'font': font_name, 'ink': list(region_style['ink']),
                                    'bold': region_style['bold'], 'italic': region_style['italic']}
             wrapped = (region.get('metadata', {}).get('wrapped_lines') if region_style else None)
+            # A paragraph translated as one piece has no line per printed line: it is flowed over the
+            # paragraph's whole area below, instead of failing as "cannot fit" (Chinese newsletter
+            # scan, 2026-11-19).
+            if wrapped and len(text.split('\n')) != len(wrapped):
+                wrapped = None
             if wrapped and not needs_shaping(text):
                 # One paragraph over several printed lines (scan_lines.join_wrapped_lines): each line is
                 # drawn in its own box exactly as a separate line would be; the locked paragraph area
@@ -521,7 +553,13 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             p = result.new_page(width=source[0].rect.width, height=source[0].rect.height)
             from tools.ocr.raster_policy import preserve_background
             cleaned,raster = preserve_background(source[0],pixels,erase_mask)
-            p.insert_image(p.rect, pixmap=cleaned)
+            if jpeg_scan(source[0]):
+                # A JPEG scan stays JPEG: stored losslessly, the noise of 25 scanned pages made a
+                # 200-page output 55 MB, over the 50 MB the site accepts (2026-11-19). The text on
+                # top is drawn as text, so it stays sharp.
+                p.insert_image(p.rect, stream=cleaned.tobytes(output='jpeg', jpg_quality=85))
+            else:
+                p.insert_image(p.rect, pixmap=cleaned)
             p.insert_font(fontname='scanfont', fontbuffer=font.buffer)
             from transformation.pdf.scan_style import EMBEDDED, font as style_font
             for name in sorted({fontname for *_, fontname in placements if fontname in EMBEDDED}):
@@ -532,6 +570,8 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 with outlines:
                     p.show_pdf_page(rect, outlines, 0)
             output = run / 'output' / ('scan-corrected.pdf' if corrections_path else 'scan-reconstructed.pdf')
+            from transformation.pdf.complex_script import subset
+            subset(result)  # the CJK font is inserted whole (3.5 MB per rebuilt page)
             result.save(output, garbage=4, deflate=True)
         report = {'review_status': 'requires_human_review', 'model_requests': 0,'raster':raster,
                   'acceptance_blockers': [dict(id=r['id'], reason=r['reason']) for r in records

@@ -36,9 +36,27 @@ def style_from_name(name):
     return serif, (True if BOLD.search(base) else None), (True if ITALIC.search(base) else None)
 
 
+# Serif or sans-serif measured from the document's own embedded fonts (font_shapes.py), by base
+# name; it wins over the name and the PDF's flags. Filled once per run by learn().
+LEARNED = {}
+
+
+def learn(pdf_path):
+    from transformation.pdf.font_shapes import classify_pdf
+    LEARNED.clear()
+    try:
+        LEARNED.update(classify_pdf(pdf_path))
+    except Exception:
+        pass
+    return dict(LEARNED)
+
+
 def correct(font):
     """Apply style_from_name to a BabelDOC PdfFont in place; returns True when a flag changed."""
     serif, bold, italic = style_from_name(getattr(font, 'name', ''))
+    measured = LEARNED.get((getattr(font, 'name', '') or '').split('+', 1)[-1])
+    if measured is not None:
+        serif = measured
     changed = False
     for attribute, value in (('serif', serif), ('bold', bold), ('italic', italic)):
         if value is not None and bool(getattr(font, attribute, None)) != value:

@@ -470,6 +470,13 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                             info['image_ocr_progress']=asset_event.get('progress',{}).get('ocr_progress',{})
                             yield emit('image_ocr')
                 else: info['warnings'].append('Mixed-page image text requires PaddleOCR; image coverage remains unverified.')
+            if translate and not redact:
+                # Highlights, notes, form fields and links of the source (pdf/annotations.py).
+                from transformation.pdf.annotations import carry
+                try:
+                    processed,info['carried_annotations']=carry(data,processed)
+                except Exception as error:
+                    info['warnings'].append(f'Source annotations were not copied: {type(error).__name__}.')
             final_source=run/'output'/'transformed.pdf'; final_source.write_bytes(processed)
             final_ir=content_ir(extract_pdf(final_source,run,'native'))
             if output_kind=='pdf': artifact=processed
@@ -501,7 +508,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                                     list(options.get('protected_values',[]))+['[REDACTED]'],context,structured=len(region['text'])<=200,source_language=options.get('source','en'),terminology=terms)
                             validate_candidate(region['text'],transformed,list(options.get('protected_values',[]))+['[REDACTED]'])
                             if stats.get('skipped_model'): break
-                            if model.startswith('translategemma:'): break
+                            if __import__('transformation.llm.endpoints',fromlist=['is_translategemma']).is_translategemma(model): break
                             audit=audit_candidate(pii_endpoint,pii_model,region['text'],transformed,language,safe_context,list(options.get('protected_values',[]))+['[REDACTED]'])
                             if audit['faithful']: break
                             context+='\nPrior translation failed review: '+'; '.join(audit['issues'])

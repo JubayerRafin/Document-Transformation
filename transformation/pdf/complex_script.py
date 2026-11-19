@@ -59,12 +59,21 @@ def _styles(paragraph):
     yield paragraph.pdf_style
 
 
+def instruction_text(instruction):
+    """A graphic-state instruction as text. BabelDOC may hand a LazyPassthroughInstruction, a
+    string-like object without str methods: every timetable failed in Arabic and Hindi (2026-11-19)."""
+    if instruction is None:
+        return ''
+    materialize = getattr(instruction, 'materialize', None)
+    return materialize() if callable(materialize) else str(instruction)
+
+
 def colour(instruction):
     """RGB (0-1) of the fill colour a PDF instruction string leaves in effect: operators apply in
     order, so in '0.85 0.88 0.95 rg 0 g' the text is black. Fill operators: g (gray), rg (RGB),
     k (CMYK), sc/scn (1, 3 or 4 components); stroke operators (G, RG, K, SC, SCN) do not colour text."""
     fill, operands = (0.0, 0.0, 0.0), []
-    for token in (instruction or '').split():
+    for token in instruction_text(instruction).split():
         try:
             operands.append(float(token)); continue
         except ValueError:
@@ -108,7 +117,7 @@ def take_paragraph(page, paragraph, box=None, reason='shaping'):
     text = logical_text(paragraph)
     styles = [s for s in _styles(paragraph) if s is not None]
     sizes = Counter(round(s.font_size, 2) for s in styles if s.font_size)
-    instructions = Counter((s.graphic_state.passthrough_per_char_instruction or '') for s in styles if s.graphic_state)
+    instructions = Counter(instruction_text(s.graphic_state.passthrough_per_char_instruction) for s in styles if s.graphic_state)
     fonts = Counter(font_names.get(s.font_id, s.font_id or '').lower() for s in styles)
     own = paragraph.box
     record = {'page': page.page_number, 'box': list(box) if box else [own.x, own.y, own.x2, own.y2], 'text': text,
@@ -176,6 +185,41 @@ def fit_shaped(rect, text, max_size, min_size, color=(0.0, 0.0, 0.0)):
     return outlines, max_size * scale
 
 
+def _invisible_text(page, rect, text, size, text_font, rtl):
+    """Write the paragraph's text invisibly inside rect, smaller if needed: its unshaped widths differ
+    from the drawn outlines, and text placed past the page edge is dropped by PDF readers. A single
+    long line written when the box was too small ran off the page, so values at the end of Hindi,
+    Bengali and Arabic paragraphs could not be found or copied (checked 2026-11-19)."""
+    import pymupdf
+    options = dict(fontname='TxShaped', fontfile=str(text_font), render_mode=3)
+    align = pymupdf.TEXT_ALIGN_RIGHT if rtl else pymupdf.TEXT_ALIGN_LEFT
+    for factor in (1.0, 0.85, 0.7, 0.55, 0.42, 0.32, 0.24, 0.18):
+        if page.insert_textbox(rect, text, fontsize=max(0.5, size * factor), align=align, **options) >= 0:
+            return
+    # Still too long for the box (a tiny cell): one line, sized to the box width, inside the page.
+    line = ' '.join(text.split())
+    width = pymupdf.Font(fontfile=str(text_font)).text_length(line, fontsize=1) or 1
+    fitted = max(0.5, min(size, rect.width / width))
+    page.insert_text((rect.x0, min(rect.y1, rect.y0 + fitted)), line, fontsize=fitted, **options)
+
+
+def _grown(rect, record, page_rect):
+    """A box under a point wide or tall (a lone danda "।" measured as 0.9 pt) grown around its centre
+    to hold the text at its font size, kept on the page. Such a box once failed a whole Bengali
+    document (mass test, 2026-11-19)."""
+    import pymupdf
+    size = max(1.0, record.get('font_size') or 10)
+    width = max(rect.width, 0.7 * size * max(1, len(record.get('text') or '')))
+    height = max(rect.height, 1.2 * size)
+    centre = pymupdf.Point((rect.x0 + rect.x1) / 2, (rect.y0 + rect.y1) / 2)
+    grown = pymupdf.Rect(centre.x - width / 2, centre.y - height / 2, centre.x + width / 2, centre.y + height / 2)
+    if grown.x1 > page_rect.x1: grown += (page_rect.x1 - grown.x1, 0, page_rect.x1 - grown.x1, 0)
+    if grown.x0 < page_rect.x0: grown += (page_rect.x0 - grown.x0, 0, page_rect.x0 - grown.x0, 0)
+    if grown.y1 > page_rect.y1: grown += (0, page_rect.y1 - grown.y1, 0, page_rect.y1 - grown.y1)
+    if grown.y0 < page_rect.y0: grown += (0, page_rect.y0 - grown.y0, 0, page_rect.y0 - grown.y0)
+    return grown & page_rect
+
+
 def draw(pdf_path, records, text_font=None):
     """Draw recorded paragraphs into the written PDF; returns per-paragraph results.
     text_font: a font file covering these scripts, for the invisible searchable text layer."""
@@ -191,6 +235,8 @@ def draw(pdf_path, records, text_font=None):
             x0, y0, x1, y1 = record['box']
             rect = pymupdf.Rect(x0, y0, x1, y1) * page.transformation_matrix
             rect.normalize()
+            if rect.width < 1 or rect.height < 1:
+                rect = _grown(rect, record, page.rect)
             if rect.is_empty or rect.width < 1 or rect.height < 1:
                 results.append({'paragraph_id': record['paragraph_id'], 'status': 'empty_box'}); continue
             # Slots are as tall as the source line (a 10 pt cell for 10 pt text): allow the extra height
@@ -213,16 +259,23 @@ def draw(pdf_path, records, text_font=None):
                 # read right-to-left text from visual order, so RTL lines are stored that way.
                 size = max(1.0, record['font_size'] * scale)
                 stored = _visual_order(record['text']) if record['rtl'] else record['text']
-                options = dict(fontname='TxShaped', fontfile=str(text_font), fontsize=size, render_mode=3)
-                if page.insert_textbox(rect, stored, align=pymupdf.TEXT_ALIGN_RIGHT if record['rtl']
-                                       else pymupdf.TEXT_ALIGN_LEFT, **options) < 0:
-                    # Did not fit (unshaped widths differ): place it anyway; invisible text needs no fit.
-                    page.insert_text((rect.x0, rect.y0 + size), stored, **options)
+                _invisible_text(page, rect, stored, size, text_font, record['rtl'])
             results.append({'paragraph_id': record['paragraph_id'], 'status': 'drawn' if spare >= 0 else 'not_fitted',
                             'scale': round(scale, 3)})
+        subset(pdf)
         pdf.save(temporary, garbage=1, deflate=True)
     os.replace(temporary, pdf_path)
     return results
+
+
+def subset(pdf):
+    """Keep only the glyphs used. This drawing runs after BabelDOC's own subsetting, so the 15 MB font
+    of the invisible text layer was embedded whole: Arabic and Hindi outputs averaged 9 MB against
+    1.3 MB for Korean (2026-11-19). Without fontTools the fonts stay whole."""
+    try:
+        pdf.subset_fonts(fallback=False)
+    except Exception:
+        pass
 
 
 def save_records(folder, records):

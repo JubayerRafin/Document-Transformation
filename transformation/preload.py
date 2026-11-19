@@ -95,15 +95,29 @@ def serve(path, module):
     path = Path(path)
     if path.exists(): path.unlink()
     listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    listener.bind(str(path)); os.chmod(path, 0o600); listener.listen(8)
-    listener.settimeout(IDLE_SECONDS)
+    listener.bind(str(path)); os.chmod(path, 0o600); listener.listen(16)
+    listener.settimeout(5)
     print('preload ready', flush=True)
+    # Each job gets its own small handler process that starts the job, reports its pid, waits for it
+    # and reports its exit code. The server itself goes straight back to accepting, so jobs run side
+    # by side. (It used to wait for each job before accepting the next: parallel BabelDOC runs, such as
+    # the pictures of one page, queued one behind another, about 7 s each on an L40S, 2026-11-19.)
+    # Handlers are processes, not threads, so the server stays safe to fork.
+    handlers, idle_since = set(), time.monotonic()
     try:
         while True:
+            for pid in list(handlers):
+                try:
+                    if os.waitpid(pid, os.WNOHANG)[0]: handlers.discard(pid)
+                except ChildProcessError:
+                    handlers.discard(pid)
+            if handlers: idle_since = time.monotonic()
             try:
                 conn, _ = listener.accept()
             except socket.timeout:
-                return
+                if not handlers and time.monotonic() - idle_since > IDLE_SECONDS: return
+                continue
+            idle_since = time.monotonic()
             with conn:
                 conn.settimeout(30)
                 try:
@@ -112,16 +126,31 @@ def serve(path, module):
                         continue  # a liveness probe or a broken client: keep serving
                 except (OSError, ValueError):
                     continue
-                pid = os.fork()
-                if pid == 0:
-                    listener.close(); conn.close(); _child(request)
-                conn.sendall((json.dumps({'pid': pid}) + '\n').encode())
-                _, status = os.waitpid(pid, 0)
-                try: conn.sendall((json.dumps({'returncode': os.waitstatus_to_exitcode(status)}) + '\n').encode())
-                except OSError: pass
+                handler = os.fork()
+                if handler == 0:
+                    listener.close()
+                    _handle(conn, request)
+                handlers.add(handler)
     finally:
         listener.close()
         if path.exists(): path.unlink()
+
+
+def _handle(conn, request):
+    """In a handler process: start the job, report its pid and exit code to the client, then exit."""
+    code = 0
+    try:
+        pid = os.fork()
+        if pid == 0:
+            conn.close(); _child(request)
+        conn.sendall((json.dumps({'pid': pid}) + '\n').encode())
+        _, status = os.waitpid(pid, 0)
+        try: conn.sendall((json.dumps({'returncode': os.waitstatus_to_exitcode(status)}) + '\n').encode())
+        except OSError: pass
+    except BaseException:
+        code = 1
+    finally:
+        os._exit(code)
 
 
 # ---------------------------------------------------------------- client (used where Popen was)

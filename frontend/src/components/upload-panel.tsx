@@ -63,6 +63,7 @@ export function UploadPanel({
     ]),
     [piiStyle, setPiiStyle] = useState<PiiStyle>("box"),
     [keepVisible, setKeepVisible] = useState(""),
+    [translationModel, setTranslationModel] = useState("default"),
     [consent, setConsent] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null),
     selection = useRef(0),
@@ -70,6 +71,9 @@ export function UploadPanel({
     reduced = useReducedMotion();
   const worker = workers.find((w) => w.id === server),
     eligible = workers.filter((w) => w.enabled);
+  // Translation models the chosen server offers; the selector appears only when there is a choice.
+  const models = worker?.capabilities?.translation_models ?? [],
+    model = models.find((m) => m.id === translationModel) ?? models[0];
   const select = async (f?: File) => {
     if (!f) return;
     const version = ++selection.current;
@@ -130,6 +134,9 @@ export function UploadPanel({
       document_context: context,
       pii_categories: mode === "translation" ? [] : categories,
     };
+    if (mode !== "pii" && model && model.id !== "default") {
+      options.translation_model = model.id;
+    }
     if (mode !== "translation") {
       options.pii_style = piiStyle;
       const keep = keepVisible
@@ -479,7 +486,10 @@ export function UploadPanel({
                 id="processing-server"
                 className="select-input"
                 value={server}
-                onChange={(e) => setServer(e.target.value)}
+                onChange={(e) => {
+                  setServer(e.target.value);
+                  setTranslationModel("default");
+                }}
                 required
               >
                 <option value="">Choose a connected server</option>
@@ -508,6 +518,30 @@ export function UploadPanel({
                 Manage servers <ArrowRight />
               </Button>
             </div>
+            {mode !== "pii" && models.length > 1 && (
+              <div className="field mt-4">
+                <Label htmlFor="translation-model">Translation model</Label>
+                <select
+                  id="translation-model"
+                  className="select-input"
+                  value={model?.id ?? "default"}
+                  onChange={(e) => setTranslationModel(e.target.value)}
+                >
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                      {m.external ? " · outside service" : ""}
+                    </option>
+                  ))}
+                </select>
+                {model?.external && (
+                  <p className="mb-0 mt-2 text-xs leading-5 text-amber-200">
+                    This model runs on an outside service chosen by your server&apos;s administrator:
+                    the document&apos;s text is sent there to be translated.
+                  </p>
+                )}
+              </div>
+            )}
             {worker?.ready &&
               !worker.capabilities?.operations?.includes(mode) && (
                 <p className="mb-0 mt-3 text-xs text-amber-200">

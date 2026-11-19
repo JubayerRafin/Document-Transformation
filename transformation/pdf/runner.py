@@ -12,6 +12,7 @@ import pymupdf
 from transformation.llm.protected_text import normalize_protected_values
 from transformation.progress import read_progress
 
+# Models the engine was first validated with; every model now uses the paragraph path (see run_pdf).
 PARAGRAPH_MODELS = {
     "qwen2.5:3b", "transformx-qwen2.5-3b",
     "transformx-qwen2.5-3b:latest", "qwen3.5:9b",
@@ -52,9 +53,8 @@ def validate_options(python, endpoint, source, target, translate=True, redact=Fa
         raise ValueError("Choose an available operation: translation.")
     if source == target or source not in LANGUAGES.values() or target not in LANGUAGES.values():
         raise ValueError("Choose two different supported language options.")
-    parsed = urlparse(endpoint)
-    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {"localhost", "127.0.0.1", "::1"} or parsed.username or parsed.password:
-        raise ValueError("Milestone 1 requires a local model endpoint (localhost or loopback address).")
+    from transformation.llm.endpoints import check as check_endpoint
+    check_endpoint(endpoint)
     if not Path(python).is_file():
         raise ValueError("Select the Python executable in your BabelDOC environment.")
 
@@ -81,9 +81,11 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
     from transformation.llm.policy import validate_terminology, context_with_terms
     terminology = validate_terminology(terminology)
     document_context = context_with_terms(document_context, terminology)
-    paragraph_mode = model in PARAGRAPH_MODELS
-    if (protected_values or document_context) and not paragraph_mode:
-        raise ValueError("Protected values and document context require a configured single-paragraph model, such as qwen3.5:9b.")
+    # Every model translates paragraph by paragraph through TransformX's own transport (API keys,
+    # retries, protected values, checks), whatever name its server gives it ("gpt-5-mini",
+    # "google/translategemma-12b-it"). BabelDOC's built-in OpenAI client is never used: it has no API
+    # key setting here and does not protect values.
+    paragraph_mode = True
     with pymupdf.open(stream=data, filetype="pdf") as doc:
         if doc.needs_pass or not len(doc):
             raise ValueError("Use an unencrypted PDF containing at least one page.")
@@ -169,14 +171,14 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
         env.pop("TRANSFORMX_OLLAMA_NATIVE_ENDPOINT", None)
     info["translation_prompt"] = translation_prompt(target)
     if paragraph_mode:
-        from transformation.llm.ollama_native import paragraph_messages
         language = next(name for name, code in LANGUAGES.items() if code == target)
-        info["translation_prompt"] = paragraph_messages("", language, document_context)[0]["content"]
-        if model.startswith('translategemma:'):
-            from transformation.llm.translategemma import messages
-            info['translation_prompt']=messages('',language,document_context,source)[0]['content']
+        from transformation.llm.endpoints import is_translategemma
+        from transformation.llm.translategemma import messages
+        # Paragraphs of every model go through translategemma.translate; this is the prompt it sends.
+        info['translation_prompt']=messages('',language,document_context,source,model)[0]['content']
+        info['model_options']['translation_backend']='translategemma' if is_translategemma(model) else 'chat_model'
+        if is_translategemma(model):
             info['model_options'].pop('think',None)
-            info['model_options']['translation_backend']='translategemma'
     info['translation_qps']=translation_qps
     info['translation_workers']=translation_workers
     info['requested_translation_workers']=translation_workers
@@ -192,6 +194,12 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
         command.extend(["--min-text-length", "1"])
     if ignore_cache:
         command.append("--ignore-cache")
+    # A scan already read by our OCR and rebuilt as text: BabelDOC's own scan detector refused the
+    # rebuilt slides of a Japanese scan ("Scanned PDF detected", 2026-11-19).
+    if ocr_recognition_dir or (external_ir and any(u.get('locked_regions') or u.get('preserve_source_only') is not None
+                                                   for u in external_ir.get('units', []))):
+        command.append("--skip-scanned-detection")
+        info['scanned_detection_skipped']=True
     yield save()
     try:
         if ocr_python or ocr_remote:

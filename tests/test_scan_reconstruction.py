@@ -40,6 +40,33 @@ class ScanReconstructionTests(unittest.TestCase):
         self.assertEqual(agreement, 1)
         self.assertEqual(color.tolist(), [240, 240, 240])
 
+    def test_jpeg_scans_are_recognised_and_backgrounds_encode_as_jpeg(self):
+        import io
+        import pymupdf
+        from PIL import Image
+        from transformation.pdf.scan_reconstruction import jpeg_scan
+        def page_with(fmt):
+            buffer = io.BytesIO(); Image.new('RGB', (200, 100), (240, 240, 240)).save(buffer, format=fmt)
+            pdf = pymupdf.open(); page = pdf.new_page(width=200, height=100)
+            page.insert_image(page.rect, stream=buffer.getvalue()); return pdf, page
+        jpeg_pdf, jpeg_page = page_with('JPEG')
+        png_pdf, png_page = page_with('PNG')
+        self.assertTrue(jpeg_scan(jpeg_page))
+        self.assertFalse(jpeg_scan(png_page))
+        self.assertTrue(jpeg_page.get_pixmap().tobytes(output='jpeg', jpg_quality=85).startswith(b'\xff\xd8'))
+
+    def test_letters_crossing_the_border_are_not_artwork(self):
+        # Paper with glyph strokes of this and the neighbouring line crossing the box border.
+        image = np.full((14, 120, 3), 238, dtype=np.uint8)
+        for x in range(4, 116, 9):
+            image[:, x:x + 2] = 30          # vertical strokes reach the top and bottom rows
+        self.assertGreaterEqual(background(image)[1], .95)
+
+    def test_a_dark_photo_behind_text_is_still_artwork(self):
+        rng = np.random.default_rng(3)
+        image = rng.integers(20, 200, size=(20, 60, 3), dtype=np.uint8)
+        self.assertLess(background(image)[1], .75)
+
     def test_mixed_background_rejected(self):
         image = np.zeros((30, 30, 3), dtype=np.uint8)
         image[:, 15:] = 255

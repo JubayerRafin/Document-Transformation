@@ -8,6 +8,9 @@ line, are close together with clean background between them, are not separated b
 and were each read reliably; table cells (wide gaps or cell borders) and lines with an unread
 symbol between the pieces ("2026 · Global Edition") stay apart.
 """
+import re
+import unicodedata
+
 import numpy as np
 import pymupdf
 
@@ -99,10 +102,22 @@ LINE_GAP = 0.6     # at most this many line heights between the lines
 SAME_INK = 0.25    # colours (0-1 RGB) closer than this are the same ink
 
 
+HANGUL = re.compile(r'[가-힣]')
+# Chinese and Japanese letters (kana, CJK ideographs). Like Korean they have no lower case.
+HAN_KANA = re.compile(r'[぀-ヿ㐀-鿿豈-﫿]')
+NEW_ITEM = re.compile(r'^(?:[•·▪\-–*]|\d+[.)])')
+
+
 def _continues(upper, lower):
     a, b = upper['text'].strip(), lower['text'].strip()
-    if not a or not b or ':' in a or ':' in b or a[-1] in '.!?;:':
+    if not a or not b or ':' in a or ':' in b or '：' in a or '：' in b or a[-1] in '.!?;:。！？；':
         return False
+    # Korean, Chinese and Japanese have no lower case: a sentence line that does not end the sentence
+    # continues below, unless the next line starts a new bullet or numbered item. Short lines
+    # (headings) never continue. Chinese and Japanese lines were translated one by one and the longer
+    # English did not fit the line (scanned newsletter and contract, 2026-11-19).
+    if (HANGUL.search(a) and HANGUL.search(b)) or (HAN_KANA.search(a) and HAN_KANA.search(b)):
+        return len(a) >= 12 and not NEW_ITEM.match(b)
     last = a.split()[-1].lower()
     return b[0].islower() or a[-1] in ',&-–' or last in CONNECTORS
 
@@ -151,7 +166,10 @@ def join_wrapped_lines(regions, mapping, rules, reliable, styles):
                 box |= pymupdf.Rect(m['bbox'])
             text = members[0]['text'].strip()
             for m in members[1:]:
-                text += ('' if text.endswith('-') else ' ') + m['text'].strip()
+                piece = m['text'].strip()
+                # Chinese and Japanese are written without spaces between words.
+                wide = lambda c: unicodedata.east_asian_width(c) in 'WF'
+                text += ('' if text.endswith('-') or (wide(text[-1]) and wide(piece[0])) else ' ') + piece
             pieces = []
             for m in members:
                 pieces.extend(m.get('metadata', {}).get('joined_boxes') or [list(m['bbox'])])

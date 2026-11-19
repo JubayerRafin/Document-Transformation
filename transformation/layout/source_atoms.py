@@ -1,4 +1,5 @@
 """Retain measured source geometry for unchanged notation after fitting fails."""
+from transformation.pdf.ir_json import ir_copy
 import copy
 import re
 
@@ -33,7 +34,7 @@ def capture_source_atoms(document):
         neighbors={p.debug_id:copy.deepcopy(p.box) for p in page.pdf_paragraph if p.box}
         for p in page.pdf_paragraph:
             if not p.vertical and is_source_atom(p.unicode) and source_characters(p):
-                result[(page.page_number+1,p.debug_id)]={'paragraph':copy.deepcopy(p),'neighbors':neighbors}
+                result[(page.page_number+1,p.debug_id)]={'paragraph':ir_copy(p),'neighbors':neighbors}
     return result
 
 
@@ -62,4 +63,4 @@ def preserved_source_characters(entry,paragraph,page):
             if previous is None:return None
             # Existing source contact is not a newly introduced collision.
             if intersection(box,other.box)>intersection(box,previous)+.01:return None
-    return copy.deepcopy(chars)
+    return ir_copy(chars)

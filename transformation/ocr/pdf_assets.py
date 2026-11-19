@@ -6,8 +6,20 @@ import time
 
 # Figures of a PII-only job are independent: their sub-runs overlap OCR (serial in
 # the shared OCR session, but short) with model calls (parallel in Ollama).
-# Translation keeps one figure at a time (BabelDOC sub-runs are heavy).
 PII_FIGURE_WORKERS = 6
+# Translated figures each run BabelDOC (mostly single-threaded CPU work: layout, font subsetting,
+# saving). One at a time made a page with six pictures take about 45 s on an L40S server with slow
+# cores (2026-11-19). Where both models stay loaded they run in parallel; where the models take turns
+# on one GPU (TRANSFORMX_GPU_SWAP) parallel figures would switch models back and forth, so one at a time.
+TRANSLATION_FIGURE_WORKERS = 3
+
+
+def translation_figure_workers():
+    import os
+    value = os.environ.get('TRANSFORMX_FIGURE_WORKERS', '')
+    if value.isdigit() and int(value) > 0:
+        return int(value)
+    return 1 if os.environ.get('TRANSFORMX_GPU_SWAP') else TRANSLATION_FIGURE_WORKERS
 
 
 def _run_figure(payload, run, translate, redact, categories, assist, suboptions):
@@ -102,7 +114,7 @@ def process(data,ir,run,translate,redact,categories,assist,options):
                 # Concurrent sub-runs must not change process-wide settings.
                 suboptions['llm_metrics']=False
                 jobs.append({'unit':unit,'region':region,'box':box,'raster':raster,'payload':payload,'options':suboptions})
-        workers=PII_FIGURE_WORKERS if (redact and not translate) else 1
+        workers=PII_FIGURE_WORKERS if (redact and not translate) else translation_figure_workers()
         results={}
         if translate and redact and len(jobs)>1:
             # On a GPU shared by the PII and translation models (transformation/llm/gpu_share.py) each

@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 import pymupdf
 from transformation.pdf.document_runner import run_document
-from test_document_profile import pdf_bytes
+from tests.test_document_profile import pdf_bytes
 
 
 class DocumentRunnerTests(unittest.TestCase):

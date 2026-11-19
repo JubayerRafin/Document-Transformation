@@ -48,6 +48,9 @@ def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=
             raise ValueError('Uploaded PDF does not match the saved OCR page image.')
         if not lines and not allow_unreadable:
             raise ValueError('No OCR text detected in the verified source image; preserve it for visual review.')
+        # One detected line across a table rule becomes one line per cell (table_rules.py).
+        from transformation.ocr.table_rules import split_at_rules
+        lines = split_at_rules(page, lines)
         regions = []
         if not lines:
             regions.append(Region('unreadable_page', 'raster_page', list(page.rect),
@@ -64,11 +67,14 @@ def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=
                         warnings=['Detected region could not be read; privacy inspection is incomplete.']))
                     continue
                 raise ValueError('OCR source text must not be empty.')
-            from tools.ocr.recognize_paddle_boxes import sensitive_literal,independent_literal_evidence
+            from tools.ocr.recognize_paddle_boxes import sensitive_literal,independent_literal_evidence,single_model_literal_evidence
             candidates=line.get('candidates',[])
             transcription_candidates=[c for c in candidates if c.get('purpose')!='redaction_geometry_only']
             sensitive=sensitive_literal(text) or any(sensitive_literal(c.get('text','')) for c in transcription_candidates)
-            independent=independent_literal_evidence(transcription_candidates,text) if sensitive else None
+            # Two independent recognizers (English), or for a language read by one model (Korean) its
+            # agreeing views plus digits confirmed by a second model.
+            independent=(independent_literal_evidence(transcription_candidates,text)
+                         or single_model_literal_evidence(transcription_candidates,text)) if sensitive else None
             if sensitive and not independent:
                 line['requires_review']=True
                 line['recognition_decision']='sensitive_literal_independent_evidence_not_established'

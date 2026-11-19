@@ -27,7 +27,8 @@ def translate_runs(endpoint,model,texts,language,protected=(),context='',source_
         source_cursor+=len(value); safe_cursor=position+len(token)
     for character in safe[safe_cursor:]:
         protected_runs[owners[source_cursor]]+=character; source_cursor+=1
-    if model.startswith('translategemma:'):
+    from transformation.llm.endpoints import is_translategemma
+    if is_translategemma(model):
         from transformation.llm.translategemma import messages
         result=[]
         for text,mapping in zip(protected_runs,maps):

@@ -88,3 +88,84 @@ class LocalizedNumberTests(unittest.TestCase):
         with patch('transformation.llm.ollama_native.chat',return_value=('6월',{})) as chat,patch('transformation.llm.ollama_native.record_progress'):
             result,_=translate('http://127.0.0.1:11434/v1','translategemma:12b','June','Korean')
         self.assertEqual(result,'6월');self.assertEqual(chat.call_count,1)
+
+
+class OrdinalWordTests(unittest.TestCase):
+    def test_spelled_out_ordinals_may_become_digits(self):
+        from transformation.llm.localized_numbers import ordinal_word_quantities
+        from transformation.llm.translation_guard import validate_candidate
+        self.assertEqual(dict(ordinal_word_quantities('the third quarter, the twenty-first day, the Second floor')),
+                         {3: 1, 21: 1, 2: 1})
+        source = ('Customer satisfaction rose for the third consecutive quarter. Costs stayed within budget, although '
+                  'prices increased in the second month. The total was JPY 769,375,000 on 03/04/2027.')
+        validate_candidate(source, '고객 만족도는 3분기 연속 상승했습니다. 2개월 차에 가격이 올랐지만 비용은 예산 범위 내였습니다. '
+                                   '총액은 JPY 769,375,000이며 날짜는 03/04/2027입니다.')
+        validate_candidate(source, 'Die Kundenzufriedenheit stieg im 3. Quartal in Folge. Im 2. Monat stiegen die Preise. '
+                                   'Gesamt: JPY 769,375,000 am 03/04/2027.')
+
+    def test_other_added_numbers_are_still_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        source = 'Prices increased in the second month. The total was JPY 769,375,000.'
+        with self.assertRaises(ValueError):   # a number with no source expression
+            validate_candidate(source, '7개월 차에 가격이 올랐습니다. 총액은 JPY 769,375,000입니다.')
+        with self.assertRaises(ValueError):   # one ordinal does not license two numbers
+            validate_candidate(source, '2개월 차와 2분기에 가격이 올랐습니다. 총액은 JPY 769,375,000입니다.')
+        with self.assertRaises(ValueError):   # protected values stay exact
+            validate_candidate(source, '2개월 차에 가격이 올랐습니다. 총액은 JPY 769,375,001입니다.')
+
+
+class CalendarTests(unittest.TestCase):
+    """Months and quarters written in words or another notation by the translation (2026-11-19)."""
+
+    def test_months_and_quarters_may_change_notation(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for source, target in [
+                ('11월 말까지 3분기 보고서를 제출하십시오.', 'Submit the third quarter report by the end of November.'),
+                ('2026年11月に第3四半期の報告書を提出してください。', 'Submit the third quarter report in November 2026.'),
+                ('请在11月底前提交第3季度报告。', 'Please submit the Q3 report before the end of November.'),
+                ('Revenue rose in Q3 2025.', '2025년 3분기에 매출이 증가했습니다.'),
+                ('Revenue rose in Q3 2025.', 'Der Umsatz stieg im 3. Quartal 2025.'),
+                ('Revenue rose in Q3 2025.', '2025年第3四半期に売上が増加しました。'),
+                ('11월 말까지 제출하십시오.', 'À soumettre avant la fin novembre.')]:
+            validate_candidate(source, target)
+
+    def test_wrong_or_missing_calendar_values_are_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for source, target in [
+                ('11월 말까지 제출하십시오.', 'Submit by the end of October.'),
+                ('11월 말까지 3분기 보고서를 제출하십시오.', 'Submit the report by the end of November.'),
+                ('Revenue rose in Q3 2025.', '2025년 2분기에 매출이 증가했습니다.'),
+                ('Revenue rose in Q3 2025.', '2025년 3분기 및 3분기에 매출이 증가했습니다.'),
+                ('총액은 5,440,000원입니다.', 'The total is KRW 5,440.')]:
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)
+
+
+class SpelledCountTests(unittest.TestCase):
+    """Small counts written as the same number in words (Japanese clauses, 2026-11-19)."""
+    source = '顧客満足度は3四半期連続で上昇し、損傷があれば2営業日以内に報告してください。'
+
+    def test_the_same_count_in_words_is_accepted(self):
+        from transformation.llm.translation_guard import validate_candidate
+        validate_candidate(self.source, 'Customer satisfaction rose for three consecutive quarters; '
+                                        'report damage within two business days.')
+
+    def test_another_count_a_missing_count_or_a_count_inside_an_identifier_is_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for target in ('Customer satisfaction rose for four consecutive quarters; report damage within two business days.',
+                       'Customer satisfaction rose for consecutive quarters; report damage within two business days.'):
+            with self.assertRaises(ValueError):
+                validate_candidate(self.source, target)
+        with self.assertRaises(ValueError):
+            validate_candidate('Ref INV-2025-3', 'Ref INV-2025-three')
+
+
+class LengthTests(unittest.TestCase):
+    def test_an_answer_far_longer_than_its_source_is_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        with self.assertRaises(ValueError):
+            validate_candidate('Thi', 'Sure, please provide the Hindi text you would like me to translate. '
+                                      'I will do my best to provide an accurate translation.')
+        validate_candidate('概要', 'Overview')
+        validate_candidate('従業員は会計年度末までに年次セキュリティ研修を修了する必要があります。',
+                           'Employees must complete their annual security training by the end of the fiscal year.')

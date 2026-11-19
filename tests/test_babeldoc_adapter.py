@@ -82,6 +82,8 @@ class BabelDocGeometryTests(unittest.TestCase):
 
 
 class SavedBabelDocPredictionTests(unittest.TestCase):
+    # Saved results of earlier BabelDOC experiments; experiments/ is kept out of git.
+    @unittest.skipUnless((ROOT / "experiments" / "babeldoc").is_dir(), "saved experiment results not present")
     def test_saved_predictions_have_shared_metadata(self):
         prediction_dir = ROOT / "experiments" / "babeldoc"
 

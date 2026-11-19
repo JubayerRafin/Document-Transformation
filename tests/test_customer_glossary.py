@@ -37,7 +37,9 @@ class EngineJobTests(unittest.TestCase):
         def workflow(data, filename, operation, **options):
             seen.update(options); yield {'status': 'generated', 'stage': 'complete'}
         with tempfile.TemporaryDirectory() as folder:
-            source = Path(folder, 'source.pdf'); source.write_bytes(b'%PDF-1.7')
+            import pymupdf
+            source = Path(folder, 'source.pdf')
+            with pymupdf.open() as pdf: pdf.new_page(); pdf.save(source)
             request = Path(folder, 'request.json')
             request.write_text(json.dumps({'source': str(source), 'filename': 'a.pdf', 'profile': {},
                 'options': {'operation': 'translation', 'source_language': 'en', 'target_language': 'de',

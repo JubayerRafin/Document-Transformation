@@ -162,6 +162,21 @@ def redaction_word_candidates(crop, record, primary, secondary_factory, language
     return candidates
 
 
+# Recognition model per source language. PP-OCRv5_server_rec reads Chinese, Japanese and English
+# but not Hangul, so scanned Korean pages were not read before korean_PP-OCRv5_mobile_rec (2026-11-19).
+# A language without its own model here uses PP-OCRv5_server_rec.
+RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec'}
+GENERAL_RECOGNIZER = 'PP-OCRv5_server_rec'
+# For a language read by one model, a second installed model that reads digits (it need not read the
+# language) confirms the numbers of a line. Chinese and Japanese lines with a number had none, so
+# every such line kept its source pixels and scanned contracts stayed half untranslated (2026-11-19).
+DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
+
+
+def recognition_model_name(language):
+    return RECOGNIZERS.get(language, GENERAL_RECOGNIZER)
+
+
 def sensitive_literal(text):
     """Sensitive glyph decisions require another recognizer, not resized copies."""
     import unicodedata
@@ -189,7 +204,21 @@ def independent_literal_evidence(candidates,text):
     return min(map(len,targeted))>=2 and sum(c.get('score',0)>=.95 for c in matching)>=2
 
 
-def bounded_recognition(crop,primary,secondary_factory,language,padded=None):
+# A language read by one model only (Korean): there is no second model to agree with, so a line is
+# accepted when several differently prepared views agree exactly (spacing aside) at this confidence.
+# The Korean model scores agreeing long lines about 0.90-0.95 where the English one passes 0.95
+# (Korean development pages, 2026-11-19).
+SINGLE_MODEL_SCORE = .90
+SINGLE_MODEL_VIEWS = 3
+
+
+def digits(text):
+    return ''.join(re.findall(r'\d', text or ''))
+
+
+def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digit_checker=None):
+    """digit_checker: for a language read by one model, a factory for a second model that reads digits
+    (it need not read the language): a line with numbers is accepted only when it reads the same digits."""
     """Use source-language recognition first; cap retries instead of word explosion."""
     import cv2
     reads=[]
@@ -199,7 +228,7 @@ def bounded_recognition(crop,primary,secondary_factory,language,padded=None):
         row={'text':str(output[0]['rec_text']),'score':float(output[0]['rec_score']),
              'variant':name,'model':model_name}
         reads.append(row); return row
-    primary_name='en_PP-OCRv5_mobile_rec' if language=='en' else 'PP-OCRv5_server_rec'
+    primary_name=recognition_model_name(language)
     first=read(primary,crop,'detector_bounds',primary_name)
     second=read(primary,cv2.resize(crop,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC),'detector_bounds_2x',primary_name)
     best,review,decision=select_candidate(reads)
@@ -222,6 +251,10 @@ def bounded_recognition(crop,primary,secondary_factory,language,padded=None):
     for name,view in [('verification_source',verification_source),('verification_source_2x',cv2.resize(verification_source,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC))]:
         checks.append(read(secondary,view,name,secondary_name))
     confirmed=cross_model_candidate(reads[:-2],checks) if independent else None
+    if not independent:
+        accepted=single_model_consensus(reads,crop,digit_checker,sensitive,primary,DIGIT_CHECKERS.get(primary_name,GENERAL_RECOGNIZER))
+        if accepted is not None:
+            return accepted[0],False,accepted[1],reads
     if confirmed is not None:
         conflicts=[r for r in reads if r['score']>=.95 and consensus_key(r['text'])!=consensus_key(confirmed['text'])]
         if not sensitive or not conflicts:
@@ -234,6 +267,79 @@ def bounded_recognition(crop,primary,secondary_factory,language,padded=None):
         return max(strong,key=lambda r:r['score']),False,'high_confidence_source_views',reads
     # Keep the strongest hypothesis for review, but never call disagreement reliable.
     return max(reads,key=lambda r:r['score']),True,'unresolved_source_disagreement',reads
+
+
+def piece_digits_confirmed(crop,primary,checker,expected,reads,checker_name=GENERAL_RECOGNIZER):
+    """The second model confirms the digits word by word: on a whole Korean line it reads the Hangul as
+    noise, but on a short piece such as "11월" or "2026년" it reads the digits. Every piece with digits
+    must give the same digits from both models, and together they must make up the line's digits."""
+    pieces=[piece for piece in split_word_crops(crop) if piece.shape[1]>=4]
+    if len(pieces)<2: return False
+    found=''
+    for index,piece in enumerate(pieces):
+        output=list(primary.predict(piece))
+        if len(output)!=1: return False
+        own=digits(str(output[0]['rec_text']))
+        if not own: continue
+        check=list(checker.predict(piece))
+        if len(check)!=1: return False
+        reads.append({'text':str(check[0]['rec_text']),'score':float(check[0]['rec_score']),
+                      'variant':f'digit_check_piece_{index}','model':checker_name,'piece_digits':own})
+        if digits(str(check[0]['rec_text']))!=own: return False
+        found+=own
+    return found==expected
+
+
+def single_model_literal_evidence(candidates,text):
+    """Re-check, from the saved readings alone, that a one-model line with numbers was accepted on
+    sufficient evidence (single_model_consensus): its own model's views agree, and the general model
+    read the same digits on the whole line or on every word piece with digits."""
+    squeeze=lambda value:re.sub('[–—−]','-',re.sub(r'\s+','',value or ''))
+    strong=[c for c in candidates if isinstance(c,dict) and c.get('model') in DIGIT_CHECKERS and isinstance(c.get('score'),(int,float))
+            and c['score']>=SINGLE_MODEL_SCORE and squeeze(c.get('text'))==squeeze(text)
+            and not str(c.get('variant','')).startswith('digit_check')]
+    if not strong: return False
+    # The line's own model is the one with the most agreeing views; its checker is the other model.
+    own=max({c.get('model') for c in strong},key=lambda m:len({c.get('variant') for c in strong if c.get('model')==m}))
+    strong=[c for c in strong if c.get('model')==own]
+    if len({c.get('variant') for c in strong})<SINGLE_MODEL_VIEWS: return False
+    expected=digits(text)
+    if not expected or any(ch in text for ch in '@_') or any(__import__('unicodedata').category(ch)=='Sc' for ch in text): return False
+    checks=[c for c in candidates if isinstance(c,dict) and c.get('model')==DIGIT_CHECKERS[own]]
+    line=[c for c in checks if c.get('variant') in ('digit_check','digit_check_2x')]
+    if len(line)==2 and all(digits(c.get('text'))==expected for c in line): return True
+    pieces=sorted((c for c in checks if str(c.get('variant','')).startswith('digit_check_piece_')),
+                  key=lambda c:int(str(c['variant']).rsplit('_',1)[1]))
+    return bool(pieces) and all(digits(c.get('text'))==c.get('piece_digits') for c in pieces) and         ''.join(c.get('piece_digits') or '' for c in pieces)==expected
+
+
+def single_model_consensus(reads,crop,digit_checker,sensitive,primary=None,checker_name=GENERAL_RECOGNIZER):
+    """(reading, decision) when the views of a one-model language agree well enough, else None.
+    Values other than digits (emails, currency, underscores) always stay for review."""
+    import cv2
+    strong=[r for r in reads if r['text'].strip() and r['score']>=SINGLE_MODEL_SCORE]
+    if not strong: return None
+    best=max(strong,key=lambda r:r['score'])
+    # Spacing is ignored entirely here: the Korean model often drops a space, which joins a number to
+    # the next word ("3분기출하량은"); the digits themselves are checked by a second model below.
+    squeeze=lambda text:re.sub('[–—−]','-',re.sub(r'\s+','',text))
+    key=squeeze(best['text'])
+    if any(squeeze(r['text'])!=key for r in strong): return None
+    if len({r['variant'] for r in strong})<SINGLE_MODEL_VIEWS: return None
+    if not sensitive: return best,'single_model_view_consensus'
+    if digit_checker is None or not digits(best['text']) or any(c in best['text'] for c in '@_') or             any(__import__('unicodedata').category(c)=='Sc' for c in best['text']):
+        return None
+    checker=digit_checker()
+    for name,view in (('digit_check',crop),('digit_check_2x',cv2.resize(crop,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC))):
+        output=list(checker.predict(view))
+        if len(output)!=1: return None
+        reading={'text':str(output[0]['rec_text']),'score':float(output[0]['rec_score']),'variant':name,'model':checker_name}
+        reads.append(reading)
+        if digits(reading['text'])!=digits(best['text']):
+            if primary is not None and piece_digits_confirmed(crop,primary,checker,digits(best['text']),reads,checker_name):
+                return best,'single_model_consensus_digits_confirmed_by_piece'
+            return None
+    return best,'single_model_consensus_digits_confirmed'
 
 
 def tight_source_crop(crop):
@@ -301,7 +407,7 @@ def refine_recognition(crop,primary,secondary_factory,language,previous):
     tight=tight_source_crop(crop)
     segments=source_word_segments(tight)
     reads=[]
-    models=[('en_PP-OCRv5_mobile_rec' if language=='en' else 'PP-OCRv5_server_rec',primary)]
+    models=[(recognition_model_name(language),primary)]
     if language=='en': models.append(('PP-OCRv5_server_rec',secondary_factory()))
     for model_name,model in models:
         for variant in ('source_tight','source_tight_contrast'):
@@ -443,7 +549,8 @@ def main(argv=None, model_factory=None):
         faulthandler.enable(file=crash)
         from paddleocr import TextRecognition
         from importlib.metadata import version
-        model_name = 'en_PP-OCRv5_mobile_rec' if args.source_language=='en' and args.profile=='bounded' else 'PP-OCRv5_server_rec'
+        # A Korean page always needs the Korean model: the general one cannot read Hangul.
+        model_name = recognition_model_name(args.source_language) if args.profile=='bounded' or args.source_language=='ko' else GENERAL_RECOGNIZER
         secondary_model = None
         cache = Path.home() / '.paddlex/official_models' / model_name
         if not cache.is_dir():
@@ -453,7 +560,7 @@ def main(argv=None, model_factory=None):
                     'maximum_targeted_calls_per_region':16 if args.profile=='bounded' else None,
                     'maximum_redaction_localization_calls_per_region':16 if args.profile=='bounded' else None,
                     'source_language':args.source_language,
-                    'verification_model':'PP-OCRv5_server_rec',
+                    'verification_model':'PP-OCRv5_server_rec' if args.source_language=='en' else model_name,
                     'crop_padding_pixels': args.padding,
                     'detection_run': str(root), 'detection_sha256': hashlib.sha256(detection_path.read_bytes()).hexdigest(),
                     'image_sha256': hashlib.sha256((root/'page-1.png').read_bytes()).hexdigest(),
@@ -468,9 +575,17 @@ def main(argv=None, model_factory=None):
         try:
             print(f'Loading existing recognition model on {args.device}...', flush=True)
             model = (model_factory or TextRecognition)(model_name=model_name, model_dir=str(cache), device=args.device, enable_mkldnn=False, cpu_threads=10)
+            general_model=None
+            def digit_model():
+                # A second opinion on a line's numbers only (DIGIT_CHECKERS): the general model reads
+                # digits but not Hangul, the English model digits but not kanji.
+                nonlocal general_model
+                if general_model is None:
+                    general_model=(model_factory or TextRecognition)(model_name=DIGIT_CHECKERS[model_name],device=args.device,enable_mkldnn=False,cpu_threads=10)
+                return general_model
             def verification_model():
                 nonlocal secondary_model
-                if args.profile=='bounded' and args.source_language!='en': return model
+                if (args.profile=='bounded' or args.source_language=='ko') and args.source_language!='en': return model
                 if secondary_model is None:
                     name='PP-OCRv5_server_rec' if model_name=='en_PP-OCRv5_mobile_rec' else 'en_PP-OCRv5_mobile_rec'
                     secondary_model=(model_factory or TextRecognition)(model_name=name,device=args.device,enable_mkldnn=False,cpu_threads=10)
@@ -478,7 +593,8 @@ def main(argv=None, model_factory=None):
             with (out / 'lines.jsonl').open('w', encoding='utf-8') as evidence:
                 for i, record in enumerate(records):
                     if args.profile=='bounded':
-                        best,review,decision,candidates=bounded_recognition(unpadded_crops[i],model,verification_model,args.source_language,padded=crops[i])
+                        best,review,decision,candidates=bounded_recognition(unpadded_crops[i],model,verification_model,args.source_language,padded=crops[i],
+                                                                            digit_checker=digit_model if model_name in DIGIT_CHECKERS else None)
                         if review:
                             detail=source_detail_crop(report['source'],record['bbox'],crops[i])
                             best,review,decision,retries=refine_recognition(detail,model,verification_model,args.source_language,candidates)
