@@ -24,6 +24,16 @@ class CandidateTests(unittest.TestCase):
             self.assertNotIn(value, found)
 
 
+class LabelTests(unittest.TestCase):
+    def test_sentences_are_not_labels_even_without_spaces(self):
+        from transformation.llm.glossary import _is_label
+        for text in ('財務状況', '今後の予定', '주요 결과', 'Payment Terms'):
+            self.assertTrue(_is_label(text), text)
+        for text in ('今四半期の売上は、物流部門の新規契約により着実に増加しました。', 'Done.',
+                     '物流部门新合同带来收入增长的原因分析报告'):
+            self.assertFalse(_is_label(text), text)
+
+
 class ApplyTests(unittest.TestCase):
     G = {'Meets': 'Conforme aux attentes', 'Title': 'Poste', 'redaction': 'masquage', 'redaction pipeline': 'chaîne de masquage',
          'HP': 'HP', 'ID': 'ID', 'LaserJet Pro X1': 'LaserJet Pro X1', 'Kim Min-jun': 'Kim Min-jun', 'W1.2M': 'W1.2M'}

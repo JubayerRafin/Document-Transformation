@@ -202,6 +202,29 @@ def _edge_placeholders(text):
     return start,end
 
 
+def without_source_echo(source, answer):
+    """The answer without a copy of the whole source appended after the translation.
+
+    TranslateGemma sometimes ends with "Source: <the original>"; the Korean manual then printed the
+    translation followed by the English sentence (HP printer manual, 2026-11-19). Only a verbatim copy
+    of the entire source (12 characters or more) at the very end is removed, with a short label
+    ("Source:", "원문:") just before it; anything else is left to validation."""
+    import re
+    words = source.split()
+    if len(' '.join(words)) < 12:
+        return answer
+    match = None
+    for match in re.finditer(r'\s+'.join(map(re.escape, words)), answer):
+        pass
+    if match is None or answer[match.end():].strip():
+        return answer
+    head = answer[:match.start()].rstrip()
+    head = re.sub(r'(?:^|\n)[^\S\n]*[(\[]?[^\W\d_][^\n:：]{0,24}[:：][^\S\n]*$', '', head).rstrip()
+    if not any(c.isalpha() for c in head) or ' '.join(head.split()) == ' '.join(words):
+        return answer
+    return head
+
+
 def _unglued(text):
     """The text as shown to the model: placeholders glued to words ("Call{v1}for", BabelDOC's
     formula took the spaces around a phone number) get spaces, so the model keeps them whole.
@@ -305,6 +328,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
         try:
             restored=restore_values(result,tokens) if attempt==1 else result
             restored=normalize_field_layout(text,restored)
+            restored=without_source_echo(text,restored)
             answer_lines=[line.strip() for line in restored.splitlines() if line.strip()]
             if (len(text.splitlines())==1 and len(text.split())<=8 and len(answer_lines)>1
                     and len(answer_lines)<=len([p for p in re.split(r'[,;:·|]',text) if p.strip()])):

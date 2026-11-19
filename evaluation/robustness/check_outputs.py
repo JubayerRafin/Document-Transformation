@@ -112,10 +112,16 @@ def meaning_missing(source_pages, output_text, source, target):
     return checked, missing
 
 
-def source_script_share(output_text, source, target):
-    """Share of the output's letters still in the source's own script (when the target's differs)."""
+def source_script_share(output_text, source, target, source_text=''):
+    """Share of the output's letters still in the source's own script (when the target's differs).
+    Characters found only inside identifier-like tokens of the source (with digits or hyphens) are
+    copied values, not untranslated text: some generated sources map their digits to CJK
+    characters ("INV-䐶䐴䐶䐶"), and the output rightly keeps them."""
     own = SCRIPTS.get(source, set()) - SCRIPTS.get(target, set())
-    letters = [script(c) for c in output_text if c.isalpha()]
+    in_values = set(''.join(re.findall(r'\S*[\d\-‐‑]\S*', source_text)))
+    in_words = set(''.join(t for t in source_text.split() if not re.search(r'[\d\-‐‑]', t)))
+    copied = in_values - in_words
+    letters = [script(c) for c in output_text if c.isalpha() and c not in copied]
     if not own or not letters:
         return 0.0
     return sum(s in own for s in letters) / len(letters)
@@ -191,7 +197,7 @@ def check(results, sources, target, source='en', review=None):
                    untranslated=untranslated_lines(source_pages, output_text, source) if target != source else [],
                    replacement_chars=output_text.count('�'), off_page_spans=off_page_spans(output),
                    unread_glyphs=output_text.count('(cid:'),
-                   source_script=round(source_script_share(output_text, source, target), 3) if target != source else 0,
+                   source_script=round(source_script_share(output_text, source, target, '\n'.join(source_pages)), 3) if target != source else 0,
                    chatter=[line.strip()[:80] for line in output_text.splitlines()
                             if CHATTER.search(line) and not CHATTER.search('\n'.join(source_pages))][:3],
                    meaning=meaning_missing(source_pages, output_text, source, target))

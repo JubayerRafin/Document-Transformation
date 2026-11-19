@@ -29,6 +29,23 @@ class DamagedTokenTests(unittest.TestCase):
                 restore_values(text, tokens)
 
 
+class SourceEchoTests(unittest.TestCase):
+    def test_a_copy_of_the_source_after_the_translation_is_removed(self):
+        from transformation.llm.translategemma import without_source_echo
+        source = "HP's all-inclusive help for the printer includes the following information:"
+        answer = 'HP 프린터에 대한 종합적인 지원 서비스는 다음 정보를 포함합니다.\n\nSource: ' + source
+        self.assertEqual(without_source_echo(source, answer), 'HP 프린터에 대한 종합적인 지원 서비스는 다음 정보를 포함합니다.')
+        self.assertEqual(without_source_echo(source, '다음 정보를 포함합니다. ' + source), '다음 정보를 포함합니다.')
+
+    def test_other_answers_are_left_alone(self):
+        from transformation.llm.translategemma import without_source_echo
+        source = 'Install the HP Smart app on your phone.'
+        for answer in ('휴대폰에 HP Smart 앱을 설치하십시오.', source, 'Source: ' + source,
+                       source + ' 휴대폰에 설치하십시오.'):
+            self.assertEqual(without_source_echo(source, answer), answer)
+        self.assertEqual(without_source_echo('HP Smart', '앱 HP Smart'), '앱 HP Smart')
+
+
 class PlaceholderLayoutTests(unittest.TestCase):
     def test_only_markers_at_sentence_edges_are_held_out(self):
         self.assertEqual(_edge_placeholders('{v1}All shipments must be inspected.'), (4, 36))

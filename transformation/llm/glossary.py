@@ -15,6 +15,7 @@ The glossary is advisory data built from the document itself; it never adds or r
 """
 import json
 import re
+import unicodedata
 from collections import Counter
 
 MAX_LABEL_WORDS = 4
@@ -38,6 +39,11 @@ def _is_label(text):
     """A short piece of wording worth fixing once: letters, at most MAX_LABEL_WORDS words, not a value."""
     words = text.split()
     if not 1 <= len(words) <= MAX_LABEL_WORDS or len(text) > 40: return False
+    # A sentence is not a label. Japanese, Chinese and Korean sentences have no spaces, so they passed
+    # as one word; two sentences on a scanned slide got headline "translations" ("Current Quarter Sales
+    # Update") that were then forced on the document (2026-11-19).
+    if text.rstrip().endswith(('.', '。', '．', '!', '?', '！', '？')): return False
+    if sum(unicodedata.east_asian_width(c) in 'WF' for c in text) > 16: return False
     letters = sum(c.isalpha() for c in text)
     if letters < 2 or sum(c.isdigit() for c in text) > letters: return False
     if '@' in text or re.search(r'\d{3,}|[A-Za-z]+-\d|https?:', text): return False
