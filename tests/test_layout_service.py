@@ -55,6 +55,25 @@ class LayoutServiceTests(unittest.TestCase):
                 self.assertEqual(model.model.run(None,{'images':[1,2,3]}),[[7,8]])
                 self.assertEqual(model._stride,32)
 
+    def test_an_error_from_the_service_runs_the_page_on_a_private_cpu_copy(self):
+        class Model:
+            pass
+        calls=[]
+        with temporary_workspace() as root:
+            path=root/'model.onnx';path.write_bytes(b'unseen model')
+            def remote(address,key,operation,payload=None,timeout=None):
+                if operation=='ping': return 0
+                if operation=='metadata': return {'stride':32,'names':{0:'text'}}
+                calls.append(operation)
+                raise RuntimeError('Layout service failed: RuntimeException: [ONNXRuntimeError] : 6')
+            local=unittest.mock.MagicMock(); local.run.return_value=[[1]]
+            with patch.dict(os.environ,{ENV:json.dumps(['127.0.0.1',1234]),KEY:'ab'*32}), patch(
+                    'transformation.pdf.layout_service.request',side_effect=remote), patch.dict(
+                    'sys.modules',{'onnxruntime':unittest.mock.MagicMock(InferenceSession=lambda *a,**k:local)}):
+                self.assertTrue(install(Model))
+                self.assertEqual(Model(path).model.run(None,{'images':[1]}),[[1]])
+            self.assertEqual(calls,['run','run'])   # retried once before the local copy
+
     def test_a_service_that_does_not_answer_is_not_used(self):
         class Model:
             pass

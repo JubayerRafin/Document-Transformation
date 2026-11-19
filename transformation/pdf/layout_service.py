@@ -138,8 +138,24 @@ def install(model_class=None):
     import threading
 
     class Session:
+        """The shared model, and a private CPU copy of the same file when the service answers with
+        an error: under GPU memory pressure it failed every page of five Korean scans at once
+        ("ONNXRuntimeError ... Conv", 2026-11-19), and each failure ended its job."""
+        def __init__(self, model_path):
+            self.model_path = model_path
+            self.local = None
+
         def run(self, outputs, inputs):
-            return request(address, key, 'run', (outputs, inputs))
+            for attempt in (1, 2):
+                try:
+                    return request(address, key, 'run', (outputs, inputs))
+                except (RuntimeError, TimeoutError, OSError, EOFError):
+                    if attempt == 2 or self.local is not None:
+                        break
+            if self.local is None:
+                import onnxruntime
+                self.local = onnxruntime.InferenceSession(str(self.model_path), providers=['CPUExecutionProvider'])
+            return self.local.run(outputs, inputs)
 
     def initialize(self, model_path):
         # Match the exact asset selected by the vendor in this job.
@@ -149,7 +165,7 @@ def install(model_class=None):
         self.model_path = model_path
         self._stride = metadata['stride']
         self._names = metadata['names']
-        self.model = Session()
+        self.model = Session(model_path)
         self.lock = threading.Lock()
 
     model_class.__init__ = initialize
