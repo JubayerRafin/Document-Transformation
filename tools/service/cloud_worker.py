@@ -99,6 +99,13 @@ def run_limit(profile):
     return float(limit)
 
 
+def job_limit(profile,pages):
+    """Seconds a job may run: the configured limit, plus 30 s for every page beyond 100. A 200-page
+    document took 52 minutes beside another job against the 60-minute default (2026-11-19)."""
+    base=run_limit(profile)
+    return int(min(86400,max(base,base+30*max(0,int(pages)-100))))
+
+
 def engine_python(cfg):
     """Engine interpreter is distinct from the BabelDOC interpreter (python)."""
     return cfg.get('engine_profile',{}).get('engine_python') or sys.executable
@@ -378,6 +385,7 @@ def execute(cfg,j,root):
     try:
         with pymupdf.open(stream=data,filetype='pdf') as pdf:
             if pdf.needs_pass or not 1<=len(pdf)<=200:raise JobFailure('INPUT_REJECTED','Unsupported encrypted PDF or page count.')
+            source_pages=len(pdf)
     except JobFailure:raise
     except Exception as exc:raise JobFailure('INPUT_REJECTED','The input PDF could not be opened.') from exc
     source=folder/'source.pdf';source.write_bytes(data)
@@ -404,13 +412,14 @@ def execute(cfg,j,root):
     # The chosen translation model (website selector): its server and model in the job's profile, its
     # key file only in the job process's environment (never in request.json).
     profile,job_env=job_translation(cfg,j['options'])
+    profile=dict(profile,timeout_seconds=job_limit(profile,source_pages))
     request.write_text(json.dumps({'source':str(source),'filename':j['filename'],'options':j['options'],
         'profile':profile}),encoding='utf8')
     started=time.monotonic()
     progress=progress_reporter(events,lambda stage,seconds:heartbeat(cfg,j,stage,seconds))
     # All parsing/reconstruction and inference execute on this server. The
     # engine enforces timeout_seconds itself; the worker stops it shortly after.
-    limit=run_limit(cfg['engine_profile'])+DEADLINE_GRACE_SECONDS
+    limit=profile['timeout_seconds']+DEADLINE_GRACE_SECONDS
     with (folder/'process.log').open('w',encoding='utf8') as log:
         process=spawn([engine_python(cfg),'-u','-m','backend.engine_job',str(request),str(events),str(terminal)],cwd=PROJECT,stdout=log,stderr=subprocess.STDOUT,env=job_env)
         supervise(process,limit,progress,interval=STAGE_CHECK_SECONDS)

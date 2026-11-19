@@ -289,6 +289,14 @@ class WorkerCleanupTests(unittest.TestCase):
             self.assertFalse(old.exists()); self.assertTrue(new.exists()); self.assertTrue(other.exists())
             self.assertEqual(worker.clean_old_jobs(root, hours=0), 0)
 
+    def test_long_documents_get_more_time(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('cloud_worker', Path(__file__).resolve().parents[1] / 'tools/service/cloud_worker.py')
+        worker = importlib.util.module_from_spec(spec); spec.loader.exec_module(worker)
+        self.assertEqual(worker.job_limit({'timeout_seconds': 3600}, 20), 3600)
+        self.assertEqual(worker.job_limit({'timeout_seconds': 3600}, 200), 6600)
+        self.assertEqual(worker.job_limit({'timeout_seconds': 86000}, 200), 86400)
+
     def test_a_nearly_full_job_disk_is_reported(self):
         import importlib.util, shutil
         spec = importlib.util.spec_from_file_location('cloud_worker', Path(__file__).resolve().parents[1] / 'tools/service/cloud_worker.py')
