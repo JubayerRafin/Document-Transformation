@@ -470,6 +470,13 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                             info['image_ocr_progress']=asset_event.get('progress',{}).get('ocr_progress',{})
                             yield emit('image_ocr')
                 else: info['warnings'].append('Mixed-page image text requires PaddleOCR; image coverage remains unverified.')
+            if translate and not redact:
+                # Highlights, notes, form fields and links of the source (pdf/annotations.py).
+                from transformation.pdf.annotations import carry
+                try:
+                    processed,info['carried_annotations']=carry(data,processed)
+                except Exception as error:
+                    info['warnings'].append(f'Source annotations were not copied: {type(error).__name__}.')
             final_source=run/'output'/'transformed.pdf'; final_source.write_bytes(processed)
             final_ir=content_ir(extract_pdf(final_source,run,'native'))
             if output_kind=='pdf': artifact=processed
