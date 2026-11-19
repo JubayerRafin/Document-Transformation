@@ -57,6 +57,9 @@ def run_workflow(data,filename,workflow='Translation only',**options):
         # Rotated pages came out blank; they are processed as unrotated pages that look the same.
         from transformation.pdf.rotation import unrotated
         data=unrotated(data)
+        # Scanned pages a degree or two off level are turned level before OCR (see deskew).
+        from transformation.pdf.deskew import deskewed
+        data=deskewed(data)
     yield from run_pipeline(data,filename,translate=translate,redact=redact,**options)
 
 

@@ -164,6 +164,18 @@ class WrappedLineTests(unittest.TestCase):
                                   ('Cuisine', [65, 314, 143, 338])])
         self.assertEqual(len(joined), 1)
 
+    def test_chinese_and_japanese_lines_that_do_not_end_a_sentence_continue_without_a_space(self):
+        joined, _, _ = self.join([('所有货物到达后必须立即检查，如有损坏须在两个工作日', [61, 141, 288, 150]),
+                                  ('内报告。员工应在财政年度结束前完成年度安全培训。', [62, 152, 275, 162])])
+        self.assertEqual([r['text'] for r in joined], ['所有货物到达后必须立即检查，如有损坏须在两个工作日内报告。员工应在财政年度结束前完成年度安全培训。'])
+        apart = [[('従業員は会計年度末までに年次研修を修了する必要があります。', [61, 141, 288, 150]),
+                  ('契約内容の変更は書面で行ってください。', [62, 152, 275, 162])],             # sentence ends
+                 [('1.1 すべての貨物は到着時に検査してください、そして', [61, 141, 288, 150]),
+                  ('2.1 今四半期の売上は増加しました。', [62, 152, 275, 162])],                 # new item
+                 [('財務状況', [61, 141, 106, 150]), ('今後の予定について説明します。', [62, 152, 275, 162])]]  # heading
+        for lines in apart:
+            self.assertEqual(len(self.join(lines)[0]), 2, lines[0][0])
+
     def test_separate_lines_stay_apart(self):
         cases = [
             [('Learn a few phrases before arrival.', [91, 309, 488, 330]), ('carry small cash', [91, 331, 415, 350])],  # sentence ends

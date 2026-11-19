@@ -40,6 +40,18 @@ class ScanReconstructionTests(unittest.TestCase):
         self.assertEqual(agreement, 1)
         self.assertEqual(color.tolist(), [240, 240, 240])
 
+    def test_letters_crossing_the_border_are_not_artwork(self):
+        # Paper with glyph strokes of this and the neighbouring line crossing the box border.
+        image = np.full((14, 120, 3), 238, dtype=np.uint8)
+        for x in range(4, 116, 9):
+            image[:, x:x + 2] = 30          # vertical strokes reach the top and bottom rows
+        self.assertGreaterEqual(background(image)[1], .95)
+
+    def test_a_dark_photo_behind_text_is_still_artwork(self):
+        rng = np.random.default_rng(3)
+        image = rng.integers(20, 200, size=(20, 60, 3), dtype=np.uint8)
+        self.assertLess(background(image)[1], .75)
+
     def test_mixed_background_rejected(self):
         image = np.zeros((30, 30, 3), dtype=np.uint8)
         image[:, 15:] = 255

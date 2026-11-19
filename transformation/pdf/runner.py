@@ -194,6 +194,12 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
         command.extend(["--min-text-length", "1"])
     if ignore_cache:
         command.append("--ignore-cache")
+    # A scan already read by our OCR and rebuilt as text: BabelDOC's own scan detector refused the
+    # rebuilt slides of a Japanese scan ("Scanned PDF detected", 2026-11-19).
+    if ocr_recognition_dir or (external_ir and any(u.get('locked_regions') or u.get('preserve_source_only') is not None
+                                                   for u in external_ir.get('units', []))):
+        command.append("--skip-scanned-detection")
+        info['scanned_detection_skipped']=True
     yield save()
     try:
         if ocr_python or ocr_remote:

@@ -167,6 +167,10 @@ def redaction_word_candidates(crop, record, primary, secondary_factory, language
 # A language without its own model here uses PP-OCRv5_server_rec.
 RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec'}
 GENERAL_RECOGNIZER = 'PP-OCRv5_server_rec'
+# For a language read by one model, a second installed model that reads digits (it need not read the
+# language) confirms the numbers of a line. Chinese and Japanese lines with a number had none, so
+# every such line kept its source pixels and scanned contracts stayed half untranslated (2026-11-19).
+DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
 
 
 def recognition_model_name(language):
@@ -248,7 +252,7 @@ def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digi
         checks.append(read(secondary,view,name,secondary_name))
     confirmed=cross_model_candidate(reads[:-2],checks) if independent else None
     if not independent:
-        accepted=single_model_consensus(reads,crop,digit_checker,sensitive,primary)
+        accepted=single_model_consensus(reads,crop,digit_checker,sensitive,primary,DIGIT_CHECKERS.get(primary_name,GENERAL_RECOGNIZER))
         if accepted is not None:
             return accepted[0],False,accepted[1],reads
     if confirmed is not None:
@@ -265,7 +269,7 @@ def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digi
     return max(reads,key=lambda r:r['score']),True,'unresolved_source_disagreement',reads
 
 
-def piece_digits_confirmed(crop,primary,checker,expected,reads):
+def piece_digits_confirmed(crop,primary,checker,expected,reads,checker_name=GENERAL_RECOGNIZER):
     """The second model confirms the digits word by word: on a whole Korean line it reads the Hangul as
     noise, but on a short piece such as "11월" or "2026년" it reads the digits. Every piece with digits
     must give the same digits from both models, and together they must make up the line's digits."""
@@ -280,7 +284,7 @@ def piece_digits_confirmed(crop,primary,checker,expected,reads):
         check=list(checker.predict(piece))
         if len(check)!=1: return False
         reads.append({'text':str(check[0]['rec_text']),'score':float(check[0]['rec_score']),
-                      'variant':f'digit_check_piece_{index}','model':GENERAL_RECOGNIZER,'piece_digits':own})
+                      'variant':f'digit_check_piece_{index}','model':checker_name,'piece_digits':own})
         if digits(str(check[0]['rec_text']))!=own: return False
         found+=own
     return found==expected
@@ -291,13 +295,17 @@ def single_model_literal_evidence(candidates,text):
     sufficient evidence (single_model_consensus): its own model's views agree, and the general model
     read the same digits on the whole line or on every word piece with digits."""
     squeeze=lambda value:re.sub('[–—−]','-',re.sub(r'\s+','',value or ''))
-    own_models=set(RECOGNIZERS.values())-{'en_PP-OCRv5_mobile_rec'}
-    strong=[c for c in candidates if isinstance(c,dict) and c.get('model') in own_models and isinstance(c.get('score'),(int,float))
-            and c['score']>=SINGLE_MODEL_SCORE and squeeze(c.get('text'))==squeeze(text)]
+    strong=[c for c in candidates if isinstance(c,dict) and c.get('model') in DIGIT_CHECKERS and isinstance(c.get('score'),(int,float))
+            and c['score']>=SINGLE_MODEL_SCORE and squeeze(c.get('text'))==squeeze(text)
+            and not str(c.get('variant','')).startswith('digit_check')]
+    if not strong: return False
+    # The line's own model is the one with the most agreeing views; its checker is the other model.
+    own=max({c.get('model') for c in strong},key=lambda m:len({c.get('variant') for c in strong if c.get('model')==m}))
+    strong=[c for c in strong if c.get('model')==own]
     if len({c.get('variant') for c in strong})<SINGLE_MODEL_VIEWS: return False
     expected=digits(text)
     if not expected or any(ch in text for ch in '@_') or any(__import__('unicodedata').category(ch)=='Sc' for ch in text): return False
-    checks=[c for c in candidates if isinstance(c,dict) and c.get('model')==GENERAL_RECOGNIZER]
+    checks=[c for c in candidates if isinstance(c,dict) and c.get('model')==DIGIT_CHECKERS[own]]
     line=[c for c in checks if c.get('variant') in ('digit_check','digit_check_2x')]
     if len(line)==2 and all(digits(c.get('text'))==expected for c in line): return True
     pieces=sorted((c for c in checks if str(c.get('variant','')).startswith('digit_check_piece_')),
@@ -305,7 +313,7 @@ def single_model_literal_evidence(candidates,text):
     return bool(pieces) and all(digits(c.get('text'))==c.get('piece_digits') for c in pieces) and         ''.join(c.get('piece_digits') or '' for c in pieces)==expected
 
 
-def single_model_consensus(reads,crop,digit_checker,sensitive,primary=None):
+def single_model_consensus(reads,crop,digit_checker,sensitive,primary=None,checker_name=GENERAL_RECOGNIZER):
     """(reading, decision) when the views of a one-model language agree well enough, else None.
     Values other than digits (emails, currency, underscores) always stay for review."""
     import cv2
@@ -325,10 +333,10 @@ def single_model_consensus(reads,crop,digit_checker,sensitive,primary=None):
     for name,view in (('digit_check',crop),('digit_check_2x',cv2.resize(crop,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC))):
         output=list(checker.predict(view))
         if len(output)!=1: return None
-        reading={'text':str(output[0]['rec_text']),'score':float(output[0]['rec_score']),'variant':name,'model':GENERAL_RECOGNIZER}
+        reading={'text':str(output[0]['rec_text']),'score':float(output[0]['rec_score']),'variant':name,'model':checker_name}
         reads.append(reading)
         if digits(reading['text'])!=digits(best['text']):
-            if primary is not None and piece_digits_confirmed(crop,primary,checker,digits(best['text']),reads):
+            if primary is not None and piece_digits_confirmed(crop,primary,checker,digits(best['text']),reads,checker_name):
                 return best,'single_model_consensus_digits_confirmed_by_piece'
             return None
     return best,'single_model_consensus_digits_confirmed'
@@ -569,10 +577,11 @@ def main(argv=None, model_factory=None):
             model = (model_factory or TextRecognition)(model_name=model_name, model_dir=str(cache), device=args.device, enable_mkldnn=False, cpu_threads=10)
             general_model=None
             def digit_model():
-                # The general model reads digits, not Hangul: a second opinion on a line's numbers only.
+                # A second opinion on a line's numbers only (DIGIT_CHECKERS): the general model reads
+                # digits but not Hangul, the English model digits but not kanji.
                 nonlocal general_model
                 if general_model is None:
-                    general_model=(model_factory or TextRecognition)(model_name=GENERAL_RECOGNIZER,device=args.device,enable_mkldnn=False,cpu_threads=10)
+                    general_model=(model_factory or TextRecognition)(model_name=DIGIT_CHECKERS[model_name],device=args.device,enable_mkldnn=False,cpu_threads=10)
                 return general_model
             def verification_model():
                 nonlocal secondary_model
@@ -585,7 +594,7 @@ def main(argv=None, model_factory=None):
                 for i, record in enumerate(records):
                     if args.profile=='bounded':
                         best,review,decision,candidates=bounded_recognition(unpadded_crops[i],model,verification_model,args.source_language,padded=crops[i],
-                                                                            digit_checker=digit_model if model_name not in (GENERAL_RECOGNIZER,'en_PP-OCRv5_mobile_rec') else None)
+                                                                            digit_checker=digit_model if model_name in DIGIT_CHECKERS else None)
                         if review:
                             detail=source_detail_crop(report['source'],record['bbox'],crops[i])
                             best,review,decision,retries=refine_recognition(detail,model,verification_model,args.source_language,candidates)

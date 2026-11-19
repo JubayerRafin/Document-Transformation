@@ -15,9 +15,23 @@ import pymupdf
 
 
 def background(crop):
+    """(background colour, share of the box border that is plain background).
+
+    Letters of the line itself or of a tightly set neighbouring line cross the border of a line's
+    box; on a densely set scanned page that made ordinary paper look like artwork and lines were
+    left untranslated (Chinese newsletter scan, 2026-11-19). Border pixels in the tone of the text
+    ink are therefore not counted, as long as they are a minority of the border: a photo or a
+    gradient behind the text still counts as artwork."""
     edge = np.concatenate([crop[0], crop[-1], crop[:, 0], crop[:, -1]])
     color = np.median(edge, axis=0)
-    agreement = float(np.mean(np.max(abs(edge.astype(float) - color), axis=1) < 45))
+    plain = np.max(abs(edge.astype(float) - color), axis=1) < 45
+    agreement = float(np.mean(plain))
+    if agreement < 1:
+        tone = edge.reshape(len(edge), -1).astype(float).mean(axis=1)
+        ink = float(np.percentile(crop.reshape(-1, crop.shape[-1] if crop.ndim == 3 else 1).astype(float).mean(axis=1), 2))
+        inked = (tone < float(np.mean(color)) - 80) & (abs(tone - ink) < 70)
+        if 0 < inked.mean() <= 0.35:
+            agreement = max(agreement, float(np.mean(plain[~inked])))
     return color.astype(np.uint8), agreement
 
 
