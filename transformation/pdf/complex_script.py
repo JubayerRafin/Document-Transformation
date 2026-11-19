@@ -59,12 +59,21 @@ def _styles(paragraph):
     yield paragraph.pdf_style
 
 
+def instruction_text(instruction):
+    """A graphic-state instruction as text. BabelDOC may hand a LazyPassthroughInstruction, a
+    string-like object without str methods: every timetable failed in Arabic and Hindi (2026-11-19)."""
+    if instruction is None:
+        return ''
+    materialize = getattr(instruction, 'materialize', None)
+    return materialize() if callable(materialize) else str(instruction)
+
+
 def colour(instruction):
     """RGB (0-1) of the fill colour a PDF instruction string leaves in effect: operators apply in
     order, so in '0.85 0.88 0.95 rg 0 g' the text is black. Fill operators: g (gray), rg (RGB),
     k (CMYK), sc/scn (1, 3 or 4 components); stroke operators (G, RG, K, SC, SCN) do not colour text."""
     fill, operands = (0.0, 0.0, 0.0), []
-    for token in (instruction or '').split():
+    for token in instruction_text(instruction).split():
         try:
             operands.append(float(token)); continue
         except ValueError:
@@ -108,7 +117,7 @@ def take_paragraph(page, paragraph, box=None, reason='shaping'):
     text = logical_text(paragraph)
     styles = [s for s in _styles(paragraph) if s is not None]
     sizes = Counter(round(s.font_size, 2) for s in styles if s.font_size)
-    instructions = Counter((s.graphic_state.passthrough_per_char_instruction or '') for s in styles if s.graphic_state)
+    instructions = Counter(instruction_text(s.graphic_state.passthrough_per_char_instruction) for s in styles if s.graphic_state)
     fonts = Counter(font_names.get(s.font_id, s.font_id or '').lower() for s in styles)
     own = paragraph.box
     record = {'page': page.page_number, 'box': list(box) if box else [own.x, own.y, own.x2, own.y2], 'text': text,

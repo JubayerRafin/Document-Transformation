@@ -13,7 +13,8 @@ BLACK = {'', '0 g', '0 0 0 rg', '0 0 0 1 k'}
 
 def _instruction(style):
     state = style.graphic_state if style is not None else None
-    return ' '.join((state.passthrough_per_char_instruction or '').split()) if state is not None else ''
+    from transformation.pdf.complex_script import instruction_text
+    return ' '.join(instruction_text(state.passthrough_per_char_instruction).split()) if state is not None else ''
 
 
 def source_colour(page, box):

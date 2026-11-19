@@ -59,6 +59,10 @@ class ComplexScriptTests(unittest.TestCase):
         self.assertEqual(cs.colour('0.122 0.306 0.475 rg 1 g'), [1.0, 1.0, 1.0])
         self.assertEqual(cs.colour('0 g 0.18 0.455 0.71 rg /GS0 gs 0 0 m 1 0 l h W n'), [0.18, 0.455, 0.71])
         self.assertEqual(cs.colour('0.2 0.2 0.2 rg 1 0 0 RG 0.5 G'), [0.2, 0.2, 0.2])
+        # BabelDOC's lazy, string-like instruction (it has no str methods of its own).
+        lazy = type('LazyPassthroughInstruction', (), {'materialize': lambda self: '0.5 0.25 1 rg'})()
+        self.assertEqual(cs.colour(lazy), [0.5, 0.25, 1.0])
+        self.assertEqual(cs.colour(None), [0.0, 0.0, 0.0])
 
     def test_drawn_paragraphs_are_outlines_in_their_box_with_a_correct_invisible_text_layer(self):
         import os
