@@ -202,6 +202,23 @@ def _edge_placeholders(text):
     return start,end
 
 
+SEPARATORS = (' · ', ' | ', ' • ', ' ; ', '; ', ' / ')
+
+
+def single_line(source, answer):
+    """A one-line source's translation on one line. Line breaks the model put between fields are
+    dropped when the page is set, so "Bank · IBAN ... · Payment terms" came out as "BankIBAN ...98결제"
+    (invoice, 2026-11-19). The source's own separator is put back when the parts match; a longer
+    sentence gets spaces. Short labels are left to the stricter check on added lines."""
+    if '\n' in source.strip() or '\n' not in answer.strip():
+        return answer
+    lines = [line.strip() for line in answer.splitlines() if line.strip()]
+    for separator in SEPARATORS:
+        if source.count(separator) == len(lines) - 1:
+            return separator.join(lines)
+    return ' '.join(lines) if len(source.split()) > 8 else answer
+
+
 def without_source_echo(source, answer):
     """The answer without a copy of the whole source appended after the translation.
 
@@ -329,6 +346,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             restored=restore_values(result,tokens) if attempt==1 else result
             restored=normalize_field_layout(text,restored)
             restored=without_source_echo(text,restored)
+            restored=single_line(text,restored)
             answer_lines=[line.strip() for line in restored.splitlines() if line.strip()]
             if (len(text.splitlines())==1 and len(text.split())<=8 and len(answer_lines)>1
                     and len(answer_lines)<=len([p for p in re.split(r'[,;:·|]',text) if p.strip()])):

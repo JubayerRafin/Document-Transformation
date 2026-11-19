@@ -74,7 +74,9 @@ def protect_values(text, values=()):
                     r'(?<![\w*])[\w-]*\d[\w-]*\*{2,}[\w*-]*|(?<![\w*])\*{2,}[\w-]*\d[\w*-]*',
                     r'\b\d{4}-\d{2}-\d{2}[T ](?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?:Z|[+-]\d{2}:\d{2}|\s+[A-Z]{2,5})?\b',
                     r'\b(?:[01]?\d|2[0-3]):[0-5]\d(?::[0-5]\d)?(?:\s+[A-Z]{2,5})?\b',
-                    r'\b[A-Z]{3}\s*\d+(?:,\d+)*(?:\.\d+)?\b',
+                    # An amount in a currency ("USD 1,234.50"), not a rate: "VAT 10%" kept VAT in
+                    # English, so an invoice's totals line was refused twice (2026-11-19).
+                    r'\b[A-Z]{3}\s*\d+(?:,\d+)*(?:\.\d+)?\b(?!\s*%)',
                     r'[$€£¥₩]\s*\d+(?:,\d+)*(?:\.\d+)?',
                     r'\b[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*-[ \t]+\d+[A-Za-z0-9]*(?:-[A-Za-z0-9]+)*\b',
                     r'\b(?=[A-Za-z0-9-]*\d)[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+\b',

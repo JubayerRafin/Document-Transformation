@@ -29,6 +29,30 @@ class DamagedTokenTests(unittest.TestCase):
                 restore_values(text, tokens)
 
 
+class RateTests(unittest.TestCase):
+    def test_a_tax_rate_is_a_number_not_an_amount_in_a_currency(self):
+        from transformation.llm.protected_text import protect_values
+        self.assertEqual(list(protect_values('VAT 10%: USD 849,674.29', [])[1].values()), ['10%', 'USD 849,674.29'])
+        self.assertEqual(list(protect_values('ISO 9001 and GBP 25', [])[1].values()), ['ISO 9001', 'GBP 25'])
+
+
+class SingleLineTests(unittest.TestCase):
+    def test_fields_of_a_one_line_source_get_its_separator_back(self):
+        from transformation.llm.translategemma import single_line
+        source = 'Bank: Granite Harbor Bank · IBAN DE67 7286 9005 8730 1146 98 · Payment terms: 30 days.'
+        answer = '은행: Granite Harbor Bank\nIBAN: DE67 7286 9005 8730 1146 98\n결제 조건: 30 일.'
+        self.assertEqual(single_line(source, answer),
+                         '은행: Granite Harbor Bank · IBAN: DE67 7286 9005 8730 1146 98 · 결제 조건: 30 일.')
+
+    def test_a_long_sentence_gets_spaces_and_short_labels_and_multiline_sources_are_left(self):
+        from transformation.llm.translategemma import single_line
+        source = 'Bill to: Silverline Transit, 269 Harbour Road, Busan Attn: Arjun Patel'
+        self.assertEqual(single_line(source, '청구처: Silverline Transit, 269 Harbour Road, 부산\n수신인: Arjun Patel'),
+                         '청구처: Silverline Transit, 269 Harbour Road, 부산 수신인: Arjun Patel')
+        self.assertEqual(single_line('Subtotal', '소계\nSubtotal'), '소계\nSubtotal')
+        self.assertEqual(single_line('Line one\nLine two', '첫째 줄\n둘째 줄'), '첫째 줄\n둘째 줄')
+
+
 class SourceEchoTests(unittest.TestCase):
     def test_a_copy_of_the_source_after_the_translation_is_removed(self):
         from transformation.llm.translategemma import without_source_echo
