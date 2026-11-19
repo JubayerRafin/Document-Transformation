@@ -19,8 +19,13 @@ removes them.
 
 English, Korean, Japanese, Chinese (Simplified), Arabic, Hindi, Bengali, French, German, Spanish
 and Portuguese. Arabic is written right to left with proper letter shaping; Hindi and Bengali use
-shaped Indic text. Translation from English into each of the other ten has been tested on sample documents. OCR of scanned
-pages reads English, Korean, Chinese and Japanese.
+shaped Indic text. Mass tests on generated documents (reports, invoices, forms, contracts, slides,
+timetables, manuals, scans) cover English into each of the other ten, and Korean, Japanese,
+Chinese, Arabic, Hindi and Bengali into English, plus a real 50-page printer manual and a 200-page
+document. OCR of scanned pages reads English, Korean, Chinese and Japanese.
+
+Highlights, notes, form fields and links in a source PDF are kept in its translation. If the GPU
+server offers more than one translation model, users choose one per job on the upload form.
 
 Customers can set a **glossary** per language pair: required translations for their own terms,
 applied to every new translation.
@@ -127,6 +132,11 @@ cached translations); details in [engine, adapters and configuration](docs/ENGIN
 | Translation, average per page | — | 10–14 s depending on language |
 | Translation + PII, all six documents | 309 s | 158 s |
 | PII only, 52-document test set | 2.6 s/page | — |
+| 50-page printer manual into Korean | — | 313 s (6.3 s/page) |
+| 200-page document (25 scanned pages) into Korean, beside another job | — | 52 min |
+
+The website accepts up to 200 pages and 50 MB. A job may run 60 minutes, plus 30 s for every page
+beyond 100 (configurable).
 
 ## Website development
 
@@ -164,8 +174,15 @@ packages. The setup scripts create them; to build them by hand:
 python -m unittest discover -s tests -t .
 ```
 
-The tests use synthetic documents and fake model servers, so they run without a GPU. A few need
-the BabelDOC or PaddleOCR environment and are skipped or fail elsewhere.
+The tests use synthetic documents and fake model servers, so they run without a GPU. Tests that
+need the BabelDOC or PaddleOCR environment, a GPU, Microsoft Office or LibreOffice, or saved
+experiment results (`experiments/`, not in Git) are skipped where those are missing.
+
+GitHub Actions (`.github/workflows/tests.yml`) runs the engine tests, the website's type check and
+tests, and the site API tests on every pull request and on `main`.
+
+To test many documents on a GPU server (generated corpus, output checker, summary report), see
+[testing many documents](docs/ENGINE_SERVICE.md#testing-many-documents).
 
 ## Privacy
 

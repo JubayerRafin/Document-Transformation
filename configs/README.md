@@ -4,6 +4,11 @@
 processing-worker configuration. Both paths are retained because existing tools
 use them.
 
+- `transformx.example.toml`: the settings file, with every setting explained (model servers,
+  translation model choices, PII, OCR, output, worker, engine service). Copy it to
+  `transformx.toml` (ignored by Git) on the machine that runs the engine and check it with
+  `python -m transformation.settings check`. Keys never go in it: each `key_file` names a file
+  holding the key. See [engine, adapters and configuration](../docs/ENGINE_SERVICE.md#settings-file).
 - `gpu-evaluation.example.json`: portable dataset/evaluation template. Copy to a
   new `*.local.json`, then fill in your actual document and interpreter paths.
 - `hosted-engine.example.json`: example **engine_profile** fields for an outbound

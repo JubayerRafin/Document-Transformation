@@ -115,7 +115,7 @@ Documents are untrusted input data. No document text is executed or interpreted 
 | Mashrur | Marker | Whole-document extraction and adapter |
 | Hyun | PaddleOCR PP-StructureV3 | Whole-document extraction and adapter |
 
-Every tool handles text, tables and figures together. Other tools run separately and import their normalized output; they are not yet built-in backends. See [team setup and submission instructions](docs/TEAM_START.md).
+Every tool handles text, tables and figures together. Other tools run separately and import their normalized output; they are not yet built-in backends. See [team setup and submission instructions](TEAM_START.md).
 
 Streamlit discovers completed visual-review runs recursively under both `runs/` and `experiments/`. Imported predictions without manifests/previews can still be scored using the CLI.
 
@@ -130,4 +130,4 @@ Official references: [Docling](https://docling-project.github.io/docling/), [Doc
 
 ## PaddleOCR experiment
 
-See [PaddleOCR reproduction and limitations](docs/PADDLEOCR.md) for the submitted Sample02 experiment, adapter commands, and coordinate caveats.
+See [PaddleOCR reproduction and limitations](PADDLEOCR.md) for the submitted Sample02 experiment, adapter commands, and coordinate caveats.
