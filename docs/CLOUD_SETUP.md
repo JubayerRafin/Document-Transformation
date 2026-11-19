@@ -40,10 +40,11 @@ Run the complete file `supabase/migrations/202610220001_transformx.sql` once.
 It executes in a transaction. It creates only `tx_*` tables and a private bucket
 named `transformx-private`. Do not replace it with public-bucket policies.
 
-In Authentication > Users, create/invite `mjhossain808@gmail.com` and set up that
+In Authentication > Users, create/invite the administrator's email address and set up that
 account's password using Supabase's supported account flow. Do not send its password
-in chat. Run `supabase/bootstrap-admin.sql` afterwards; it must return exactly one
-administrator profile. A zero-row result means the Auth user is not present yet.
+in chat. Copy `supabase/bootstrap-admin.example.sql` to `supabase/bootstrap-admin.sql` (ignored by
+Git), put the administrator's address in place of the placeholder and run it; it must return exactly
+one administrator profile. A zero-row result means the Auth user is not present yet.
 
 Disable public signup in the project's email authentication settings for this pilot.
 The application independently rejects accounts without an explicitly active profile.
@@ -89,17 +90,19 @@ A free deployment is not a guaranteed 24/7 service-level agreement.
 
 ## 4. GPU server worker
 
-Install this repository and the established engine dependencies on the server.
-Start Ollama; install the selected models and verify actual GPU placement. This
-agent does not install packages, start billed pods, or silently switch to another
-server. All engine parsing/reconstruction and model inference execute on this server.
+Install this repository and the engine dependencies on the server with the setup scripts in
+`tools/gpu/` (see [private GPU workers](PRIVATE_GPU_WORKERS.md)). `bash tools/gpu/start_worker.sh`
+starts the model servers (vLLM), checks their GPU placement and starts the worker. The worker does
+not install packages, start billed pods, or silently switch to another server. All engine
+parsing/reconstruction and model inference execute on this server.
 
-From the repository root, using the engine's Python environment:
+To register by hand instead of downloading the connection file from the website, from the
+repository root, using the engine's Python environment:
 
 ```bash
 python -m tools.service.cloud_worker register \
   --url https://YOUR-DEPLOYED-APP.workers.dev \
-  --email mjhossain808@gmail.com --name mentor-gpu
+  --email you@example.com --name mentor-gpu
 python -m tools.service.cloud_worker run
 ```
 

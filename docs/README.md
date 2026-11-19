@@ -5,7 +5,7 @@ without relocating referenced files or changing existing commands.
 
 ## Product and deployment
 
-- [Engine, adapters and configuration](ENGINE_SERVICE.md): engine service API, every setting, OCR languages, speed.
+- [Engine, adapters and configuration](ENGINE_SERVICE.md): engine service API, every setting, OCR languages, mass testing, speed.
 - [Security notes and known limitations](SECURITY_AND_LIMITATIONS.md).
 - [Customer frontend](CUSTOMER_FRONTEND.md): Next export, publishing and checks.
 - [Cloud setup](CLOUD_SETUP.md): initial Cloudflare/Supabase setup procedure; inspect current deployment records separately.

@@ -9,6 +9,8 @@ Work on a dedicated branch and keep `main` unchanged until review. Describe the
 actual source snapshot and checks in the commit or PR. Do not commit credentials,
 SSH keys, local worker profiles, virtual environments, generated bundles or private
 document outputs. `.gitignore` does not remove files already tracked in history.
+Commits carry their human author only: no co-author lines or attributions for tools.
+Keep personal email addresses out of docs and examples (use `you@example.com`).
 
 This checkout includes previous development work alongside the organization
 changes. Its organization branch is a source snapshot of those modules, not a
@@ -25,11 +27,23 @@ node --check cloud/src/index.mjs
 python -m unittest tests.test_cloud_worker tests.test_separate_workflows
 ```
 
+The whole Python suite:
+
+```sh
+python -m unittest discover -s tests -t .
+```
+
 `npm --prefix cloud test` rebuilds the customer frontend and the redaction editor and then tests
 the Worker. It does not deploy. Use existing lockfiles and separate Python
 environments. BabelDOC-specific tests need the pinned BabelDOC environment;
 metric tests need evaluation dependencies. Native Office tests need a configured
-renderer. Report exclusions and unavailable dependencies explicitly.
+renderer. Tests whose dependency or saved data is missing skip with the reason; report exclusions
+and unavailable dependencies explicitly.
+
+Every pull request and every push to `main` runs `.github/workflows/tests.yml` on GitHub: the
+Python suite (with the packages listed there), the website's type check and tests, and the site
+API tests (which build the website first). A test that needs files outside Git (`experiments/`,
+`runs/`) must skip when they are absent, or it fails there.
 
 For broader offline checks use `python -m tools.evaluation.offline_checks --help`.
 Unit tests use synthetic inputs; do not start a GPU or submit documents merely to

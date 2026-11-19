@@ -156,6 +156,7 @@ document text alone as the user message.
 | `TRANSFORMX_SERVICE_RETENTION_HOURS` | Engine service: delete finished jobs after this many hours (default 24) |
 | `TRANSFORMX_RUN_RETENTION_HOURS` | Site worker: delete local job folders after this many hours (default 72, `0` keeps them) |
 | `TRANSFORMX_MIN_FREE_GB` | Site worker: report not ready and take no jobs while the job disk has less free space (default 5) |
+| `timeout_seconds` (engine profile; `[output] job_timeout_seconds` in the settings file) | Seconds a job may run (default 3600). The site worker adds 30 s for every page beyond 100, up to 24 hours. |
 | `TRANSFORMX_FIGURE_WORKERS` | Pictures translated at the same time (default 3; 1 when models share the GPU) |
 | `TRANSFORMX_SHARED_LAYOUT` | `0` turns off the shared page-layout model (each run then loads its own) |
 | `TRANSFORMX_PRELOAD` | `1` starts job processes from pre-loaded parents (saves import time); restart them after a code update (`tools/gpu/restart_worker.sh`) |
@@ -168,9 +169,27 @@ document text alone as the user message.
 contracts, slides, newsletters, manuals, papers, timetables, letters; scans, rotated pages, text in
 pictures, edge cases, long documents; English, Korean, Japanese, Chinese, Arabic, Hindi and Bengali
 sources). `evaluation/pii/pod_samples.py` runs a folder of them, `evaluation/robustness/check_outputs.py`
-checks every output (generated, page count, protected values, foreign letters, untranslated lines,
-missing glyphs, text outside the page) and `evaluation/robustness/report.py` collects a summary with
-sample source/output pairs. Use `--set heldout` for documents not used while fixing.
+checks every output and `evaluation/robustness/report.py` collects a before/after summary with
+sample source/output pairs and side-by-side images. Use `--set heldout` for documents not used
+while fixing, and measure those only.
+
+The checker reports, per document: whether it was generated (else the failure code), page count,
+protected values missing from the output, letters of a third script, untranslated source lines,
+letters still in the source's own script, unread glyphs (`(cid:N)`), answers about the translation
+instead of one ("Here is the translation", "please provide the text"), missing glyphs and text
+outside the page. For generated documents translated into English it also checks meaning: each
+known generator sentence must come out with its key English words. Without that check, invented
+text passed as a translation (Arabic sources, 19 November 2026). "Generated" is not "good": read
+some outputs by eye as well.
+
+```bash
+python -m evaluation.robustness.check_outputs RESULTS SOURCES --target ko [--source en] [--review DIR]
+python -m evaluation.robustness.report OUT --run LABEL=RESULTS:SOURCES:TARGET:SOURCE \
+  [--before LABEL=EARLIER_RESULTS] [--samples 2]
+```
+
+A mass run writes about 50 MB of intermediate files per document; delete the BabelDOC `work`
+folders of finished documents (results, summaries and logs stay) and keep 20 GB or more free.
 
 ### Starting model servers without the site worker
 
@@ -186,10 +205,22 @@ names, never keys) to `/workspace/servers.env` for the engine service or another
 Translation works between English and Korean, Japanese, Chinese (Simplified), Arabic, Hindi,
 Bengali, French, German, Spanish and Portuguese. Scanned pages and text in images are read with
 PaddleOCR: English with `en_PP-OCRv5_mobile_rec` checked by `PP-OCRv5_server_rec`, Korean with
-`korean_PP-OCRv5_mobile_rec`, other languages with `PP-OCRv5_server_rec`. Korean has no second
-reader: a line is accepted when several differently prepared views agree, and a line with numbers
-only when a second model reads the same digits on the line or on each word piece; otherwise the
-line keeps its original pixels and is flagged for review.
+`korean_PP-OCRv5_mobile_rec`, other languages with `PP-OCRv5_server_rec`. Korean, Chinese and
+Japanese have no second reader for their letters: a line is accepted when several differently
+prepared views agree, and a line with numbers only when a second installed model reads the same
+digits on the line or on each word piece (the general model for Korean, the English model for
+Chinese and Japanese); otherwise the line keeps its original pixels and is flagged for review.
+
+Before OCR, scanned pages (no text layer, one picture over the page) that are tilted between 0.25°
+and 5° are turned level, so the source is erased and the translation placed in level boxes; pages
+with a text layer are never changed. Chinese and Japanese lines that do not end a sentence are
+joined with the next line and translated as one paragraph. Arabic, Hindi and Bengali scans are not
+read.
+
+Text that BabelDOC's PDF reader gets wrong is read again with MuPDF before translation: letters
+written only as ActualText (Word and LibreOffice do this for Bengali and Hindi clusters), which
+arrive as `(cid:N)`, and right-to-left text stored in drawing order. The result is used only when
+it agrees with what BabelDOC did read; each decision is recorded in the run's `unmapped-text.json`.
 
 ## Speed (L40S, 19 November 2026)
 
@@ -199,3 +230,10 @@ documents reuse cached translations: about 10 s per page. A one-page digital doc
 5–7 s. The target of 3–5 s per page is not reached yet; the largest remaining costs are Docling
 extraction on the CPU (its pinned PyTorch build has no CUDA variant), the longest paragraph's
 translation, and BabelDOC's per-run start-up.
+
+Longer documents into Korean on the same server: a 50-page printer manual in 313 s (6.3 s per
+page); a 200-page document with 25 scanned pages in 52 minutes, while a second job shared the GPU.
+
+Translated text is shrunk only as much as its own page needs: BabelDOC caps every paragraph at the
+most common scale, and that cap is now taken per page instead of per document (the 50-page manual
+kept full size on 41 pages, against 12 with one cap for the whole document).

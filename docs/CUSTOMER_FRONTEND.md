@@ -73,9 +73,13 @@ held in memory. It is not a substitute for authenticated end-to-end testing.
 ## Feature contracts
 
 - Sign-in: existing cookie session and CSRF APIs; no browser-stored access tokens.
-- Upload: one PDF, up to 50 MB; signature checked locally, backend remains
-  authoritative. Exact selected private worker, existing options and categories.
+- Upload: one PDF, up to 50 MB and 200 pages; signature, page count and password protection are
+  checked in the browser before uploading (the file is read locally with PDF.js), and the backend
+  and worker check again. Exact selected private worker, existing options and categories.
   An unchanged failed submission retries with the same idempotency key.
+- Translation model: when the selected GPU server offers more than one translation model, the
+  upload form lists them by label, marks a model on another machine "outside service" and warns
+  that the document's text is sent there. The API accepts only a model that server currently offers.
 - Progress: recorded events and states, five-second polling while visible;
   no fabricated percentage or estimated completion time. Cancel queued jobs only.
 - History: search/status filters over the latest API results (up to 100).
