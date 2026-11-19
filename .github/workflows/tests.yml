@@ -54,6 +54,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: cloud/package-lock.json
+          cache-dependency-path: |
+            cloud/package-lock.json
+            frontend/package-lock.json
+      - uses: actions/setup-python@v5   # the build copies assets with a small Python script
+        with:
+          python-version: '3.12'
+      # npm test builds the website first (pretest), so its packages are needed too.
+      - run: npm ci --prefix ../frontend
       - run: npm ci
       - run: npm test

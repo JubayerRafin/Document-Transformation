@@ -12,6 +12,9 @@ from transformation.validation.privacy import detect
 from transformation.pipeline import run_pipeline
 
 HAS_OFFICE=bool(importlib.util.find_spec('docx') and importlib.util.find_spec('pptx'))
+# Rendering a Word or PowerPoint file to another format needs Microsoft Office (Windows) or LibreOffice.
+import os, shutil
+CAN_RENDER_OFFICE=(os.name=='nt' or bool(shutil.which('soffice') or os.environ.get('TRANSFORMX_LIBREOFFICE')))
 
 
 def office_fixture(kind):
@@ -77,6 +80,8 @@ class UnifiedTests(unittest.TestCase):
             data=pdf_fixture() if source=='pdf' else office_fixture(source)
             for output in ('pdf','docx','pptx'):
                 with self.subTest(source=source,output=output),tempfile.TemporaryDirectory() as folder:
+                    if source!='pdf' and output!=source and not CAN_RENDER_OFFICE:
+                        self.skipTest('needs Microsoft Office or LibreOffice to render the document')
                     events=list(run_pipeline(data,'unrelated.'+source,output_kind=output,translate=False,
                         redact=True,pii_categories=['Email addresses'],pii_assist=False,table_strategy='native',root=Path(folder)))
                     last=events[-1]
