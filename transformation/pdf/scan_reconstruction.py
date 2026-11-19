@@ -14,6 +14,15 @@ import numpy as np
 import pymupdf
 
 
+def jpeg_scan(page):
+    """Whether the page's pictures are stored as JPEG (as scanners and phones write them)."""
+    try:
+        filters = [info[8] for info in page.get_images(full=True)]
+    except Exception:
+        return False
+    return bool(filters) and all(f in ('DCTDecode', 'JPXDecode') for f in filters)
+
+
 def background(crop):
     """(background colour, share of the box border that is plain background).
 
@@ -544,7 +553,13 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             p = result.new_page(width=source[0].rect.width, height=source[0].rect.height)
             from tools.ocr.raster_policy import preserve_background
             cleaned,raster = preserve_background(source[0],pixels,erase_mask)
-            p.insert_image(p.rect, pixmap=cleaned)
+            if jpeg_scan(source[0]):
+                # A JPEG scan stays JPEG: stored losslessly, the noise of 25 scanned pages made a
+                # 200-page output 55 MB, over the 50 MB the site accepts (2026-11-19). The text on
+                # top is drawn as text, so it stays sharp.
+                p.insert_image(p.rect, stream=cleaned.tobytes(output='jpeg', jpg_quality=85))
+            else:
+                p.insert_image(p.rect, pixmap=cleaned)
             p.insert_font(fontname='scanfont', fontbuffer=font.buffer)
             from transformation.pdf.scan_style import EMBEDDED, font as style_font
             for name in sorted({fontname for *_, fontname in placements if fontname in EMBEDDED}):
@@ -555,6 +570,8 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 with outlines:
                     p.show_pdf_page(rect, outlines, 0)
             output = run / 'output' / ('scan-corrected.pdf' if corrections_path else 'scan-reconstructed.pdf')
+            from transformation.pdf.complex_script import subset
+            subset(result)  # the CJK font is inserted whole (3.5 MB per rebuilt page)
             result.save(output, garbage=4, deflate=True)
         report = {'review_status': 'requires_human_review', 'model_requests': 0,'raster':raster,
                   'acceptance_blockers': [dict(id=r['id'], reason=r['reason']) for r in records

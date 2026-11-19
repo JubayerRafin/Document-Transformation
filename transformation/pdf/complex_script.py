@@ -262,9 +262,20 @@ def draw(pdf_path, records, text_font=None):
                 _invisible_text(page, rect, stored, size, text_font, record['rtl'])
             results.append({'paragraph_id': record['paragraph_id'], 'status': 'drawn' if spare >= 0 else 'not_fitted',
                             'scale': round(scale, 3)})
+        subset(pdf)
         pdf.save(temporary, garbage=1, deflate=True)
     os.replace(temporary, pdf_path)
     return results
+
+
+def subset(pdf):
+    """Keep only the glyphs used. This drawing runs after BabelDOC's own subsetting, so the 15 MB font
+    of the invisible text layer was embedded whole: Arabic and Hindi outputs averaged 9 MB against
+    1.3 MB for Korean (2026-11-19). Without fontTools the fonts stay whole."""
+    try:
+        pdf.subset_fonts(fallback=False)
+    except Exception:
+        pass
 
 
 def save_records(folder, records):
