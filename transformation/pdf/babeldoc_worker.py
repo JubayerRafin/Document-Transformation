@@ -576,6 +576,8 @@ def main():
             Path(folder,'babeldoc-source-ir.json').write_text(ir_dumps(document),encoding='utf-8')
         from transformation.layout.source_atoms import capture_source_atoms
         source_atoms.clear();source_atoms.update(capture_source_atoms(document))
+        from transformation.layout.line_spacing import measure as measure_line_spacing
+        measure_line_spacing(document)
         result=original_translate(self,document)
         if folder:
             from transformation.pdf.ir_json import dumps as ir_dumps
@@ -587,6 +589,10 @@ def main():
     from transformation.layout.table_fitting import install_table_fitting
     from transformation.layout.line_breaks import install_date_line_breaks, widen_page_footers, join_split_dates, heading_slots
     install_date_line_breaks(Typesetting, protected_values)
+    from transformation.layout.line_spacing import install as install_source_line_spacing
+    install_source_line_spacing(Typesetting)
+    from transformation.layout.page_scale import install as install_page_scale
+    install_page_scale(Typesetting)
     from transformation.layout.line_breaks import install_whole_word_breaks, install_attached_punctuation
     install_whole_word_breaks(Typesetting)
     from babeldoc.format.pdf.document_il.midend.typesetting import TypesettingUnit
