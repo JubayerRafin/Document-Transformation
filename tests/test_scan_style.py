@@ -249,7 +249,7 @@ class NativeRebuildTests(unittest.TestCase):
             with pymupdf.open(output) as rebuilt:
                 spans = [s for b in rebuilt[0].get_text('dict')['blocks'] for l in b.get('lines', []) for s in l['spans']]
             self.assertEqual([s['text'] for s in spans], ['BEFORE YOU GO'])
-            self.assertIn('NimbusSans', spans[0]['font'])
+            self.assertRegex(spans[0]['font'], r'Nimbus ?Sans')  # the subset font is named 'Nimbus Sans Regular'
             red, blue = spans[0]['color'] >> 16, spans[0]['color'] & 255
             self.assertGreater(red, 180); self.assertLess(blue, 120)
             self.assertEqual(report['replaced'], 1)
