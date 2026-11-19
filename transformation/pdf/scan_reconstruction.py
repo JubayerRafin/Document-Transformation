@@ -456,6 +456,11 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 record['style'] = {'font': font_name, 'ink': list(region_style['ink']),
                                    'bold': region_style['bold'], 'italic': region_style['italic']}
             wrapped = (region.get('metadata', {}).get('wrapped_lines') if region_style else None)
+            # A paragraph translated as one piece has no line per printed line: it is flowed over the
+            # paragraph's whole area below, instead of failing as "cannot fit" (Chinese newsletter
+            # scan, 2026-11-19).
+            if wrapped and len(text.split('\n')) != len(wrapped):
+                wrapped = None
             if wrapped and not needs_shaping(text):
                 # One paragraph over several printed lines (scan_lines.join_wrapped_lines): each line is
                 # drawn in its own box exactly as a separate line would be; the locked paragraph area
