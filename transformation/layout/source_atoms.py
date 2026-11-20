@@ -63,4 +63,22 @@ def preserved_source_characters(entry,paragraph,page):
             if previous is None:return None
             # Existing source contact is not a newly introduced collision.
             if intersection(box,other.box)>intersection(box,previous)+.01:return None
-    return ir_copy(chars)
+    return ir_copy(reading_order(chars))
+
+
+def reading_order(chars):
+    """Characters line by line, top to bottom, each line left to right.
+
+    A paragraph's characters are not always stored in that order: a date wrapped in a narrow cell
+    ("2025-" / "07-13") kept "5-" in a formula after the next line, and drawn in that order the PDF's
+    text read "202 07-13 5-", so "2025" could not be found or copied (German news, 2026-11-21)."""
+    def box(c):
+        return getattr(getattr(c,'visual_bbox',None),'box',None) or getattr(c,'box',None)
+    placed=[c for c in chars if box(c) is not None]
+    if len(placed)!=len(chars):return chars
+    lines=[]
+    for c in sorted(chars,key=lambda c:-(box(c).y+box(c).y2)/2):
+        b=box(c);middle=(b.y+b.y2)/2;height=max(b.y2-b.y,1.0)
+        if lines and abs(lines[-1][0]-middle)<=.5*height:lines[-1][1].append(c)
+        else:lines.append([middle,[c]])
+    return [c for _,line in lines for c in sorted(line,key=lambda c:box(c).x)]

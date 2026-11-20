@@ -58,6 +58,15 @@ class SourceAtomsTests(unittest.TestCase):
             pdf_formula=NS(pdf_curve=[object()],pdf_form=[],pdf_character=[]))]
         self.assertFalse(capture_source_atoms(NS(page=[page])))
 
+    def test_restored_characters_are_drawn_line_by_line_left_to_right(self):
+        from transformation.layout.source_atoms import reading_order
+        def ch(c,x,y):
+            b=box(x,y,x+5,y+9);return NS(char_unicode=c,box=b,visual_bbox=NS(box=b))
+        # "2025-" over "07-13", stored with "5-" after the second line
+        stored=[ch('2',0,20),ch('0',5,20),ch('2',10,20),ch('0',0,8),ch('7',5,8),ch('-',10,8),
+                ch('1',15,8),ch('3',20,8),ch('5',15,20.5),ch('-',20,20)]
+        self.assertEqual(''.join(c.char_unicode for c in reading_order(stored)),'2025-07-13')
+
     def test_inferred_space_does_not_require_a_printed_glyph_id(self):
         p,page,entry=self.fixture()
         space=copy.deepcopy(entry['paragraph'].pdf_paragraph_composition[0])
