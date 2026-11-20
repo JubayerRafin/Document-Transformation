@@ -20,7 +20,7 @@ from collections import Counter
 
 MAX_LABEL_WORDS = 4
 MAX_TERMS = 40  # more terms cost more time than they add
-GROUP_TERMS = 10  # terms per request; the groups are asked in parallel
+GROUP_TERMS = 4  # terms per request; the groups are asked in parallel (4: 3.2 s for 40 terms, 10: 5.8 s; 2026-11-21)
 VALUES = re.compile(r'[\w.+-]+@[\w-]+(?:\.[\w-]+)+|https?://\S+|\b[\w-]*\d[\w-]*\b')
 STOPWORDS = set('''a an the and or of to in on for by with from at as is are was were be been being this that these
 those it its their there here which who whom whose what when where why how not no yes all any each every some such
