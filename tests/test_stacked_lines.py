@@ -118,6 +118,13 @@ class ListMarkerTests(unittest.TestCase):
         self.assertEqual(self.run_split(paragraph, [600, 588, 564, 552]),
                          (3, ['First item', 'Second itemwraps here', 'Third', 'Fourth']))
 
+    def test_bullets_after_right_to_left_items_split_them_too(self):
+        paragraph = self.list_paragraph([['First item'], ['Second item']])
+        from transformation.layout.stacked_lines import split_at_list_markers
+        curves = [NS(box=NS(x=118, y=y + 2.5, x2=121.7, y2=y + 6.2)) for y in (600, 588)]
+        page = NS(pdf_paragraph=[paragraph], pdf_curve=curves)
+        self.assertEqual(split_at_list_markers(page, lambda p, line: None, lambda p: p.debug_id + '-b'), 1)
+
     def test_paragraphs_without_bullets_beside_them_stay_whole(self):
         paragraph = self.list_paragraph([['Plain text'], ['continues']])
         self.assertEqual(self.run_split(paragraph, [])[0], 0)

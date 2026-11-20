@@ -225,9 +225,10 @@ def _visual_lines(chars):
         if lines and abs(middle - lines[-1]['middle']) <= 0.5 * size:
             lines[-1]['chars'].append(char)
             lines[-1]['x'] = min(lines[-1]['x'], box.x)
+            lines[-1]['x2'] = max(lines[-1]['x2'], box.x2)
             lines[-1]['y'], lines[-1]['y2'] = min(lines[-1]['y'], box.y), max(lines[-1]['y2'], box.y2)
         else:
-            lines.append({'chars': [char], 'middle': middle, 'x': box.x, 'y': box.y, 'y2': box.y2})
+            lines.append({'chars': [char], 'middle': middle, 'x': box.x, 'x2': box.x2, 'y': box.y, 'y2': box.y2})
     return lines
 
 
@@ -259,8 +260,10 @@ def split_at_list_markers(page, update, make_id):
             size = line['y2'] - line['y']
             for m in markers:
                 centre = (m.y + m.y2) / 2
-                if (m.x2 <= line['x'] + 1 and line['x'] - m.x2 <= 3 * size
-                        and line['y'] - 0.2 * size <= centre <= line['y2'] + 0.2 * size):
+                # The bullet before the line, or after it for right-to-left text (Arabic report).
+                beside = ((m.x2 <= line['x'] + 1 and line['x'] - m.x2 <= 3 * size)
+                          or (m.x >= line['x2'] - 1 and m.x - line['x2'] <= 3 * size))
+                if beside and line['y'] - 0.2 * size <= centre <= line['y2'] + 0.2 * size:
                     starts.append(number)
                     break
         cuts = sorted(set(n for n in starts if n > 0))
