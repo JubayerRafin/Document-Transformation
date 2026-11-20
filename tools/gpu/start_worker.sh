@@ -67,7 +67,9 @@ tg_level=2; [ "${mem_limit:-0}" -ge 80000000000 ] && tg_level=1
 servers=""
 
 wait_for() {  # port, log
-  for _ in $(seq 1 150); do curl -fsS "http://127.0.0.1:$1/v1/models" >/dev/null 2>&1 && return 0; sleep 2; done
+  # Up to 10 minutes: a new server's first start compiles GPU kernels (over 5 minutes on an
+  # RTX 5090 and an L40S, 2026-11-19/21); later starts reuse the compiled kernels.
+  for _ in $(seq 1 300); do curl -fsS "http://127.0.0.1:$1/v1/models" >/dev/null 2>&1 && return 0; sleep 2; done
   echo "vLLM on port $1 did not start; see $2."; exit 1
 }
 

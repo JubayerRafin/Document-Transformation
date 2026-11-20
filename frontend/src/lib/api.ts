@@ -125,6 +125,8 @@ const FAILURES: Record<string, string> = {
     "The selected areas could not be removed and verified, so no redacted copy was released.",
   TRANSLATION_MODEL_UNAVAILABLE:
     "The chosen translation model is no longer set up on this server. Choose another model and start again.",
+  PII_MODEL_UNAVAILABLE:
+    "The chosen PII model is no longer set up on this server. Choose another model and start again.",
 };
 export function failureMessage(code?: string) {
   return (
@@ -159,6 +161,8 @@ export type Worker = {
     note?: string;
     /** Translation models this server offers (its settings file); "default" is its own. */
     translation_models?: TranslationModel[];
+    /** PII models this server offers (its settings file); "default" is its own. */
+    pii_models?: TranslationModel[];
   };
 };
 export type TranslationModel = {
@@ -188,6 +192,8 @@ export type TransformOptions = {
   pii_keep?: string[];
   /** One of the chosen server's translation models; omitted for its default. */
   translation_model?: string;
+  /** One of the server's PII models; omitted for its default. */
+  pii_model?: string;
 };
 export type PiiStyle = "box" | "label" | "pseudonym";
 export const PII_CATEGORIES = [
@@ -227,6 +233,8 @@ const MESSAGES: Record<string, string> = {
     "Every glossary term needs a translation, on one line, of at most 200 characters (100 terms at most).",
   DUPLICATE_GLOSSARY_TERM: "A term appears twice in this glossary.",
   INVALID_LANGUAGE: "Choose two different languages.",
+  TRANSLATION_MODEL_NOT_OFFERED: "That translation model is not available on this server right now. Reload the page.",
+  PII_MODEL_NOT_OFFERED: "That PII model is not available on this server right now. Reload the page.",
 };
 export class ApiError extends Error {
   constructor(

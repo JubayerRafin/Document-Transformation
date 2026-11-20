@@ -35,7 +35,6 @@ it("upload form has associated labels, accessible tabs and named controls", asyn
         api={new ApiClient()}
         workers={[worker]}
         onSubmitted={vi.fn()}
-        onServers={vi.fn()}
         onError={vi.fn()}
       />
     </LazyMotion>,

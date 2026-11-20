@@ -70,3 +70,5 @@ supabase/bootstrap-admin.sql
 # Local assistant and tooling files
 .agents/
 evaluation/pii/review_artifact.html
+frontend/public/pdfjs/
+frontend/public/redaction-review.*

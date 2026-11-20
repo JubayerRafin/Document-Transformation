@@ -33,7 +33,6 @@ export function UploadPanel({
   workers,
   initialMode = "translation",
   onSubmitted,
-  onServers,
   onError,
   readOnly = false,
 }: {
@@ -41,7 +40,6 @@ export function UploadPanel({
   workers: Worker[];
   initialMode?: Operation;
   onSubmitted: (id: string) => Promise<void>;
-  onServers: () => void;
   onError: (e: unknown) => void;
   readOnly?: boolean;
 }) {
@@ -53,7 +51,6 @@ export function UploadPanel({
   const [mode, setMode] = useState<Operation>(initialMode),
     [source, setSource] = useState("en"),
     [target, setTarget] = useState("ko"),
-    [server, setServer] = useState(""),
     [context, setContext] = useState(""),
     [protectedValues, setProtected] = useState(""),
     [categories, setCategories] = useState<string[]>([
@@ -64,16 +61,20 @@ export function UploadPanel({
     [piiStyle, setPiiStyle] = useState<PiiStyle>("box"),
     [keepVisible, setKeepVisible] = useState(""),
     [translationModel, setTranslationModel] = useState("default"),
+    [piiModelId, setPiiModelId] = useState("default"),
     [consent, setConsent] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null),
     selection = useRef(0),
     attempt = useRef<{ file: File; options: string; key: string } | null>(null),
     reduced = useReducedMotion();
-  const worker = workers.find((w) => w.id === server),
-    eligible = workers.filter((w) => w.enabled);
+  // One server: the GPU server this website runs on.
+  const worker = workers[0];
   // Translation models the chosen server offers; the selector appears only when there is a choice.
   const models = worker?.capabilities?.translation_models ?? [],
     model = models.find((m) => m.id === translationModel) ?? models[0];
+  // PII models the server offers; the selector appears only when there is a choice.
+  const piiModels = worker?.capabilities?.pii_models ?? [],
+    piiModel = piiModels.find((m) => m.id === piiModelId) ?? piiModels[0];
   const select = async (f?: File) => {
     if (!f) return;
     const version = ++selection.current;
@@ -109,8 +110,8 @@ export function UploadPanel({
       setFileError("Choose a PDF document to continue.");
       return;
     }
-    if (!worker?.enabled) {
-      setError("Choose one of your processing servers.");
+    if (!worker) {
+      setError("The TransformX server is not answering. Reload the page.");
       return;
     }
     if (mode !== "translation" && !categories.length) {
@@ -125,7 +126,7 @@ export function UploadPanel({
       operation: mode,
       source_language: source,
       target_language: target,
-      worker_id: server,
+      worker_id: worker.id,
       output_format: "pdf",
       protected_values: protectedValues
         .split("\n")
@@ -136,6 +137,9 @@ export function UploadPanel({
     };
     if (mode !== "pii" && model && model.id !== "default") {
       options.translation_model = model.id;
+    }
+    if (mode !== "translation" && piiModel && piiModel.id !== "default") {
+      options.pii_model = piiModel.id;
     }
     if (mode !== "translation") {
       options.pii_style = piiStyle;
@@ -477,47 +481,25 @@ export function UploadPanel({
                 3
               </span>
               <h2 className="mb-0 text-base font-semibold">
-                Select your processing server
+                Processing server
               </h2>
             </div>
-            <div className="field">
-              <Label htmlFor="processing-server">GPU server</Label>
-              <select
-                id="processing-server"
-                className="select-input"
-                value={server}
-                onChange={(e) => {
-                  setServer(e.target.value);
-                  setTranslationModel("default");
-                }}
-                required
-              >
-                <option value="">Choose a connected server</option>
-                {eligible.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} ·{" "}
-                    {w.ready ? "Ready" : w.online ? "Not ready" : "Offline"}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="mb-0 text-xs leading-5 text-muted-foreground">
-                {worker?.ready
-                  ? "This server reports its processing prerequisites are ready."
-                  : worker
-                    ? "Your job will wait for this server to become ready."
-                    : "Jobs run on a private server registered to your account."}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onServers}
-              >
-                Manage servers <ArrowRight />
-              </Button>
-            </div>
+            <p className="mb-0 text-sm leading-6">
+              {worker ? (
+                <>
+                  <span className="font-medium">{worker.name}</span>
+                  {" · "}
+                  {worker.ready ? "Ready" : "Not ready yet"}
+                </>
+              ) : (
+                "Checking the server…"
+              )}
+            </p>
+            <p className="mb-0 mt-1 text-xs leading-5 text-muted-foreground">
+              {worker?.ready
+                ? "The models on this server are loaded and ready."
+                : worker?.capabilities?.note || "Your job will wait until the server is ready."}
+            </p>
             {mode !== "pii" && models.length > 1 && (
               <div className="field mt-4">
                 <Label htmlFor="translation-model">Translation model</Label>
@@ -538,6 +520,31 @@ export function UploadPanel({
                   <p className="mb-0 mt-2 text-xs leading-5 text-amber-200">
                     This model runs on an outside service chosen by your server&apos;s administrator:
                     the document&apos;s text is sent there to be translated.
+                  </p>
+                )}
+              </div>
+            )}
+            {mode !== "translation" && piiModels.length > 1 && (
+              <div className="field mt-4">
+                <Label htmlFor="pii-model">PII model</Label>
+                <select
+                  id="pii-model"
+                  className="select-input"
+                  value={piiModel?.id ?? "default"}
+                  onChange={(e) => setPiiModelId(e.target.value)}
+                >
+                  {piiModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                      {m.external ? " · outside service" : ""}
+                    </option>
+                  ))}
+                </select>
+                {piiModel?.external && (
+                  <p className="mb-0 mt-2 text-xs leading-5 text-amber-200">
+                    This model runs on an outside service chosen by your server&apos;s administrator:
+                    the document&apos;s text, including the personal data to be removed, is sent there
+                    to be checked.
                   </p>
                 )}
               </div>
@@ -569,8 +576,8 @@ export function UploadPanel({
         )}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="mb-0 flex items-center gap-2 text-xs text-muted-foreground">
-            <ShieldCheck className="size-4" /> Your files stay private to
-            permitted accounts.
+            <ShieldCheck className="size-4" /> Your files stay on this
+            server.
           </p>
           <Button type="submit" size="lg" disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : <ArrowRight />}
@@ -597,7 +604,7 @@ export function UploadPanel({
           </p>
           <ol className="space-y-4 text-xs text-muted-foreground">
             {[
-              "Your document enters the selected server’s queue.",
+              "Your document joins this server’s queue.",
               "The engine extracts, transforms and reconstructs your document.",
               "Your result appears here for review and download.",
             ].map((t) => (
