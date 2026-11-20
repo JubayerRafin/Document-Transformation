@@ -52,6 +52,14 @@ class WidenSingleLineTests(unittest.TestCase):
         self.assertEqual((heading.box.x, heading.box.x2), (42, 290))
         self.assertEqual(changes[0]['reason'], 'single_line_widened_left')
 
+    def test_a_piece_never_grows_over_the_next_piece_it_already_overlaps(self):
+        first = para('a', 72.3, 507.4, 82.8, 516.9, size=9)
+        second = para('b', 81.0, 507.7, 88.1, 516.7, size=9)
+        below = para('c', 72.3, 480.0, 200.0, 489.0, size=9)
+        doc = NS(page=[page([first, second, below])])
+        widen_single_lines(doc)
+        self.assertEqual(first.box.x2, 82.8)
+
     def test_paragraphs_of_several_lines_and_skipped_ones_keep_their_box(self):
         block = para('m', 42, 600, 100, 640)             # several lines
         heading = para('h', 42, 700, 100, 711)

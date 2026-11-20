@@ -292,6 +292,47 @@ def split_at_list_markers(page, update, make_id):
     return added
 
 
+def _shaped_script(text):
+    from transformation.pdf.unmapped_text import _JOINED_SCRIPTS, RTL
+    return bool(_JOINED_SCRIPTS.search(text) or RTL.search(text))
+
+
+def join_overlapping_fragments(page, update):
+    """Join one-line pieces of one Indic or Arabic line whose boxes overlap side by side.
+
+    BabelDOC 0.6.4 split "परामर्श घंटे" in a table cell into three overlapping paragraphs
+    ("परामर्श", "र्श घंट", "घंटे"); each was translated alone ("Consultation", "Sure", "Hours")
+    and drawn over the others (Hindi report, 2026-11-21). Pieces of these scripts whose boxes
+    overlap horizontally and share most of their height are parts of one line: they are joined and
+    the line is read again as a whole (unmapped_text.repair_page). Text of other scripts, and pieces
+    that only touch, are left alone. Returns how many pieces were joined into others."""
+    joined = 0
+    changed = True
+    while changed:
+        changed = False
+        items = [p for p in page.pdf_paragraph if getattr(p, 'box', None) and not getattr(p, 'vertical', False)
+                 and _shaped_script(''.join(getattr(c, 'char_unicode', '') or '' for c in _characters(p)))]
+        items.sort(key=lambda p: p.box.x)
+        for a in items:
+            for b in items:
+                if a is b or a not in page.pdf_paragraph or b not in page.pdf_paragraph:
+                    continue
+                if getattr(a, 'xobj_id', None) != getattr(b, 'xobj_id', None) or b.box.x < a.box.x:
+                    continue
+                height = min(a.box.y2 - a.box.y, b.box.y2 - b.box.y)
+                size = max(_size(a) or 0, _size(b) or 0, 1.0)
+                if (a.box.y2 - a.box.y > 1.8 * size or b.box.y2 - b.box.y > 1.8 * size
+                        or min(a.box.y2, b.box.y2) - max(a.box.y, b.box.y) < 0.5 * height
+                        or min(a.box.x2, b.box.x2) - max(a.box.x, b.box.x) <= 0.5):
+                    continue
+                a.pdf_paragraph_composition.extend(b.pdf_paragraph_composition)
+                page.pdf_paragraph.remove(b)
+                update(a)
+                joined += 1
+                changed = True
+    return joined
+
+
 def _characters(paragraph):
     """All characters of a paragraph: those of its lines, formulas and same-style runs."""
     out = []
@@ -367,6 +408,7 @@ def install(ParagraphFinder):
 
         changed = split_at_rules(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
+        changed += join_overlapping_fragments(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),
                                       (vertical_rules(page), horizontal_rules(page)))
         changed += attach_lone_marks(page, lambda p: self.update_paragraph_data(p, update_unicode=True))

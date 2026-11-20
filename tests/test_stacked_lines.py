@@ -153,5 +153,38 @@ class LoneMarkTests(unittest.TestCase):
         self.assertFalse(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='•')]))])))
 
 
+class OverlappingFragmentTests(unittest.TestCase):
+    def piece(self, pid, text, x, y, x2, y2):
+        chars = [NS(char_unicode=c, pdf_style=NS(font_size=9)) for c in text]
+        return NS(debug_id=pid, box=NS(x=x, y=y, x2=x2, y2=y2), vertical=False, xobj_id=0,
+                  pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=chars))])
+
+    def test_overlapping_pieces_of_one_hindi_line_become_one_paragraph(self):
+        from transformation.layout.stacked_lines import join_overlapping_fragments
+        # Boxes measured in the Hindi report: "परामर्श", "र्श घंट", "घंटे" on one line of a cell.
+        a = self.piece('a', 'परामर्श', 49.0, 507.3, 74.6, 512.9)
+        b = self.piece('b', 'र्श घंट', 72.3, 507.4, 82.8, 517.0)
+        c = self.piece('c', 'घंटे', 81.0, 507.7, 88.1, 516.7)
+        other_cell = self.piece('d', 'ZSC-2023', 120.0, 507.3, 170.0, 516.0)
+        page = NS(pdf_paragraph=[a, b, c, other_cell])
+        boxes = {id(p.pdf_paragraph_composition[0]): p.box for p in (a, b, c)}
+
+        def update(p):  # as BabelDOC: the joined paragraph's box covers all its pieces
+            parts = [boxes[id(comp)] for comp in p.pdf_paragraph_composition]
+            p.box = NS(x=min(q.x for q in parts), y=min(q.y for q in parts),
+                       x2=max(q.x2 for q in parts), y2=max(q.y2 for q in parts))
+        self.assertEqual(join_overlapping_fragments(page, update), 2)
+        self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['a', 'd'])
+
+    def test_touching_or_latin_pieces_stay_apart(self):
+        from transformation.layout.stacked_lines import join_overlapping_fragments
+        left = self.piece('l', 'परामर्श', 49.0, 507.3, 74.6, 512.9)
+        right = self.piece('r', 'घंटे', 74.8, 507.7, 88.1, 516.7)           # touching, not overlapping
+        latin_a = self.piece('x', 'Total', 49.0, 400.0, 75.0, 409.0)
+        latin_b = self.piece('y', 'due', 72.0, 400.0, 90.0, 409.0)
+        page = NS(pdf_paragraph=[left, right, latin_a, latin_b])
+        self.assertEqual(join_overlapping_fragments(page, lambda p: None), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

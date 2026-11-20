@@ -132,8 +132,10 @@ def _free_edge(box, size, others, shapes, page_edge):
     column = [o[2] for o in others if abs(o[0] - left) <= size and max(o[1] - top, bottom - o[3]) <= 6 * size]
     limit = min(max(column) if column else right + (right - left), page_edge)
     for x, y, x2, y2 in others:
-        if min(y2, top) > max(y, bottom) and x >= right - 1:
-            limit = min(limit, x - 2)
+        # Anything on its line that starts after it, also a piece it already overlaps: a Hindi word
+        # split into overlapping pieces grew one piece over the next ("Sure" over "Hours", 2026-11-21).
+        if min(y2, top) > max(y, bottom) and x > left + 1:
+            limit = min(limit, max(right, x - 2))
     for x, y, x2, y2 in shapes:
         if not min(y2, top) > max(y, bottom):
             continue
