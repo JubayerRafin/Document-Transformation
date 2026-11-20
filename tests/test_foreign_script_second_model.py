@@ -42,5 +42,25 @@ class SecondModelTests(unittest.TestCase):
         self.assertTrue(stats['foreign_script_review_required'])
 
 
+class SecondModelAfterValidationTests(unittest.TestCase):
+    def test_the_other_model_gets_one_try_when_both_answers_change_a_value(self):
+        source = 'The following examples depict letter-size paper with the short edge first.'
+        wrong = '다음 예시는 짧은 변이 먼저 들어가는 A4 용지를 보여줍니다.'
+        right = '다음 예시는 짧은 변이 먼저 들어가는 레터 크기 용지를 보여줍니다.'
+        answers = {'translategemma:12b': wrong, 'qwen3.5-9b-fp8': right}
+        with patch('transformation.llm.ollama_native.chat', server(answers)),              patch('transformation.llm.ollama_native.record_progress'),              patch.dict(os.environ, {'TRANSFORMX_PII_ENDPOINT': 'http://127.0.0.1:8000/v1',
+                                     'TRANSFORMX_PII_MODEL': 'qwen3.5-9b-fp8'}):
+            result, stats = translategemma.translate('http://127.0.0.1:8010/v1', 'translategemma:12b', source, 'Korean')
+        self.assertEqual(result, right)
+        self.assertTrue(stats['second_model_after_validation'])
+
+    def test_without_a_second_model_the_failure_is_raised_as_before(self):
+        source = 'The following examples depict letter-size paper with the short edge first.'
+        with patch('transformation.llm.ollama_native.chat', server({'translategemma:12b': '다음 A4 용지를 보여줍니다.'})),              patch('transformation.llm.ollama_native.record_progress'),              patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('TRANSFORMX_PII_ENDPOINT', None); os.environ.pop('TRANSFORMX_PII_MODEL', None)
+            with self.assertRaises(ValueError):
+                translategemma.translate('http://127.0.0.1:8010/v1', 'translategemma:12b', source, 'Korean')
+
+
 if __name__ == '__main__':
     unittest.main()

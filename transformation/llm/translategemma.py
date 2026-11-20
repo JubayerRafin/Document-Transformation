@@ -445,6 +445,14 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                 (audit/(uuid4().hex+'.json')).write_text(json.dumps({'source':text,'candidate':result,
                     'reason':str(error),'attempt':attempt,'model':model},ensure_ascii=False,indent=2),encoding='utf-8')
             if attempt==2:
+                # Both answers changed a value ("letter-size" -> "A4", an invented web address after a
+                # sentence cut at a line end; HP manual, 2026-11-21): the server's other model gets one
+                # try under the same checks before the paragraph is spliced or kept in English.
+                second=_second_model_translation(text,language,protected,context,source,model)
+                if second is not None:
+                    record_progress('validation_second_model',source_sha256=digest,model=model,reason=failure_reason[:120])
+                    return second[0],{**totals,**second[1],'translation_backend':_backend(model),
+                                      'second_model_after_validation':True}
                 # Never attempt to repair a field/value relationship by splicing.
                 # Recovery is bounded and retains the same final validation.
                 if tokens and (isinstance(error,PlaceholderIntegrityError)
