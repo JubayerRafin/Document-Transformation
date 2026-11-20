@@ -44,6 +44,14 @@ class WidenSingleLineTests(unittest.TestCase):
         widen_single_lines(doc)
         self.assertEqual(cell.box.x2, 138)
 
+    def test_a_right_aligned_heading_grows_to_the_left_edge_of_its_column(self):
+        heading = para('h', 230, 700, 290, 711)          # right-aligned, as in an Arabic report
+        body = para('b', 42, 640, 290, 690)
+        doc = NS(page=[page([heading, body])])
+        changes = widen_single_lines(doc)
+        self.assertEqual((heading.box.x, heading.box.x2), (42, 290))
+        self.assertEqual(changes[0]['reason'], 'single_line_widened_left')
+
     def test_paragraphs_of_several_lines_and_skipped_ones_keep_their_box(self):
         block = para('m', 42, 600, 100, 640)             # several lines
         heading = para('h', 42, 700, 100, 711)

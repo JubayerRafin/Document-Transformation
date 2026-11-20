@@ -48,8 +48,33 @@ def _text(paragraph):
     return ''.join(getattr(ch, 'char_unicode', '') or '' for line in _lines(paragraph) for ch in (line.pdf_character or []))
 
 
-def mergeable(upper, lower):
-    """Whether `lower` continues `upper` as the next line of the same narrow-column text."""
+def _same_cell(upper, lower, rules):
+    """Whether two stacked lines lie in one ruled table cell: a vertical rule on each side covering
+    both lines, and no horizontal rule between them."""
+    a, b = upper, lower
+    top, bottom = max(a.y2, b.y2), min(a.y, b.y)
+    left, right = min(a.x, b.x), max(a.x2, b.x2)
+    vertical, horizontal = rules
+    covering = [r for r in vertical if r.y <= bottom + 1 and r.y2 >= top - 1]
+    if not any(r.x2 <= left + 1 for r in covering) or not any(r.x >= right - 1 for r in covering):
+        return False
+    return not any(r.x <= left and r.x2 >= right and b.y2 - 1 <= (r.y + r.y2) / 2 <= a.y + 1 for r in horizontal)
+
+
+def horizontal_rules(page):
+    """Boxes of thin horizontal lines on the page (table row borders)."""
+    rules = []
+    for curve in getattr(page, 'pdf_curve', None) or []:
+        box = getattr(curve, 'box', None)
+        if box is not None and box.y2 - box.y <= RULE_WIDTH and box.x2 - box.x > 2 * (box.y2 - box.y):
+            rules.append(box)
+    return rules
+
+
+def mergeable(upper, lower, rules=None):
+    """Whether `lower` continues `upper` as the next line of the same narrow-column text: Chinese,
+    Japanese or Korean text anywhere, other scripts only inside one ruled table cell ("परामर्श /
+    घंटे" came out as "Consultation" and "Hours" drawn at two sizes, Hindi report, 2026-11-21)."""
     if upper is lower or getattr(upper, 'vertical', False) or getattr(lower, 'vertical', False):
         return False
     if getattr(upper, 'xobj_id', None) != getattr(lower, 'xobj_id', None):
@@ -71,14 +96,20 @@ def mergeable(upper, lower):
     if abs(last.x - first.x) > ALIGN * height:
         return False
     upper_text, lower_text = _text(upper).strip(), _text(lower).strip()
-    if not is_compact_cjk(upper_text) or not is_compact_cjk(lower_text) or upper_text[-1:] in SENTENCE_END:
+    if not upper_text or not lower_text or upper_text[-1:] in SENTENCE_END:
         return False
-    return True
+    in_cell = bool(rules) and _same_cell(last, first, rules)
+    if is_compact_cjk(upper_text) and is_compact_cjk(lower_text):
+        return in_cell or not rules or not any(
+            r.x <= min(last.x, first.x) and r.x2 >= max(last.x2, first.x2)
+            and first.y2 - 1 <= (r.y + r.y2) / 2 <= last.y + 1 for r in rules[1])
+    return in_cell and upper_text[-1:] != '.'
 
 
-def join_stacked_lines(paragraphs, update):
+def join_stacked_lines(paragraphs, update, rules=None):
     """Merge stacked one-column lines in place; `update(paragraph)` recomputes a merged paragraph's
-    box and text. Returns how many paragraphs were joined into others."""
+    box and text; rules: (vertical, horizontal) rule boxes of the page. Returns how many paragraphs
+    were joined into others."""
     joined = 0
     changed = True
     while changed:
@@ -86,7 +117,7 @@ def join_stacked_lines(paragraphs, update):
         for upper in list(paragraphs):
             if upper not in paragraphs:
                 continue
-            below = [p for p in paragraphs if mergeable(upper, p)]
+            below = [p for p in paragraphs if mergeable(upper, p, rules)]
             if not below:
                 continue
             lower = min(below, key=lambda p: _lines(upper)[-1].box.y - _lines(p)[0].box.y2)
@@ -333,7 +364,8 @@ def install(ParagraphFinder):
 
         changed = split_at_rules(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
-        changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True))
+        changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),
+                                      (vertical_rules(page), horizontal_rules(page)))
         changed += attach_lone_marks(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         if changed:
             self._set_paragraph_render_order(page)

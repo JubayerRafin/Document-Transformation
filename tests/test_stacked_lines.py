@@ -37,6 +37,17 @@ class StackedLineTests(unittest.TestCase):
         self.assertFalse(mergeable(para('完成。', 49.2, 260.0), para('手套', 49.2, 247.1)))
         self.assertTrue(mergeable(upper, para('手套', 49.2, 247.1)))
 
+    def test_lines_of_other_scripts_join_only_inside_one_ruled_cell(self):
+        upper, lower = para('परामर्श ', 49.2, 260.0), para('घंटे', 49.2, 247.1)
+        cell = ([NS(x=45, y=240, x2=45.8, y2=275), NS(x=120, y=240, x2=120.8, y2=275)], [])
+        self.assertTrue(mergeable(upper, lower, cell))
+        self.assertFalse(mergeable(upper, lower))                       # no table rules
+        self.assertFalse(mergeable(upper, lower, ([NS(x=45, y=240, x2=45.8, y2=275)], [])))  # one side only
+        row_border = ([*cell[0]], [NS(x=45, y=257.0, x2=120.8, y2=257.6)])
+        self.assertFalse(mergeable(upper, lower, row_border))           # two rows of the cell column
+        self.assertFalse(mergeable(para('Done.', 49.2, 260.0), lower, cell))
+        self.assertFalse(mergeable(para('安全', 49.2, 260.0), para('手套', 49.2, 247.1), row_border))
+
     def test_compact_cjk_means_han_and_kana_only(self):
         self.assertTrue(is_compact_cjk('热敏标签'))
         self.assertTrue(is_compact_cjk('バーコード'))

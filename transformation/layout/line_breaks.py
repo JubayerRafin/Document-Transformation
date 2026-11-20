@@ -124,52 +124,71 @@ def _font_size(paragraph):
     return float(style.font_size) if style and getattr(style, 'font_size', None) else None
 
 
+def _free_edge(box, size, others, shapes, page_edge):
+    """How far right box can grow: to the right edge of its column (paragraphs starting at its left
+    edge within six lines above or below; twice its width without one), before anything to its
+    right on its line, and inside a panel or cell drawn around it. Boxes are (x, y, x2, y2)."""
+    left, bottom, right, top = box
+    column = [o[2] for o in others if abs(o[0] - left) <= size and max(o[1] - top, bottom - o[3]) <= 6 * size]
+    limit = min(max(column) if column else right + (right - left), page_edge)
+    for x, y, x2, y2 in others:
+        if min(y2, top) > max(y, bottom) and x >= right - 1:
+            limit = min(limit, x - 2)
+    for x, y, x2, y2 in shapes:
+        if not min(y2, top) > max(y, bottom):
+            continue
+        if x >= right - 1:                                   # something to the right on this line
+            limit = min(limit, x - 2)
+        elif x <= left + 1 and x2 >= right - 1 and y <= bottom + 1 and y2 >= top - 1:
+            limit = min(limit, x2 - 2)                       # a panel or cell around it
+        elif x2 > right:                                     # a shape crossing its line further right
+            limit = min(limit, max(right, x - 2))
+    return limit, bool(column)
+
+
 def widen_single_lines(document, source_images=None, skip=()):
-    """Let a one-line paragraph use the free space to its right, up to the edge of its column.
+    """Let a one-line paragraph use the free space of its column.
 
     A translation longer than its source ("계약 조건" -> "Contract Terms", "Finanzlage" ->
     "Financial Position") was fitted into the source's short box and drawn at a third of its size
-    (Korean and German reports, 2026-11-21). The box now reaches the right edge of the paragraphs
-    above and below it in the same column (or twice its width when it has none), and stops before
-    anything to its right on its line and at the edge of a panel or cell drawn around it."""
+    (Korean and German reports, 2026-11-21). A left-aligned line now reaches the right edge of its
+    column (_free_edge); a right-aligned one, as in Arabic documents, the left edge."""
     changes = []
     for page in document.page:
         crop = getattr(getattr(page, 'cropbox', None), 'box', None)
-        others = [p for p in page.pdf_paragraph if getattr(p, 'box', None)]
+        paragraphs = [p for p in page.pdf_paragraph if getattr(p, 'box', None)]
         shapes = [getattr(o, 'box', None) for attr in ('pdf_figure', 'pdf_curve', 'pdf_form')
                   for o in (getattr(page, attr, None) or [])]
         shapes.extend(getattr(o, 'box', None) for o in (source_images or {}).get(page.page_number, []))
-        shapes = [b for b in shapes if b is not None]
-        for paragraph in others:
+        shapes = [(b.x, b.y, b.x2, b.y2) for b in shapes if b is not None]
+        for paragraph in paragraphs:
             b = paragraph.box
             size = _font_size(paragraph)
             if (paragraph.debug_id in skip or getattr(paragraph, 'vertical', False) or not size
                     or b.y2 - b.y > 1.8 * size or b.x2 - b.x <= 0):
                 continue
-            left, right, bottom, top = b.x, b.x2, b.y, b.y2
-            # The column: paragraphs starting at the same left edge within a few lines above or below.
-            column = [o.box.x2 for o in others if o is not paragraph and abs(o.box.x - left) <= size
-                      and max(o.box.y - top, bottom - o.box.y2) <= 6 * size]
-            limit = max(column) if column else right + (right - left)
-            if crop:
-                limit = min(limit, crop.x2 - 2)
-            for o in others:
-                ob = o.box
-                if o is not paragraph and min(ob.y2, top) > max(ob.y, bottom) and ob.x2 > right and ob.x >= right - 1:
-                    limit = min(limit, ob.x - 2)
-            for sb in shapes:
-                if not min(sb.y2, top) > max(sb.y, bottom):
-                    continue
-                if sb.x >= right - 1:                       # something to the right on this line
-                    limit = min(limit, sb.x - 2)
-                elif sb.x <= left + 1 and sb.x2 >= right - 1 and sb.y <= bottom + 1 and sb.y2 >= top - 1:
-                    limit = min(limit, sb.x2 - 2)            # a panel or cell around it
-                elif sb.x2 > right:                          # a shape crossing its line further right
-                    limit = min(limit, max(right, sb.x - 2))
-            if limit > right + 1:
+            others = [(o.box.x, o.box.y, o.box.x2, o.box.y2) for o in paragraphs if o is not paragraph]
+            box = (b.x, b.y, b.x2, b.y2)
+            limit, aligned = _free_edge(box, size, others, shapes, crop.x2 - 2 if crop else float('inf'))
+            if aligned and limit > b.x2 + 1:
                 changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
-                                'reason': 'single_line_widened', 'before': [left, bottom, right, top],
-                                'after': [left, bottom, limit, top]})
+                                'reason': 'single_line_widened', 'before': list(box),
+                                'after': [b.x, b.y, limit, b.y2]})
+                b.x2 = limit
+                continue
+            # Mirrored: the same rules for a line aligned with its column's right edge.
+            flip = lambda r: (-r[2], r[1], -r[0], r[3])
+            edge, right_aligned = _free_edge(flip(box), size, [flip(o) for o in others], [flip(s) for s in shapes],
+                                             -(crop.x + 2) if crop else float('inf'))
+            if right_aligned and -edge < b.x - 1:
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': 'single_line_widened_left', 'before': list(box),
+                                'after': [-edge, b.y, b.x2, b.y2]})
+                b.x = -edge
+            elif limit > b.x2 + 1:
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': 'single_line_widened', 'before': list(box),
+                                'after': [b.x, b.y, limit, b.y2]})
                 b.x2 = limit
     return changes
 
