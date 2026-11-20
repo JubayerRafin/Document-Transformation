@@ -101,7 +101,11 @@ def _build_docling_converter():
     opts.do_table_structure=True
     opts.do_ocr=False
     opts.generate_page_images=False
-    opts.accelerator_options=AcceleratorOptions(device=AcceleratorDevice.CPU)
+    # TRANSFORMX_DOCLING_DEVICE: "auto" (default) uses the GPU when this Python has CUDA PyTorch.
+    # Forced to the CPU, the layout and table models took 7.4 s for a one-page invoice, against
+    # about 0.8 s on an L40S (2026-11-21).
+    import os
+    opts.accelerator_options=AcceleratorOptions(device=os.environ.get('TRANSFORMX_DOCLING_DEVICE','auto'))
     return DocumentConverter(format_options={InputFormat.PDF:PdfFormatOption(pipeline_options=opts)})
 
 
@@ -116,6 +120,19 @@ class DoclingAdapter(DoclingTableExtractor):
     def _init_docling(self):
         self.errors=[]
         self.page_results=[]
+        self._service=False
+        if not getattr(self,'_local_only',False):
+            # The worker's shared, already loaded models (extraction/docling_service.py): loading them
+            # took about 13 s of every job (2026-11-21).
+            try:
+                from extraction.docling_service import ping
+                self._service=ping()
+            except Exception:
+                self._service=False
+            if self._service:
+                self.converter_timing={'seconds':0.0,'reused_in_process':False,'shared_service':True}
+                self.available=True
+                return
         try:
             started=time.monotonic()
             with _DOCLING_LOCK:
@@ -129,6 +146,23 @@ class DoclingAdapter(DoclingTableExtractor):
 
     def extract_page(self,path,number,start_index=0):
         if not self.available: return []
+        if getattr(self,'_service',False):
+            try:
+                from extraction.docling_service import extract_page
+                reply=extract_page(Path(path).resolve(),number,Path(self.tables_dir).resolve(),start_index)
+            except Exception as exc:
+                print(f'Shared table models unavailable ({type(exc).__name__}); loading them in this job.',flush=True)
+                self._local_only=True
+                self._init_docling()
+                return self.extract_page(path,number,start_index)
+            self.page_results.extend(reply['page_results']); self.errors.extend(reply['errors'])
+            elements=[]
+            for fields in reply['elements']:
+                element=ExtractedElement(fields['page_num'],fields['y_coordinate'],fields['element_type'],fields['content'])
+                for name in ('bbox','matrix','cell_records','source_engine'):
+                    if name in fields: setattr(element,name,fields[name])
+                elements.append(element)
+            return elements
         self.geometry={}
         single=None
         try:

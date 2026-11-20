@@ -792,6 +792,12 @@ def main():
             from transformation.pdf.layout_service import optional_shared_layout
             engine.ocr_session = stack.enter_context(managed_session(profile['ocr_python'], store.root, enabled))
             layout = stack.enter_context(optional_shared_layout(profile.get('python'), store.root / 'layout-service'))
+            # Table models loaded once for all jobs, in the engine's Python (extraction/docling_service.py).
+            from extraction.docling_service import optional_shared_docling
+            tables = stack.enter_context(optional_shared_docling(
+                os.environ.get('TRANSFORMX_ENGINE_PYTHON') or profile.get('engine_python'), store.root / 'docling-service'))
+            if tables:
+                print(f"Shared table models ready ({tables['load_seconds']} s).", flush=True)
             if engine.ocr_session:
                 from transformation.ocr.service import prewarm
                 prewarm(store.root / 'prewarm')
