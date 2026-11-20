@@ -92,3 +92,41 @@ class LineBreakTests(unittest.TestCase):
         for u in values[8:]: u.box = NS(y=11.5, y2=21.5)      # formula drawn 1.5 pt higher
         _, fits = Layout()._layout_typesetting_units(values, None, 1, 1, None)
         self.assertTrue(fits)
+
+
+class KoreanAndIndentHookTests(unittest.TestCase):
+    def test_korean_letters_are_no_break_point_but_spaces_and_other_scripts_keep_theirs(self):
+        from transformation.layout.line_breaks import install_korean_word_breaks
+
+        class Unit:
+            def __init__(self, text): self.text = text
+            def try_get_unicode(self): return self.text
+            def calc_can_break_line(self): return not self.text.isascii() or self.text == ' '
+
+        install_korean_word_breaks(Unit)
+        self.assertFalse(Unit('가').calc_can_break_line())
+        self.assertFalse(Unit('ㄱ').calc_can_break_line())
+        self.assertTrue(Unit(' ').calc_can_break_line())
+        self.assertTrue(Unit('中').calc_can_break_line())   # Chinese still breaks between characters
+        self.assertTrue(Unit('あ').calc_can_break_line())   # and Japanese
+
+    def test_first_line_indent_needs_half_an_em(self):
+        from types import SimpleNamespace as NS
+        from transformation.layout.line_breaks import install_real_first_line_indents
+
+        def paragraph(offset, size=13.0):
+            first = NS(visual_bbox=NS(box=NS(x=100 + offset)), pdf_style=NS(font_size=size))
+            return NS(box=NS(x=100), first_line_indent=None,
+                      pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[first]))])
+
+        class Finder:
+            def update_paragraph_data(self, p, update_unicode=False):
+                first = p.pdf_paragraph_composition[0].pdf_line.pdf_character[0]
+                p.first_line_indent = first.visual_bbox.box.x - p.box.x > 1  # BabelDOC's rule
+
+        install_real_first_line_indents(Finder)
+        jitter, real = paragraph(2.0), paragraph(13.0)
+        Finder().update_paragraph_data(jitter)
+        Finder().update_paragraph_data(real)
+        self.assertFalse(jitter.first_line_indent)   # two points of scan jitter
+        self.assertTrue(real.first_line_indent)      # one em: a real indent

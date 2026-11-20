@@ -597,6 +597,10 @@ def main():
     install_whole_word_breaks(Typesetting)
     from babeldoc.format.pdf.document_il.midend.typesetting import TypesettingUnit
     install_attached_punctuation(TypesettingUnit)
+    from transformation.layout.line_breaks import install_korean_word_breaks, install_real_first_line_indents
+    install_korean_word_breaks(TypesettingUnit)
+    from babeldoc.format.pdf.document_il.midend.paragraph_finder import ParagraphFinder
+    install_real_first_line_indents(ParagraphFinder)
     install_table_fitting(Typesetting)
     original = Typesetting.typesetting_document
 

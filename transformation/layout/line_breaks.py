@@ -180,6 +180,67 @@ def install_whole_word_breaks(Typesetting):
     Typesetting._transformx_whole_words = True
 
 
+def is_hangul(character):
+    """Korean letters: syllables, jamo and compatibility jamo."""
+    code = ord(character) if character else 0
+    return (0xAC00 <= code <= 0xD7AF or 0x1100 <= code <= 0x11FF or 0x3130 <= code <= 0x318F
+            or 0xA960 <= code <= 0xA97F or 0xD7B0 <= code <= 0xD7FF)
+
+
+def install_korean_word_breaks(TypesettingUnit):
+    """Break Korean lines between words, not inside them.
+
+    BabelDOC 0.6.4 lets a line break after any Chinese, Japanese or Korean character. Korean
+    separates words with spaces like English, and a word split over two lines ("사용 가 | 능.")
+    reads as two words (scanned caution label, 2026-11-21). Hangul letters are no break point now,
+    like Latin letters; a space still is. A single word wider than the line still breaks: BabelDOC
+    retries such a paragraph with character breaks (use_english_line_break=False)."""
+    if getattr(TypesettingUnit, '_transformx_korean_words', False):
+        return
+    original = TypesettingUnit.calc_can_break_line
+
+    def can_break(self):
+        text = self.try_get_unicode()
+        if text and len(text) == 1 and is_hangul(text):
+            return False
+        return original(self)
+
+    TypesettingUnit.calc_can_break_line = can_break
+    TypesettingUnit._transformx_korean_words = True
+
+
+INDENT_EMS = 0.5  # a first line starting this many ems right of the paragraph is indented
+
+
+def install_real_first_line_indents(ParagraphFinder):
+    """Indent a paragraph's first line only when the source really indents it.
+
+    BabelDOC 0.6.4 marks a paragraph as indented when its first character starts more than 1 pt right
+    of the paragraph's left edge, and then sets the translated first line four spaces in. Lines read
+    from a scan start a pixel or two apart, so a label's second line ("Badge EMP-2024-8831") came out
+    pushed right inside its box (2026-11-21). An indent now needs half an em of the first
+    character's size; typographic indents are about one em or more."""
+    if getattr(ParagraphFinder, '_transformx_real_indents', False):
+        return
+    original = ParagraphFinder.update_paragraph_data
+
+    def update(self, paragraph, *args, **kwargs):
+        result = original(self, paragraph, *args, **kwargs)
+        if getattr(paragraph, 'first_line_indent', False):
+            try:
+                first = paragraph.pdf_paragraph_composition[0].pdf_line.pdf_character[0]
+                offset = first.visual_bbox.box.x - paragraph.box.x
+                size = (first.pdf_style.font_size if first.pdf_style else None) or 0
+            except (AttributeError, IndexError, TypeError):
+                return result
+            if size > 0 and offset < INDENT_EMS * size:
+                paragraph.first_line_indent = False
+        return result
+
+    ParagraphFinder.update_paragraph_data = update
+    ParagraphFinder._transformx_real_indents = True
+
+
 ATTACHING_PUNCTUATION = set('.,:;!?)]}%’”') | set('([{“‘')
 
 
