@@ -112,16 +112,16 @@ def _split_index(chars, rules, line_box):
     """Index of the first character after a vertical rule that crosses the line between two of its
     characters, with letters on both sides; or None."""
     height = line_box.y2 - line_box.y
-    for i in range(len(chars) - 1):
-        left, right = chars[i].visual_bbox.box, chars[i + 1].visual_bbox.box
+    # Neighbouring visible characters: BabelDOC's space between two cells spans the whole gap, border
+    # included, so a border lies between two letters, never between a letter and that space.
+    visible = [i for i, c in enumerate(chars) if (c.char_unicode or '').strip() and getattr(c, 'visual_bbox', None)]
+    for a, b in zip(visible, visible[1:]):
+        left, right = chars[a].visual_bbox.box, chars[b].visual_bbox.box
         for rule in rules:
             centre = (rule.x + rule.x2) / 2
             covers = min(rule.y2, line_box.y2) - max(rule.y, line_box.y) >= 0.8 * height
             if covers and left.x2 - 0.5 <= centre <= right.x + 0.5:
-                before = ''.join(c.char_unicode or '' for c in chars[:i + 1]).strip()
-                after = ''.join(c.char_unicode or '' for c in chars[i + 1:]).strip()
-                if before and after:
-                    return i + 1
+                return a + 1
     return None
 
 

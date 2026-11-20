@@ -48,7 +48,10 @@ class SplitAtRulesTests(unittest.TestCase):
         def char(c, x):
             box = NS(x=x, y=544.2, x2=x + 9, y2=553.2)
             return NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=9))
-        chars = [char(c, 263 + 9 * i) for i, c in enumerate(text_left)] + [char(' ', 263 + 9 * len(text_left))]
+        chars = [char(c, 263 + 9 * i) for i, c in enumerate(text_left)]
+        space = char(' ', 263 + 9 * len(text_left))
+        space.visual_bbox.box.x2 = rule_x + 6   # BabelDOC's space spans the whole gap, border included
+        chars.append(space)
         start = rule_x + 6
         chars += [char(c, start + 9 * i) for i, c in enumerate(text_right)]
         line = NS(pdf_character=chars, box=NS(x=263, y=544.2, x2=chars[-1].visual_bbox.box.x2, y2=553.2))

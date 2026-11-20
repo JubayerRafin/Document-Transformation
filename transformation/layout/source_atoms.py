@@ -10,7 +10,7 @@ def is_source_atom(text):
     words=re.findall(r'[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*',text)
     residue=re.sub(r'[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*','',text)
     if not words or re.search(r'[^\s×÷+\-*/=<>≤≥.,:;()[\]_%{}]',residue):return False
-    return all(word.isdigit() or re.fullmatch(r'[A-Z]{2,8}\d*',word)
+    return all(word.isdigit() or re.fullmatch(r'[A-Z]{2,8}\d*',word) or re.fullmatch(r'\d+(?:-\d+)+',word)
                or ('-' in word and any(c.isdigit() for c in word) and any(c.isalpha() for c in word))
                for word in words)
 

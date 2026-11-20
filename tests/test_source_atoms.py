@@ -15,7 +15,7 @@ class SourceAtomsTests(unittest.TestCase):
         return p,page,entries[(1,'a')]
 
     def test_notation_and_structured_identifiers_only(self):
-        for text in ['64 × 64','PQ50','PQ{v1}','Encoder-ResNet-v3 [12]']:
+        for text in ['64 × 64','PQ50','PQ{v1}','Encoder-ResNet-v3 [12]','2026-07-12']:
             self.assertTrue(is_source_atom(text),text)
         for text in ['Accuracy of the model','Forward to section 4','A Summary','Résumé','']:
             self.assertFalse(is_source_atom(text),text)
