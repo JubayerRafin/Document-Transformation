@@ -56,7 +56,7 @@ def run_workflow(data,filename,workflow='Translation only',**options):
     # Results name the file the customer sent: the worker checks this fingerprint against the
     # upload, and the upright/levelled copy below has a different one.
     import hashlib
-    if not isinstance(data,(bytes,bytearray)) or not data:
+    if not isinstance(data,(bytes,bytearray,memoryview)) or not len(data):
         # The same check the pipeline makes, before the fingerprint below needs the bytes.
         raise ValueError('No document bytes are available. Remove the old upload and upload the document again before starting.')
     original=hashlib.sha256(bytes(data)).hexdigest()
