@@ -77,6 +77,34 @@ def _parsed_fonts(fontmap):
     fontmap.pymupdf = module
 
 
+def _model_path(assets, doclayout):
+    """Verify the layout model file once per process, like the fonts above: each BabelDOC run
+    checked the 75 MB file's SHA3 (0.2 s), once more for every picture with text (2026-11-21)."""
+    original = assets.get_doclayout_onnx_model_path
+    if getattr(original, '_transformx_cached', False): return
+    state = {}
+
+    def get_doclayout_onnx_model_path():
+        with _lock:
+            hit = state.get('path')
+        if hit:
+            path, stamp = hit
+            try:
+                current = os.stat(path)
+                if (current.st_size, current.st_mtime_ns) == stamp: return path
+            except OSError:
+                pass
+        path = original()
+        current = os.stat(path)
+        with _lock:
+            state['path'] = (path, (current.st_size, current.st_mtime_ns))
+        return path
+
+    get_doclayout_onnx_model_path._transformx_cached = True
+    assets.get_doclayout_onnx_model_path = get_doclayout_onnx_model_path
+    doclayout.get_doclayout_onnx_model_path = get_doclayout_onnx_model_path
+
+
 def _quiet_memory_monitor(high_level):
     monitor = high_level.MemoryMonitor
     if getattr(monitor, '_transformx_quiet', False): return
@@ -89,8 +117,10 @@ def install():
     from babeldoc.assets import assets
     from babeldoc.format.pdf.document_il.utils import fontmap
     from babeldoc.format.pdf import high_level
+    from babeldoc.docvision import doclayout
     _font_assets(assets)
     _parsed_fonts(fontmap)
+    _model_path(assets, doclayout)
     _quiet_memory_monitor(high_level)
     return True
 
@@ -105,3 +135,7 @@ def warm():
     for name in getattr(assets, 'EMBEDDING_FONT_METADATA', {}):
         if get_cache_file_path(name, 'fonts').exists():
             assets.get_font_and_metadata(name)
+    model = get_cache_file_path('doclayout_yolo_docstructbench_imgsz1024.onnx', 'models')
+    if model.exists():
+        from transformation.pdf.layout_service import model_digest
+        model_digest(assets.get_doclayout_onnx_model_path())

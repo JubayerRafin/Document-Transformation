@@ -47,6 +47,30 @@ class ParsedFontTests(unittest.TestCase):
         self.assertNotIsInstance('text', fontmap.pymupdf.Font)
 
 
+class LayoutModelTests(unittest.TestCase):
+    def test_the_layout_model_file_is_verified_and_hashed_once_until_it_changes(self):
+        with tempfile.TemporaryDirectory() as folder:
+            model = Path(folder) / 'model.onnx'
+            model.write_bytes(b'weights')
+            calls = []
+            def verify():
+                calls.append(1)
+                return model
+            assets, doclayout = SimpleNamespace(get_doclayout_onnx_model_path=verify), SimpleNamespace()
+            babeldoc_speed._model_path(assets, doclayout)
+            self.assertEqual([assets.get_doclayout_onnx_model_path() for _ in range(3)], [model] * 3)
+            self.assertIs(doclayout.get_doclayout_onnx_model_path, assets.get_doclayout_onnx_model_path)
+            self.assertEqual(len(calls), 1)
+            from transformation.pdf.layout_service import model_digest
+            first = model_digest(model)
+            self.assertEqual(model_digest(model), first)
+            model.write_bytes(b'other weights!')
+            os.utime(model, ns=(1, 2))
+            assets.get_doclayout_onnx_model_path()
+            self.assertEqual(len(calls), 2)
+            self.assertNotEqual(model_digest(model), first)
+
+
 class MemoryMonitorTests(unittest.TestCase):
     def test_memory_monitor_starts_no_thread(self):
         started = []

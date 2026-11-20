@@ -797,4 +797,13 @@ def main():
             )
 
 if __name__ == "__main__":
-    main()
+    # TRANSFORMX_PROFILE_FILE: write a cProfile of this run there (for measuring; off by default).
+    if os.environ.get("TRANSFORMX_PROFILE_FILE"):
+        import cProfile
+        profiler = cProfile.Profile()
+        try:
+            profiler.runcall(main)
+        finally:
+            profiler.dump_stats(os.environ["TRANSFORMX_PROFILE_FILE"])
+    else:
+        main()

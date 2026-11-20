@@ -117,6 +117,21 @@ def ping(timeout=5):
         return False
 
 
+_DIGESTS = {}
+
+
+def model_digest(path):
+    """SHA-256 of the layout model file, computed once per process for a given size and time
+    (0.1 s per BabelDOC run otherwise; the preload warm-up computes it before jobs fork)."""
+    path = Path(path)
+    stat = path.stat()
+    key = (str(path), stat.st_size, stat.st_mtime_ns)
+    if key not in _DIGESTS:
+        import hashlib
+        _DIGESTS[key] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return _DIGESTS[key]
+
+
 def install(model_class=None):
     """Replace only session construction/run; retain vendor preprocessing/NMS."""
     address, key = os.environ.get(ENV), os.environ.get(KEY)
@@ -159,8 +174,7 @@ def install(model_class=None):
 
     def initialize(self, model_path):
         # Match the exact asset selected by the vendor in this job.
-        import hashlib
-        digest = hashlib.sha256(Path(model_path).read_bytes()).hexdigest()
+        digest = model_digest(model_path)
         metadata = request(address, key, 'metadata', digest)
         self.model_path = model_path
         self._stride = metadata['stride']
