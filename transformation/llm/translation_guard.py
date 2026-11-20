@@ -27,6 +27,23 @@ def source_unit_spacing(source,target,values=()):
     return target
 
 
+# "percent" written out, in the languages that write it with Latin letters.
+PERCENT_WORDS=r'(?:percent|per\s?cent|prozent|pour\s?cent|por\s?ciento|por\s?cento|procent|per\s?cento|percento)'
+
+
+def percent_signs(source,target):
+    """Comparison-only: "8 percent" in the source may come back as "8%" or "8 %": the model's usual
+    rendering in Korean, Chinese and Japanese. The check took "8%" for a changed value and kept the
+    English sentence after three attempts, 63 paragraphs of a 250-page report (2026-11-21). Only a
+    number the source writes with a percent word is folded, and only when the source has no "N%" of
+    its own. Returned document text is not rewritten."""
+    for number in set(re.findall(r'(?<![\w.,])(\d+(?:[.,]\d+)?)\s*'+PERCENT_WORDS+r'(?![^\W\d_])',source,flags=re.I)):
+        # Chinese and Japanese write the number against the word before it ("增长了8%").
+        if re.search(r'(?<![0-9A-Za-z.,])'+re.escape(number)+r'\s?[%％]',source):continue
+        target=re.sub(r'(?<![0-9A-Za-z.,])'+re.escape(number)+r'\s?[%％]',number,target)
+    return target
+
+
 def joined_separator_spacing(source,values=()):
     """Comparison-only: a number broken by a stray space after its separator ("2024-03- 20", from
     PDF text extraction) may come back joined ("2024-03-20"). Only digit-separator-space-digit is
@@ -74,7 +91,7 @@ def validate_candidate(source, target, values=()):
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.localized_numbers import permits_numeric_additions,permits_numeric_omissions
-    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,target,values)),values)
+    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,percent_signs(source,target),values)),values)
     def preserved(source):
         expected=literal_inventory(source,values)
         return (permits_numeric_omissions(source,target,expected-actual,values)
