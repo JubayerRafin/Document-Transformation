@@ -44,6 +44,20 @@ def percent_signs(source,target):
     return target
 
 
+ROMANIZED_NAME = re.compile(r'\b[A-Z][a-z]+ [A-Z][a-z]+-[a-z]+\b')
+
+
+def transliterated_names(source,target):
+    """Comparison-only: a name written in another script ("김민준") is written in Latin letters in a
+    translation ("Kim Min-jun"), which the literal patterns protect as a romanized name. When the
+    source has letters of a non-Latin script and does not itself contain that name, the
+    romanized name in the translation is ordinary text, not an added value. Returned document
+    text is not rewritten."""
+    if not any(c.isalpha() and not c.isascii() for c in source):
+        return target
+    return ROMANIZED_NAME.sub(lambda m: m.group() if m.group() in source else m.group().replace('-',''),target)
+
+
 def joined_separator_spacing(source,values=()):
     """Comparison-only: a number broken by a stray space after its separator ("2024-03- 20", from
     PDF text extraction) may come back joined ("2024-03-20"). Only digit-separator-space-digit is
@@ -91,7 +105,7 @@ def validate_candidate(source, target, values=()):
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.localized_numbers import permits_numeric_additions,permits_numeric_omissions
-    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,percent_signs(source,target),values)),values)
+    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,transliterated_names(source,percent_signs(source,target)),values)),values)
     def preserved(source):
         expected=literal_inventory(source,values)
         return (permits_numeric_omissions(source,target,expected-actual,values)

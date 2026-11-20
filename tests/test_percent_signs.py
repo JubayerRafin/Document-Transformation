@@ -22,5 +22,17 @@ class PercentSignTests(unittest.TestCase):
             validate_candidate('Costs fell 8% and margins 8 percent.', '비용은 8% 감소했습니다.')
 
 
+class TransliteratedNameTests(unittest.TestCase):
+    def test_a_name_from_a_non_latin_source_may_be_written_in_latin_letters(self):
+        validate_candidate('김민준', 'Kim Min-jun')
+        validate_candidate('담당자: 김민준', 'Contact: Kim Min-jun')
+
+    def test_names_of_latin_sources_stay_protected_and_none_may_be_invented(self):
+        with self.assertRaises(ValueError):
+            validate_candidate('Contact: Kim Min-jun', '담당자: 김민준')
+        with self.assertRaises(ValueError):
+            validate_candidate('Report', 'Bericht von Kim Min-jun')
+
+
 if __name__ == '__main__':
     unittest.main()

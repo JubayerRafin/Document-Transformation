@@ -37,6 +37,18 @@ def foreign_script(source, target, language):
     return ', '.join(sorted(found))
 
 
+def unchanged_in_other_script(source, target, language):
+    """Whether a translation into a Latin-script language (English, French, German, Spanish,
+    Portuguese) returned text with Korean, Chinese, Japanese, Arabic or Indic letters unchanged."""
+    from transformation.pdf.runner import LANGUAGES
+    code = LANGUAGES.get(language, language)
+    if TARGET_SCRIPTS.get(code) != set():
+        return False
+    if ' '.join(source.split()) != ' '.join(target.split()):
+        return False
+    return any(_script(c) not in (None, 'Latin') for c in source if c.isalpha())
+
+
 def foreign_share(source, target, language):
     """Share of the translation's letters in a script that belongs to neither language."""
     from transformation.pdf.runner import LANGUAGES
@@ -412,6 +424,10 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             restored=fit_leader(text,restored)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
+            if unchanged_in_other_script(text,restored,language):
+                # A name alone ("김민준") came back as written for an English document; the second
+                # model, tried after both attempts, writes it in the target's letters (2026-11-21).
+                raise ValueError('Translation returned text in the source script unchanged for a Latin-script target.')
             stray=foreign_script(text,restored,language)
             if stray and attempt==1:
                 raise ValueError(f'Translation contains {stray} text that is in neither the source nor the target language; '

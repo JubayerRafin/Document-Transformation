@@ -62,5 +62,22 @@ class SecondModelAfterValidationTests(unittest.TestCase):
                 translategemma.translate('http://127.0.0.1:8010/v1', 'translategemma:12b', source, 'Korean')
 
 
+class UnchangedNameTests(unittest.TestCase):
+    def test_a_korean_name_returned_unchanged_for_english_goes_to_the_other_model(self):
+        answers = {'translategemma:12b': '김민준', 'qwen3.5-9b-fp8': 'Kim Min-jun'}
+        with patch('transformation.llm.ollama_native.chat', server(answers)),              patch('transformation.llm.ollama_native.record_progress'),              patch.dict(os.environ, {'TRANSFORMX_PII_ENDPOINT': 'http://127.0.0.1:8000/v1',
+                                     'TRANSFORMX_PII_MODEL': 'qwen3.5-9b-fp8'}):
+            result, stats = translategemma.translate('http://127.0.0.1:8010/v1', 'translategemma:12b', '김민준',
+                                                     'English', source='ko')
+        self.assertEqual(result, 'Kim Min-jun')
+
+    def test_unchanged_latin_text_or_non_latin_targets_are_not_flagged(self):
+        from transformation.llm.translategemma import unchanged_in_other_script
+        self.assertFalse(unchanged_in_other_script('Copperleaf Software', 'Copperleaf Software', 'English'))
+        self.assertFalse(unchanged_in_other_script('김민준', '김민준', 'Japanese'))
+        self.assertTrue(unchanged_in_other_script('김민준', '김민준', 'English'))
+        self.assertFalse(unchanged_in_other_script('김민준', 'Kim Min-jun', 'English'))
+
+
 if __name__ == '__main__':
     unittest.main()
