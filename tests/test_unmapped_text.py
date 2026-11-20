@@ -92,3 +92,26 @@ class RepairTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RightToLeftOrderTests(unittest.TestCase):
+    def test_a_right_to_left_line_reads_right_to_left_with_numbers_left_to_right(self):
+        from transformation.pdf.unmapped_text import visual_to_logical
+        # "بين 5 و30 درجة." drawn left to right: ". ة ج ر د   3 0 و   5   ن ي ب"
+        drawn = list('.ةجرد') + [' '] + list('30و') + [' '] + ['5'] + [' '] + list('نيب')
+        clusters = [(float(x), c) for x, c in enumerate(drawn)]
+        self.assertEqual(visual_to_logical(clusters), 'بين 5 و30 درجة.')
+
+    def test_amounts_percentages_and_latin_runs_stay_in_their_own_order(self):
+        from transformation.pdf.unmapped_text import visual_to_logical
+        def logical(drawn):
+            return visual_to_logical([(float(x), c) for x, c in enumerate(drawn)])
+        self.assertEqual(logical(list('%12') + [' '] + list('ةبسنب')), 'بنسبة 12%')
+        self.assertEqual(logical(list('USD 1,250.50') + [' '] + list('غلبم')), 'مبلغ USD 1,250.50')
+
+    def test_a_mark_written_before_its_zero_width_letter_is_put_after_it(self):
+        from transformation.pdf.unmapped_text import _clusters
+        line = {'spans': [{'chars': [
+            {'c': 'ع', 'bbox': (67.2, 0, 73.3, 9)}, {'c': 'ّ', 'bbox': (61.9, 0, 67.2, 9)},
+            {'c': 'و', 'bbox': (62.9, 0, 62.9, 9)}, {'c': 'ض', 'bbox': (51.4, 0, 61.9, 9)}]}]}
+        self.assertEqual([t for _, t in _clusters(line)], ['ع', 'وّ', 'ض'])

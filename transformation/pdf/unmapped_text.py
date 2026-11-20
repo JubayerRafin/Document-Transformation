@@ -53,14 +53,85 @@ def join_pieces(pieces):
     return ' '.join(out.split())
 
 
+_LTR_CLASSES = {'L', 'EN', 'AN'}
+_RUN_JOINERS = {'WS', 'CS', 'ES', 'ET', 'ON'}
+
+
+def _bidi(text):
+    return unicodedata.bidirectional(text[0]) if text else ''
+
+
+def visual_to_logical(clusters):
+    """Reading order of one right-to-left line from its clusters (x0, text), drawn left to right.
+
+    MuPDF orders a line's text runs as they are drawn, left to right, and some PDFs (Chromium's) store
+    a run mixing Arabic and digits in drawing order too: "يجب ... بين 5 و30 درجة." came back as
+    "30 و5 ... بين" and the numbers landed in another sentence ("contact 30 and 5"; Arabic report,
+    2026-11-21). In a right-to-left line the reading order is right to left, except that runs of
+    left-to-right characters (digits, Latin letters, and the separators and spaces between them, as
+    in "12,500", "12%" or "USD 50") read left to right inside it."""
+    order = [text for _, text in sorted(clusters, key=lambda c: -c[0])]
+    out, i = [], 0
+    while i < len(order):
+        if _bidi(order[i]) not in _LTR_CLASSES:
+            out.append(order[i])
+            i += 1
+            continue
+        j = i + 1
+        while j < len(order):
+            kind = _bidi(order[j])
+            if kind in _LTR_CLASSES:
+                j += 1
+                continue
+            if kind in _RUN_JOINERS:
+                # Separators continue the run only up to another left-to-right character.
+                k = j
+                while k < len(order) and _bidi(order[k]) in _RUN_JOINERS:
+                    k += 1
+                if k < len(order) and _bidi(order[k]) in _LTR_CLASSES:
+                    j = k
+                    continue
+            break
+        out.extend(reversed(order[i:j]))
+        i = j
+    return ''.join(out)
+
+
+def _clusters(line):
+    """(x0, text) per drawn letter, each combining mark (Arabic vowel signs, shadda) attached to its
+    letter. Chromium writes a letter with a mark as the mark first, holding the cluster's box, then
+    the letter with no width inside that box ("ع ّ و" for "عوّ"); such a pair is put back in
+    reading order, letter then mark, at the cluster's position."""
+    chars = [[c['bbox'][0], c['bbox'][2], c['c']] for span in line['spans'] for c in span.get('chars', [])]
+    i = 0
+    while i < len(chars) - 1:
+        mark, letter = chars[i], chars[i + 1]
+        if (unicodedata.combining(mark[2]) and not unicodedata.combining(letter[2])
+                and letter[1] - letter[0] < 0.5 and mark[0] - 0.5 <= letter[0] <= mark[1] + 0.5):
+            chars[i], chars[i + 1] = [mark[0], mark[1], letter[2]], [mark[0], mark[1], mark[2]]
+            i += 2
+            continue
+        i += 1
+    clusters = []
+    for x0, _, c in chars:
+        if clusters and unicodedata.combining(c):
+            clusters[-1] = (clusters[-1][0], clusters[-1][1] + c)
+        else:
+            clusters.append((x0, c))
+    return clusters
+
+
 def read_area(page, rect):
-    """MuPDF's text inside rect (MuPDF coordinates), horizontal lines only, or ''."""
+    """MuPDF's text inside rect (MuPDF coordinates), horizontal lines only, or ''. Lines with
+    right-to-left letters are put into reading order from their characters' positions."""
     pieces = []
-    for block in page.get_text('dict', clip=rect, sort=True)['blocks']:
+    for block in page.get_text('rawdict', clip=rect, sort=True)['blocks']:
         for line in block.get('lines', []):
             if tuple(round(v) for v in line['dir']) != (1, 0) or not line['spans']:
                 continue
-            text = ''.join(span['text'] for span in line['spans'])
+            text = ''.join(char['c'] for span in line['spans'] for char in span.get('chars', []))
+            if RTL.search(text):
+                text = visual_to_logical(_clusters(line))
             if text.strip():
                 size = max(span['size'] for span in line['spans']) or 1
                 pieces.append((line['spans'][0]['origin'][1], line['bbox'][0], line['bbox'][2], text, size))
