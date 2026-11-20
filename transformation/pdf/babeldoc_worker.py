@@ -601,6 +601,8 @@ def main():
     install_korean_word_breaks(TypesettingUnit)
     from babeldoc.format.pdf.document_il.midend.paragraph_finder import ParagraphFinder
     install_real_first_line_indents(ParagraphFinder)
+    from transformation.layout.stacked_lines import install as install_stacked_lines
+    install_stacked_lines(ParagraphFinder)
     install_table_fitting(Typesetting)
     original = Typesetting.typesetting_document
 
