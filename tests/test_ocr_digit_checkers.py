@@ -38,3 +38,16 @@ class DigitCheckerTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class LanguageRecognizerTests(unittest.TestCase):
+    def test_each_script_the_general_model_cannot_read_has_its_own_model_and_a_digit_checker(self):
+        from tools.ocr.recognize_paddle_boxes import RECOGNIZERS, OWN_SCRIPT, recognition_model_name
+        self.assertEqual(recognition_model_name('ar'), 'arabic_PP-OCRv5_mobile_rec')
+        self.assertEqual(recognition_model_name('hi'), 'devanagari_PP-OCRv5_mobile_rec')
+        self.assertEqual({recognition_model_name(l) for l in ('fr', 'de', 'es', 'pt')}, {'latin_PP-OCRv5_mobile_rec'})
+        self.assertEqual(recognition_model_name('zh'), GENERAL_RECOGNIZER)
+        self.assertEqual(recognition_model_name('ja'), GENERAL_RECOGNIZER)
+        self.assertNotIn('en', OWN_SCRIPT)
+        for language in OWN_SCRIPT:
+            self.assertIn(RECOGNIZERS[language], DIGIT_CHECKERS)

@@ -164,13 +164,22 @@ def redaction_word_candidates(crop, record, primary, secondary_factory, language
 
 # Recognition model per source language. PP-OCRv5_server_rec reads Chinese, Japanese and English
 # but not Hangul, so scanned Korean pages were not read before korean_PP-OCRv5_mobile_rec (2026-11-19).
-# A language without its own model here uses PP-OCRv5_server_rec.
-RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec'}
+# Arabic, Devanagari and accented Latin letters are not in it either; their own PP-OCRv5 models read
+# them (2026-11-21). A language without its own model here (Chinese, Japanese; Bengali, for which
+# PaddleOCR has no model) uses PP-OCRv5_server_rec. tools/gpu/setup_transformx.sh installs them all.
+LATIN_RECOGNIZER = 'latin_PP-OCRv5_mobile_rec'
+RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec', 'ar': 'arabic_PP-OCRv5_mobile_rec',
+               'hi': 'devanagari_PP-OCRv5_mobile_rec', 'fr': LATIN_RECOGNIZER, 'de': LATIN_RECOGNIZER,
+               'es': LATIN_RECOGNIZER, 'pt': LATIN_RECOGNIZER}
 GENERAL_RECOGNIZER = 'PP-OCRv5_server_rec'
+# Languages whose pages need their own model: the general one cannot read their letters.
+OWN_SCRIPT = {language for language in RECOGNIZERS if language != 'en'}
 # For a language read by one model, a second installed model that reads digits (it need not read the
 # language) confirms the numbers of a line. Chinese and Japanese lines with a number had none, so
 # every such line kept its source pixels and scanned contracts stayed half untranslated (2026-11-19).
-DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
+DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, 'arabic_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER,
+                  'devanagari_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, LATIN_RECOGNIZER: GENERAL_RECOGNIZER,
+                  GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
 
 
 def recognition_model_name(language):
@@ -549,8 +558,9 @@ def main(argv=None, model_factory=None):
         faulthandler.enable(file=crash)
         from paddleocr import TextRecognition
         from importlib.metadata import version
-        # A Korean page always needs the Korean model: the general one cannot read Hangul.
-        model_name = recognition_model_name(args.source_language) if args.profile=='bounded' or args.source_language=='ko' else GENERAL_RECOGNIZER
+        # A Korean, Arabic, Hindi or accented Latin page always needs its own model: the general one
+        # cannot read its letters.
+        model_name = recognition_model_name(args.source_language) if args.profile=='bounded' or args.source_language in OWN_SCRIPT else GENERAL_RECOGNIZER
         secondary_model = None
         cache = Path.home() / '.paddlex/official_models' / model_name
         if not cache.is_dir():
@@ -585,7 +595,7 @@ def main(argv=None, model_factory=None):
                 return general_model
             def verification_model():
                 nonlocal secondary_model
-                if (args.profile=='bounded' or args.source_language=='ko') and args.source_language!='en': return model
+                if (args.profile=='bounded' or args.source_language in OWN_SCRIPT) and args.source_language!='en': return model
                 if secondary_model is None:
                     name='PP-OCRv5_server_rec' if model_name=='en_PP-OCRv5_mobile_rec' else 'en_PP-OCRv5_mobile_rec'
                     secondary_model=(model_factory or TextRecognition)(model_name=name,device=args.device,enable_mkldnn=False,cpu_threads=10)
