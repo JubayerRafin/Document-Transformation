@@ -75,6 +75,21 @@ def install_table_fitting(Typesetting):
         if key in getattr(self, "_transformx_shaped_keys", ()):
             # Drawn with shaping after the PDF is written (transformation/pdf/complex_script.py).
             return None
+        if not paragraph.vertical:
+            # An amount, code, date or quantity the translation left unchanged is drawn with its own
+            # source characters where they were. Re-typeset, digits moved inside their tight boxes
+            # (quantities above or below their row), commas sank under Chinese amounts and dates
+            # mixed two fonts (2026-11-21).
+            from transformation.layout.source_atoms import preserved_source_characters
+            entry = getattr(self, '_transformx_source_atoms', {}).get(key)
+            source_chars = preserved_source_characters(entry, paragraph, page) if entry else None
+            if source_chars:
+                from copy import deepcopy
+                paragraph.box = deepcopy(entry['paragraph'].box)
+                paragraph.scale = 1.0
+                paragraph.pdf_paragraph_composition = [PdfParagraphComposition(pdf_character=c) for c in source_chars]
+                self._update_paragraph_render_order(paragraph)
+                return None
         slot = getattr(self, "_transformx_table_slots", {}).get(key)
         heading = False
         panel = False

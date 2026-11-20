@@ -11,26 +11,27 @@ from transformation.layout.table_fitting import install_table_fitting
 
 
 class FormulaFittingTests(unittest.TestCase):
-    def test_unchanged_source_atom_is_retained_only_after_bounded_layout_fails(self):
+    def test_unchanged_source_atom_is_drawn_from_its_source_characters_before_any_layout(self):
         from transformation.layout.source_atoms import capture_source_atoms
         from babeldoc.format.pdf.document_il.il_version_1 import PdfParagraphComposition
         char=PdfCharacter(char_unicode='8',box=Box(x=10,y=10,x2=15,y2=18),pdf_style=PdfStyle(font_size=8),pdf_character_id=1)
         char.visual_bbox=NS(box=char.box)
-        p=NS(debug_id='atom',unicode='8',vertical=False,box=char.box,pdf_paragraph_composition=[PdfParagraphComposition(pdf_character=char)])
-        page=NS(page_number=0,pdf_paragraph=[p],cropbox=NS(box=Box(x=0,y=0,x2=100,y2=100)))
-        class Harness:
-            def render_paragraph(self,*args):raise AssertionError('No expanding fallback')
-            def create_typesetting_units(self,*args):return [TypesettingUnit(char=char)]
-            def _layout_typesetting_units(self,*args,**kwargs):return [],False
-            def _update_paragraph_render_order(self,*args):pass
-        install_table_fitting(Harness)
-        fitter=Harness();fitter._transformx_source_atoms=capture_source_atoms(NS(page=[page]))
-        fitter._transformx_table_slots={(1,'atom'):{'bbox':[10,10,11,11]}}
-        fitter._transformx_table_fit_results=[]
-        fitter.render_paragraph(p,page,{})
-        self.assertEqual(fitter._transformx_table_fit_results[0]['status'],'preserved_source_atomic_geometry')
-        self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.box.x2,15)
-        self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.pdf_style.font_size,8)
+        for slots in ({(1,'atom'):{'bbox':[10,10,11,11]}}, {}):   # in a table cell and in running text
+            with self.subTest(in_slot=bool(slots)):
+                p=NS(debug_id='atom',unicode='8',vertical=False,box=char.box,pdf_paragraph_composition=[PdfParagraphComposition(pdf_character=char)])
+                page=NS(page_number=0,pdf_paragraph=[p],cropbox=NS(box=Box(x=0,y=0,x2=100,y2=100)))
+                class Harness:
+                    def render_paragraph(self,*args):raise AssertionError('An unchanged value is not re-typeset')
+                    def create_typesetting_units(self,*args):raise AssertionError('An unchanged value is not re-typeset')
+                    def _update_paragraph_render_order(self,*args):pass
+                install_table_fitting(Harness)
+                fitter=Harness();fitter._transformx_source_atoms=capture_source_atoms(NS(page=[page]))
+                fitter._transformx_table_slots=slots
+                fitter._transformx_table_fit_results=[]
+                fitter.render_paragraph(p,page,{})
+                self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.box.x2,15)
+                self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.pdf_style.font_size,8)
+                self.assertEqual(p.scale,1.0)
 
     def test_vertical_text_in_a_slot_is_typeset_normally_not_failed(self):
         rendered=[]
