@@ -76,9 +76,14 @@ def reading_order(chars):
         return getattr(getattr(c,'visual_bbox',None),'box',None) or getattr(c,'box',None)
     placed=[c for c in chars if box(c) is not None]
     if len(placed)!=len(chars):return chars
+    # A character belongs to a line when most of its height lies within the line's: a comma's small
+    # box sits at the baseline, below the digits' middle, and must stay in "563,982,000" (2026-11-21).
     lines=[]
-    for c in sorted(chars,key=lambda c:-(box(c).y+box(c).y2)/2):
-        b=box(c);middle=(b.y+b.y2)/2;height=max(b.y2-b.y,1.0)
-        if lines and abs(lines[-1][0]-middle)<=.5*height:lines[-1][1].append(c)
-        else:lines.append([middle,[c]])
-    return [c for _,line in lines for c in sorted(line,key=lambda c:box(c).x)]
+    for c in sorted(chars,key=lambda c:-(box(c).y2-box(c).y)):
+        b=box(c);height=max(b.y2-b.y,.1)
+        best=max(lines,key=lambda line:min(b.y2,line[1])-max(b.y,line[0]),default=None)
+        if best is not None and min(b.y2,best[1])-max(b.y,best[0])>=.25*height:
+            best[0],best[1]=min(best[0],b.y),max(best[1],b.y2);best[2].append(c)
+        else:lines.append([b.y,b.y2,[c]])
+    lines.sort(key=lambda line:-(line[0]+line[1])/2)
+    return [c for *_,line in lines for c in sorted(line,key=lambda c:box(c).x)]

@@ -66,6 +66,10 @@ class SourceAtomsTests(unittest.TestCase):
         stored=[ch('2',0,20),ch('0',5,20),ch('2',10,20),ch('0',0,8),ch('7',5,8),ch('-',10,8),
                 ch('1',15,8),ch('3',20,8),ch('5',15,20.5),ch('-',20,20)]
         self.assertEqual(''.join(c.char_unicode for c in reading_order(stored)),'2025-07-13')
+        # Commas sit low and small, at the baseline of their digits: still one line.
+        amount=[ch('5',0,20),ch('6',5,20),ch('3',10,20),ch('9',17,20),ch('8',22,20),ch('2',27,20)]
+        comma=NS(char_unicode=',',box=box(15,18.5,16.5,21),visual_bbox=NS(box=box(15,18.5,16.5,21)))
+        self.assertEqual(''.join(c.char_unicode for c in reading_order(amount+[comma])),'563,982')
 
     def test_inferred_space_does_not_require_a_printed_glyph_id(self):
         p,page,entry=self.fixture()
