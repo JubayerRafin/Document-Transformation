@@ -42,5 +42,37 @@ class StackedLineTests(unittest.TestCase):
         self.assertFalse(is_compact_cjk('USD 12'))
 
 
+
+class SplitAtRulesTests(unittest.TestCase):
+    def header(self, text_left, text_right, rule_x):
+        def char(c, x):
+            box = NS(x=x, y=544.2, x2=x + 9, y2=553.2)
+            return NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=9))
+        chars = [char(c, 263 + 9 * i) for i, c in enumerate(text_left)] + [char(' ', 263 + 9 * len(text_left))]
+        start = rule_x + 6
+        chars += [char(c, start + 9 * i) for i, c in enumerate(text_right)]
+        line = NS(pdf_character=chars, box=NS(x=263, y=544.2, x2=chars[-1].visual_bbox.box.x2, y2=553.2))
+        paragraph = NS(pdf_paragraph_composition=[NS(pdf_line=line)], debug_id='h', vertical=False)
+        return paragraph
+
+    def run_split(self, paragraph, rules):
+        from transformation.layout.stacked_lines import split_at_rules
+        page = NS(pdf_paragraph=[paragraph], pdf_curve=[NS(box=r) for r in rules])
+        count = split_at_rules(page, lambda p, line: None, lambda p: p.debug_id + '-c')
+        texts = [''.join(c.char_unicode for c in p.pdf_paragraph_composition[0].pdf_line.pdf_character) for p in page.pdf_paragraph]
+        return count, texts
+
+    def test_two_header_cells_joined_across_a_cell_border_are_split(self):
+        border = NS(x=290.2, x2=291.0, y=536.7, y2=558.4)
+        self.assertEqual(self.run_split(self.header('数量', '単価', 290.6), [border]), (1, ['数量', '単価']))
+
+    def test_lines_without_a_crossing_rule_or_with_a_short_rule_stay_whole(self):
+        far = NS(x=400, x2=400.8, y=536.7, y2=558.4)          # a border of another column
+        short = NS(x=290.2, x2=291.0, y=550.0, y2=552.0)      # a tick mark, not a border
+        wide = NS(x=280.0, x2=300.0, y=536.7, y2=558.4)       # a box, not a rule
+        for rule in (far, short, wide):
+            self.assertEqual(self.run_split(self.header('数量', '単価', 290.6), [rule])[0], 0)
+
+
 if __name__ == '__main__':
     unittest.main()
