@@ -11,8 +11,14 @@ fi
 uv python install 3.11
 test -x /workspace/transformx-engine/bin/python || uv venv --python 3.11 /workspace/transformx-engine
 test -x /workspace/transformx-babeldoc/bin/python || uv venv --python 3.11 /workspace/transformx-babeldoc
-# Table extraction uses the server CPU; OCR and Ollama use its GPU.
-uv pip install --python /workspace/transformx-engine/bin/python torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Table extraction (Docling's layout and table models) runs on the GPU when there is one: on the CPU
+# it took about 3.5 s per page, half of a translation job (2026-11-21). TRANSFORMX_TORCH_INDEX picks
+# another PyTorch build (for example .../whl/cpu).
+torch_index="${TRANSFORMX_TORCH_INDEX:-https://download.pytorch.org/whl/cpu}"
+if [ -z "${TRANSFORMX_TORCH_INDEX:-}" ] && command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
+  torch_index=https://download.pytorch.org/whl/cu128
+fi
+uv pip install --python /workspace/transformx-engine/bin/python torch torchvision --index-url "$torch_index"
 uv pip install --python /workspace/transformx-engine/bin/python -r requirements-deep-doc.txt 'docling-core==2.85.0' 'pymupdf==1.27.2.2' 'Pillow>=11,<13' 'python-docx>=1.1,<2' 'python-pptx>=1,<2'
 uv pip install --python /workspace/transformx-babeldoc/bin/python -r requirements-transformation.txt 'pymupdf==1.28.2'
 uv pip check --python /workspace/transformx-engine/bin/python

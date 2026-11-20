@@ -38,7 +38,7 @@ class DoclingTableExtractor:
         self._init_docling()
 
     def _init_docling(self):
-        """Build a CPU, no-OCR Docling converter. Sets self.available."""
+        """Build a no-OCR Docling converter (GPU when available). Sets self.available."""
         try:
             from docling.document_converter import (
                 DocumentConverter, PdfFormatOption)
@@ -50,10 +50,13 @@ class DoclingTableExtractor:
             opts.do_ocr = False                 # born-digital manuals
             opts.generate_page_images = False   # save memory
             try:
-                from docling.datamodel.accelerator_options import (
-                    AcceleratorOptions, AcceleratorDevice)
+                # TRANSFORMX_DOCLING_DEVICE: "auto" (default) uses the GPU when this environment has
+                # CUDA PyTorch, else the CPU; "cpu" or "cuda" force one. On the CPU the layout and
+                # table models took about 3.5 s per page, half of a translation job (2026-11-21).
+                import os
+                from docling.datamodel.accelerator_options import AcceleratorOptions
                 opts.accelerator_options = AcceleratorOptions(
-                    device=AcceleratorDevice.CPU)
+                    device=os.environ.get('TRANSFORMX_DOCLING_DEVICE', 'auto'))
             except Exception:
                 pass
 

@@ -165,6 +165,96 @@ def split_at_rules(page, update, make_id):
     return added
 
 
+MARKER_SIZE = 7.0  # a bullet drawn as a shape is at most this wide and high, in points
+
+
+def list_markers(page):
+    """Boxes of small, roughly square shapes: bullets drawn as graphics (a dot, a square)."""
+    markers = []
+    for curve in getattr(page, 'pdf_curve', None) or []:
+        box = getattr(curve, 'box', None)
+        if box is None:
+            continue
+        w, h = box.x2 - box.x, box.y2 - box.y
+        if 0.8 <= w <= MARKER_SIZE and 0.8 <= h <= MARKER_SIZE and 0.5 <= w / h <= 2:
+            markers.append(box)
+    return markers
+
+
+def _visual_lines(chars):
+    """Consecutive characters grouped into the lines they are drawn on (a new line where the text
+    moves down by more than half a character)."""
+    lines = []
+    for char in chars:
+        box = char.visual_bbox.box
+        middle, size = (box.y + box.y2) / 2, max(box.y2 - box.y, 1.0)
+        if lines and abs(middle - lines[-1]['middle']) <= 0.5 * size:
+            lines[-1]['chars'].append(char)
+            lines[-1]['x'] = min(lines[-1]['x'], box.x)
+            lines[-1]['y'], lines[-1]['y2'] = min(lines[-1]['y'], box.y), max(lines[-1]['y2'], box.y2)
+        else:
+            lines.append({'chars': [char], 'middle': middle, 'x': box.x, 'y': box.y, 'y2': box.y2})
+    return lines
+
+
+def split_at_list_markers(page, update, make_id):
+    """Start a new paragraph at each line with a bullet shape just to its left.
+
+    BabelDOC 0.6.4 made a bulleted list one paragraph when its items were set close together; the
+    translation then flowed across the items and the later bullets were left empty (German and Hindi
+    reports, 2026-11-21). Bullets drawn as small shapes mark where each item starts. Returns how many
+    paragraphs were split off."""
+    import copy
+    markers = list_markers(page)
+    if not markers:
+        return 0
+    added = 0
+    index = 0
+    while index < len(page.pdf_paragraph):
+        paragraph = page.pdf_paragraph[index]
+        compositions = paragraph.pdf_paragraph_composition or []
+        index += 1
+        if getattr(paragraph, 'vertical', False) or not compositions or any(not getattr(c, 'pdf_line', None) for c in compositions):
+            continue
+        chars = [ch for c in compositions for ch in (c.pdf_line.pdf_character or []) if getattr(ch, 'visual_bbox', None)]
+        lines = _visual_lines(chars)
+        if len(lines) < 2:
+            continue
+        starts = []
+        for number, line in enumerate(lines):
+            size = line['y2'] - line['y']
+            for m in markers:
+                centre = (m.y + m.y2) / 2
+                if (m.x2 <= line['x'] + 1 and line['x'] - m.x2 <= 3 * size
+                        and line['y'] - 0.2 * size <= centre <= line['y2'] + 0.2 * size):
+                    starts.append(number)
+                    break
+        cuts = sorted(set(n for n in starts if n > 0))
+        if not cuts:
+            continue
+        groups, previous = [], 0
+        for cut in cuts + [len(lines)]:
+            groups.append([ch for line in lines[previous:cut] for ch in line['chars']])
+            previous = cut
+        template = copy.deepcopy(paragraph)
+        pieces = [paragraph]
+        for _ in groups[1:]:
+            piece = copy.deepcopy(template)
+            piece.debug_id = make_id(paragraph)
+            pieces.append(piece)
+        for piece, group in zip(pieces, groups):
+            line = copy.copy(compositions[0].pdf_line)
+            line.pdf_character = group
+            composition = copy.copy(compositions[0])
+            composition.pdf_line = line
+            piece.pdf_paragraph_composition = [composition]
+            update(piece, line)
+        page.pdf_paragraph[index:index] = pieces[1:]
+        index += len(pieces) - 1
+        added += len(pieces) - 1
+    return added
+
+
 def install(ParagraphFinder):
     if getattr(ParagraphFinder, '_transformx_stacked_lines', False):
         return
@@ -183,6 +273,7 @@ def install(ParagraphFinder):
             self.update_paragraph_data(paragraph, update_unicode=True)
 
         changed = split_at_rules(page, update, make_id)
+        changed += split_at_list_markers(page, update, make_id)
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True))
         if changed:
             self._set_paragraph_render_order(page)

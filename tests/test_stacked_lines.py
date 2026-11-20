@@ -74,5 +74,38 @@ class SplitAtRulesTests(unittest.TestCase):
             self.assertEqual(self.run_split(self.header('数量', '単価', 290.6), [rule])[0], 0)
 
 
+class ListMarkerTests(unittest.TestCase):
+    def list_paragraph(self, items):
+        """items: list of lists of line texts; lines are 12 pt apart, starting at y=600 going down."""
+        chars, y = [], 600.0
+        for lines in items:
+            for text in lines:
+                for i, c in enumerate(text):
+                    box = NS(x=60 + 5 * i, y=y, x2=65 + 5 * i, y2=y + 9)
+                    chars.append(NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=9)))
+                y -= 12
+        line = NS(pdf_character=chars, box=NS(x=60, y=y, x2=300, y2=609))
+        return NS(pdf_paragraph_composition=[NS(pdf_line=line)], debug_id='list', vertical=False)
+
+    def run_split(self, paragraph, marker_ys):
+        from transformation.layout.stacked_lines import split_at_list_markers
+        curves = [NS(box=NS(x=47.2, y=y + 2.5, x2=50.9, y2=y + 6.2)) for y in marker_ys]
+        page = NS(pdf_paragraph=[paragraph], pdf_curve=curves)
+        count = split_at_list_markers(page, lambda p, line: None, lambda p: p.debug_id + '-b')
+        return count, [''.join(c.char_unicode for c in p.pdf_paragraph_composition[0].pdf_line.pdf_character)
+                       for p in page.pdf_paragraph]
+
+    def test_each_bulleted_item_becomes_its_own_paragraph_and_wrapped_lines_stay_with_it(self):
+        paragraph = self.list_paragraph([['First item'], ['Second item', 'wraps here'], ['Third'], ['Fourth']])
+        # bullets beside lines 1, 2, 4 and 5 (y 600, 588, 564, 552); line 3 continues item 2
+        self.assertEqual(self.run_split(paragraph, [600, 588, 564, 552]),
+                         (3, ['First item', 'Second itemwraps here', 'Third', 'Fourth']))
+
+    def test_paragraphs_without_bullets_beside_them_stay_whole(self):
+        paragraph = self.list_paragraph([['Plain text'], ['continues']])
+        self.assertEqual(self.run_split(paragraph, [])[0], 0)
+        self.assertEqual(self.run_split(paragraph, [400])[0], 0)   # a bullet elsewhere on the page
+
+
 if __name__ == '__main__':
     unittest.main()
