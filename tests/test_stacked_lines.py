@@ -225,6 +225,14 @@ class BrokenLineTests(unittest.TestCase):
         self.assertIn('.' * 40, texts)
         self.assertIn('206', texts)
 
+    def test_a_form_row_of_whole_fields_is_never_joined(self):
+        row = [self.piece('a', '김민준', 41, 60), self.piece('b', 'EMP-2026-14033', 61, 140),
+               self.piece('c', 'Employee', 141, 190), self.piece('d', 'ID', 191, 202),
+               self.piece('e', 'Copperleaf Software', 300, 463)]
+        count, texts = self.run_join(row)
+        self.assertNotIn('EMP-2026-14033', ''.join(t for t in texts if '김민준' in t))
+        self.assertIn('Copperleaf Software', texts)
+
     def test_separate_cells_and_words_of_unbroken_lines_stay_apart(self):
         count, texts = self.run_join([self.piece('a', 'Total', 50, 70), self.piece('b', 'USD 12', 72.5, 100)])
         self.assertEqual(count, 0)                                  # word gap only, nothing cut mid-word

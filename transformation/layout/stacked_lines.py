@@ -403,17 +403,31 @@ def join_broken_line(page, update):
         def ruled(a, b):
             return any(a['p'].box.x2 - 0.5 <= (r.x + r.x2) / 2 <= b['p'].box.x + 0.5
                        and r.y <= a['p'].box.y + 1 and r.y2 >= a['p'].box.y2 - 1 for r in rules)
+        def ink_gap(a, b):
+            # Between the drawn characters: paragraph boxes of rebuilt scan lines are padded, and a
+            # whole form row was joined by them ("김민준 EMP-2026-14033 Employee ID ...", 2026-11-21).
+            right = max(c.visual_bbox.box.x2 for c in a['chars'] if (c.char_unicode or '').strip())
+            left = min(c.visual_bbox.box.x for c in b['chars'] if (c.char_unicode or '').strip())
+            return left - right
+
+        def fragment(item):
+            return sum(ch.isalpha() for ch in item['text']) <= 4
+
         pairs = []
         for a, b in zip(line, line[1:]):
-            gap = b['p'].box.x - a['p'].box.x2
+            gap = ink_gap(a, b)
             size = a['size']
-            mid_word = (gap <= 0.2 * size and a['text'][-1:].isalpha() and b['text'][:1].isalpha())
-            pairs.append((a, b, gap, mid_word))
-        if not any(mid for *_, mid in pairs):
+            short = fragment(a) or fragment(b)
+            mid_word = (short and 0 <= gap + 0.1 * size <= 0.3 * size
+                        and a['text'][-1:].isalpha() and b['text'][:1].isalpha())
+            pairs.append((a, b, gap, mid_word, short))
+        # A line cut by the layout has many such cuts (the HP contents line had over a dozen); one or
+        # two tight gaps between fields of a form row are not a broken line.
+        if sum(1 for p in pairs if p[3]) < 3:
             continue
         groups, current = [], [line[0]]
-        for a, b, gap, mid in pairs:
-            if (mid or gap <= 0.6 * a['size']) and gap > -0.5 * a['size'] and not ruled(a, b):
+        for a, b, gap, mid, short in pairs:
+            if (mid or (short and gap <= 0.6 * a['size'])) and gap > -0.1 * a['size'] and not ruled(a, b):
                 current.append(b)
             else:
                 groups.append(current)
