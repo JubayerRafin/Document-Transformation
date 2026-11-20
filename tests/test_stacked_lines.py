@@ -31,6 +31,8 @@ class StackedLineTests(unittest.TestCase):
         self.assertFalse(mergeable(upper, para('手套', 49.2, 247.1, size=12)))   # another size
         self.assertFalse(mergeable(upper, para('手套', 49.2, 230.0)))            # gap of a paragraph
         self.assertFalse(mergeable(para('완료。', 49.2, 260.0), para('手套', 49.2, 247.1)))
+        self.assertTrue(mergeable(para('품', 49.2, 260.0), para('목', 49.2, 247.1)))
+        self.assertFalse(mergeable(para('완료.', 49.2, 260.0), para('품목', 49.2, 247.1)))
         self.assertFalse(mergeable(para('Total', 49.2, 260.0), para('due', 49.2, 247.1)))
         self.assertFalse(mergeable(para('完成。', 49.2, 260.0), para('手套', 49.2, 247.1)))
         self.assertTrue(mergeable(upper, para('手套', 49.2, 247.1)))
@@ -38,7 +40,8 @@ class StackedLineTests(unittest.TestCase):
     def test_compact_cjk_means_han_and_kana_only(self):
         self.assertTrue(is_compact_cjk('热敏标签'))
         self.assertTrue(is_compact_cjk('バーコード'))
-        self.assertFalse(is_compact_cjk('바코드'))
+        self.assertTrue(is_compact_cjk('바코드'))
+        self.assertFalse(is_compact_cjk('바코드 USB'))
         self.assertFalse(is_compact_cjk('USD 12'))
 
 

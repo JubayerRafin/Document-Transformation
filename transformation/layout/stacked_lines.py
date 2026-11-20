@@ -5,8 +5,10 @@ made each line its own paragraph (layout "fallback_line"), and each was translat
 gloves" (安全手套) came out as "All / Hand / Set" and "thermal labels" as "Hot / 敏 / Label / Sign"
 (Chinese newsletter, 2026-11-21). Lines are joined back into one paragraph when they are stacked in
 one column: left edges within half a character, the same size, the gap between them under 0.8 of a
-character's height (the gap between table rows or paragraphs is larger), Han or kana text only (no
-spaces are lost: these scripts put none between words), and the upper line not ending a sentence.
+character's height (the gap between table rows or paragraphs is larger), Han, kana or Hangul text
+only, and the upper line not ending a sentence. Korean narrow cells wrap the same way ("품 / 목" was
+translated as "Product / Neck", Korean newsletter, 2026-11-21); its lines are joined without a space,
+which may join two words, as the model reads "열감지라벨" correctly but not "Heat / 라 / Bell".
 """
 
 SENTENCE_END = set('。．！？!?：:；;')
@@ -16,14 +18,15 @@ SAME_SIZE = 0.10   # largest relative difference of their sizes
 
 
 def is_compact_cjk(text):
-    """Han, kana and CJK punctuation only (no letters of space-separated scripts)."""
+    """Han, kana, Hangul and CJK punctuation only (no Latin or other letters)."""
     letters = [c for c in text if not c.isspace()]
     if not letters:
         return False
     for c in letters:
         code = ord(c)
         if not (0x3000 <= code <= 0x30FF or 0x3400 <= code <= 0x4DBF or 0x4E00 <= code <= 0x9FFF
-                or 0xF900 <= code <= 0xFAFF or 0xFF00 <= code <= 0xFF65 or 0x31F0 <= code <= 0x31FF):
+                or 0xF900 <= code <= 0xFAFF or 0xFF00 <= code <= 0xFF65 or 0x31F0 <= code <= 0x31FF
+                or 0xAC00 <= code <= 0xD7AF or 0x1100 <= code <= 0x11FF or 0x3130 <= code <= 0x318F):
             return False
     return True
 

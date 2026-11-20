@@ -113,6 +113,67 @@ def heading_slots(document, changes, source_images=None):
     return slots
 
 
+def _font_size(paragraph):
+    for composition in paragraph.pdf_paragraph_composition or []:
+        line = getattr(composition, 'pdf_line', None)
+        for char in (getattr(line, 'pdf_character', None) or []) if line else []:
+            style = getattr(char, 'pdf_style', None)
+            if style and style.font_size:
+                return float(style.font_size)
+    style = getattr(paragraph, 'pdf_style', None)
+    return float(style.font_size) if style and getattr(style, 'font_size', None) else None
+
+
+def widen_single_lines(document, source_images=None, skip=()):
+    """Let a one-line paragraph use the free space to its right, up to the edge of its column.
+
+    A translation longer than its source ("계약 조건" -> "Contract Terms", "Finanzlage" ->
+    "Financial Position") was fitted into the source's short box and drawn at a third of its size
+    (Korean and German reports, 2026-11-21). The box now reaches the right edge of the paragraphs
+    above and below it in the same column (or twice its width when it has none), and stops before
+    anything to its right on its line and at the edge of a panel or cell drawn around it."""
+    changes = []
+    for page in document.page:
+        crop = getattr(getattr(page, 'cropbox', None), 'box', None)
+        others = [p for p in page.pdf_paragraph if getattr(p, 'box', None)]
+        shapes = [getattr(o, 'box', None) for attr in ('pdf_figure', 'pdf_curve', 'pdf_form')
+                  for o in (getattr(page, attr, None) or [])]
+        shapes.extend(getattr(o, 'box', None) for o in (source_images or {}).get(page.page_number, []))
+        shapes = [b for b in shapes if b is not None]
+        for paragraph in others:
+            b = paragraph.box
+            size = _font_size(paragraph)
+            if (paragraph.debug_id in skip or getattr(paragraph, 'vertical', False) or not size
+                    or b.y2 - b.y > 1.8 * size or b.x2 - b.x <= 0):
+                continue
+            left, right, bottom, top = b.x, b.x2, b.y, b.y2
+            # The column: paragraphs starting at the same left edge within a few lines above or below.
+            column = [o.box.x2 for o in others if o is not paragraph and abs(o.box.x - left) <= size
+                      and max(o.box.y - top, bottom - o.box.y2) <= 6 * size]
+            limit = max(column) if column else right + (right - left)
+            if crop:
+                limit = min(limit, crop.x2 - 2)
+            for o in others:
+                ob = o.box
+                if o is not paragraph and min(ob.y2, top) > max(ob.y, bottom) and ob.x2 > right and ob.x >= right - 1:
+                    limit = min(limit, ob.x - 2)
+            for sb in shapes:
+                if not min(sb.y2, top) > max(sb.y, bottom):
+                    continue
+                if sb.x >= right - 1:                       # something to the right on this line
+                    limit = min(limit, sb.x - 2)
+                elif sb.x <= left + 1 and sb.x2 >= right - 1 and sb.y <= bottom + 1 and sb.y2 >= top - 1:
+                    limit = min(limit, sb.x2 - 2)            # a panel or cell around it
+                elif sb.x2 > right:                          # a shape crossing its line further right
+                    limit = min(limit, max(right, sb.x - 2))
+            if limit > right + 1:
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': 'single_line_widened', 'before': [left, bottom, right, top],
+                                'after': [left, bottom, limit, top]})
+                b.x2 = limit
+    return changes
+
+
 def mark_date_units(units, protected_values=()):
     parts = [unit_text(u) for u in units]
     text = "".join(parts)

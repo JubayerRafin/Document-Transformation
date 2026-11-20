@@ -636,6 +636,8 @@ def main():
                 document, source_tables
             )
         )
+        from transformation.layout.line_breaks import widen_single_lines
+        changes.extend(widen_single_lines(document, source_images, {c.get('paragraph_id') for c in changes}))
         folder = os.environ.get("TRANSFORMX_RUN_DIR")
         if folder:
             Path(folder, "layout-adjustments.json").write_text(json.dumps(changes, indent=2), encoding="utf-8")
