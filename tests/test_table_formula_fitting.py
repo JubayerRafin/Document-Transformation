@@ -46,6 +46,20 @@ class FormulaFittingTests(unittest.TestCase):
         self.assertEqual(rendered,['side'])
         self.assertEqual(fitter._transformx_table_fit_results[0]['status'],'vertical_text_typeset_normally')
 
+    def test_a_slot_paragraph_with_nothing_to_typeset_is_typeset_normally_not_failed(self):
+        rendered=[]
+        class Harness:
+            def render_paragraph(self,paragraph,*args):rendered.append(paragraph.debug_id)
+            def create_typesetting_units(self,*args):return []
+        install_table_fitting(Harness)
+        fitter=Harness()
+        fitter._transformx_table_slots={(1,'mark'):{'bbox':[10,10,40,20]}}
+        fitter._transformx_table_fit_results=[];fitter._transformx_heading_fit_results=[];fitter._transformx_panel_fit_results=[]
+        paragraph=NS(debug_id='mark',unicode='ु',vertical=False,box=NS(x=10,y=10,x2=15,y2=12),pdf_paragraph_composition=[])
+        fitter.render_paragraph(paragraph,NS(page_number=0),{})
+        self.assertEqual(rendered,['mark'])
+        self.assertEqual(fitter._transformx_table_fit_results[0]['status'],'empty_typeset_normally')
+
     def test_formula_only_slot_seeds_layout_font_without_changing_source_glyphs(self):
         char=PdfCharacter(char_unicode='8',box=Box(x=0,y=0,x2=5,y2=9),pdf_style=PdfStyle(font_size=9))
         char.visual_bbox=NS(box=char.box)

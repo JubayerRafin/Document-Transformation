@@ -128,6 +128,8 @@ class LoneMarkTests(unittest.TestCase):
     def test_letters_are_not_lone_marks(self):
         from transformation.layout.stacked_lines import _is_lone_mark
         self.assertFalse(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='स')]))])))
+        self.assertTrue(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_formula=NS(pdf_character=[NS(char_unicode='\x00')]))])))
+        self.assertFalse(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='•')]))])))
 
 
 if __name__ == '__main__':

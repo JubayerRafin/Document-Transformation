@@ -271,14 +271,17 @@ def _characters(paragraph):
 def _is_lone_mark(paragraph):
     import unicodedata
     text = ''.join(getattr(ch, 'char_unicode', '') or '' for ch in _characters(paragraph)).strip()
-    return bool(text) and all(unicodedata.category(c) in ('Mn', 'Mc', 'Me') for c in text)
+    # Combining marks, or NUL: a glyph of a shaped cluster the PDF gives no character for.
+    return bool(text) and all(unicodedata.category(c) in ('Mn', 'Mc', 'Me') or c == '\x00' for c in text)
 
 
 def attach_lone_marks(page, update):
-    """Move paragraphs made only of combining marks into the paragraph whose letters they belong to.
+    """Move paragraphs made only of combining marks (or unread glyphs) into the paragraph whose
+    letters they belong to.
 
-    A Devanagari vowel sign drawn below its consonant ("ु") became a paragraph of its own; with no
-    letter to typeset, table fitting stopped and the whole Hindi report failed (2026-11-21). The mark
+    A Devanagari vowel sign drawn below its consonant ("ु"), and an unread piece of a Bengali
+    cluster, became paragraphs of their own; with no letter to typeset, table fitting stopped and
+    whole Hindi and Bengali documents failed (2026-11-21). The mark
     joins the nearest paragraph that overlaps it horizontally and lies within a line height of it.
     Returns how many were moved."""
     moved = 0

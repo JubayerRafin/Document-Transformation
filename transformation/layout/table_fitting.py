@@ -131,7 +131,10 @@ def install_table_fitting(Typesetting):
             units = self.create_typesetting_units(paragraph, fonts)
 
             if not units:
-                raise RuntimeError("Empty table blocks require review.")
+                # Nothing to fit (a stray mark or an empty translation): BabelDOC typesets it as
+                # usual and it is listed for review, instead of failing the whole document.
+                record.update(status='empty_typeset_normally', requires_review=True)
+                return original_render(self, paragraph, page, fonts)
             # BabelDOC also represents grade symbols such as B+ as formulas.
             # Its layout engine relocates these characters; apply the same
             # containment/font checks below, without accepting vector graphics.
