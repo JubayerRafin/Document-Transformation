@@ -253,6 +253,26 @@ def _unglued(text):
     return re.sub(r'(?<![\w-])([A-Za-z][a-z]{2,})'+placeholder,r'\1 \2',text)
 
 
+def _second_model_translation(text,language,protected,context,source,model):
+    """The paragraph translated by the server's other model, when the translator mixed in words of a
+    third script twice: TranslateGemma answers the same way again, so its retry does not help
+    ("তৃতীয় ত্রৈমাসিক подряд" in a Bengali report, 2026-11-21). The other model is the one named by
+    TRANSFORMX_PII_ENDPOINT / TRANSFORMX_PII_MODEL (Qwen on the self-hosted server); its answer is used
+    only when it passes the same checks and has no third script. Returns (text, stats) or None."""
+    import os
+    endpoint,other=os.environ.get('TRANSFORMX_PII_ENDPOINT'),os.environ.get('TRANSFORMX_PII_MODEL')
+    if not endpoint or not other or other==model:
+        return None
+    try:
+        result,stats=translate(endpoint,other,text,language,protected,context,source)
+    except Exception:
+        return None
+    if result==text or foreign_script(text,result,language) or any(
+            stats.get(flag) for flag in ('kept_source_requires_review','foreign_script_review_required','recovery_review_required')):
+        return None
+    return result,{key:stats[key] for key in ('prompt_eval_count','eval_count') if key in stats}
+
+
 def translate(endpoint,model,text,language,protected=(),context='',source='en'):
     import hashlib,time
     from transformation.llm.ollama_native import chat,record_progress,needs_no_translation
@@ -363,6 +383,12 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             if stray and attempt==1:
                 raise ValueError(f'Translation contains {stray} text that is in neither the source nor the target language; '
                                  'answer only in the target language.')
+            if stray:
+                second=_second_model_translation(text,language,protected,context,source,model)
+                if second is not None:
+                    record_progress('foreign_script_second_model',source_sha256=digest,script=stray,model=model)
+                    return second[0],{**totals,**second[1],'translation_backend':_backend(model),
+                                      'second_model_after_foreign_script':True}
             if stray and (foreign_share(text,restored,language)>=FOREIGN_KEEP_SOURCE
                           or len(text.split())<=SHORT_LABEL_WORDS):
                 # Mostly another language, or a short label: the source reads better than that.
