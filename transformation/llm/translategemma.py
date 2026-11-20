@@ -61,6 +61,38 @@ _FULL = {'ja': {':': '：', '(': '（', ')': '）', '.': '。', ',': '、', '!':
          'zh': {':': '：', '(': '（', ')': '）', '.': '。', ',': '，', '!': '！', '?': '？', ';': '；'}}
 
 
+_LEADER = _re.compile(r'\s*([.·…‥・_\-])(?:\s?\1){4,}\s*$')
+
+
+def _width(text):
+    """Rough width of text in ems: wide (CJK, Hangul, Indic) letters count as one em, others as 0.5 (narrow, so the leader errs short)."""
+    return sum(1.0 if (ord(c) >= 0x0900 and not c.isspace()) else 0.3 if c in '.,·:;\'"|il' else 0.5
+               for c in text)
+
+
+def fit_leader(source, target):
+    """A table-of-contents line's dot leader, sized for the translated title.
+
+    The source line fills its width with a leader ("Check the sender's fax machine......"); the model
+    returned it as a longer run of another character ("·········"), and a run of dots cannot break,
+    so translated contents lines ran past the page edge (HP user guide, 2026-11-21). The leader is
+    rebuilt with the source's character, shorter by however much wider the translated title is
+    (estimated, erring short), at least three."""
+    match = _LEADER.search(source)
+    if not match:
+        return target
+    leader = source[match.start():].strip()
+    char = match.group(1)
+    count = sum(1 for c in leader if c == char)
+    title_source, title = source[:match.start()], _LEADER.sub('', target)
+    if title == target and not _re.search(r'[.·…‥・_]{3,}\s*$', target):
+        return target  # the model dropped the leader; nothing to fit
+    title = _re.sub(r'\s*[.·…‥・_]{3,}\s*$', '', title)
+    spare = (_width(title_source) - _width(title)) * 1.1
+    fitted = max(3, int(count + spare / 0.3) - 2)
+    return title.rstrip() + ' ' + char * min(fitted, count)
+
+
 def cjk_punctuation(target, language):
     """Full-width punctuation next to Japanese or Chinese text, as those languages write it.
 
@@ -377,6 +409,7 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             restored=match_terminal_punctuation(text,restored)
             restored=cjk_punctuation(restored,language)
             restored=middle_dot(restored,language)
+            restored=fit_leader(text,restored)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
             stray=foreign_script(text,restored,language)

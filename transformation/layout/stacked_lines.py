@@ -232,6 +232,23 @@ def _visual_lines(chars):
     return lines
 
 
+TEXT_BULLETS = set('•●○◦▪■□–—‣⁃∙')
+
+
+def _line_text(line):
+    """A visual line's text with spaces between its characters where BabelDOC stored none."""
+    chars = line['chars']
+    out = ''
+    for i, char in enumerate(chars):
+        text = getattr(char, 'char_unicode', '') or ''
+        if i and out and not out[-1].isspace() and not text.isspace():
+            gap = char.visual_bbox.box.x - chars[i - 1].visual_bbox.box.x2
+            if gap > 0.25 * max(char.visual_bbox.box.y2 - char.visual_bbox.box.y, 1.0):
+                out += ' '
+        out += text
+    return out.strip()
+
+
 def split_at_list_markers(page, update, make_id):
     """Start a new paragraph at each line with a bullet shape just to its left.
 
@@ -241,8 +258,6 @@ def split_at_list_markers(page, update, make_id):
     paragraphs were split off."""
     import copy
     markers = list_markers(page)
-    if not markers:
-        return 0
     added = 0
     index = 0
     while index < len(page.pdf_paragraph):
@@ -266,6 +281,13 @@ def split_at_list_markers(page, update, make_id):
                 if beside and line['y'] - 0.2 * size <= centre <= line['y2'] + 0.2 * size:
                     starts.append(number)
                     break
+        # Bullets written as characters ("– Some servers ...", "○ From the drop-down ..."): when the
+        # paragraph's first line starts with one, so does each later item. Three dash items of an HP
+        # manual became one paragraph, failed its checks and stayed English (2026-11-21).
+        first = _line_text(lines[0])
+        if first[:1] in TEXT_BULLETS and first[1:2].isspace():
+            starts.extend(n for n, line in enumerate(lines)
+                          if _line_text(line)[:1] in TEXT_BULLETS and _line_text(line)[1:2].isspace())
         cuts = sorted(set(n for n in starts if n > 0))
         if not cuts:
             continue

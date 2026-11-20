@@ -125,6 +125,15 @@ class ListMarkerTests(unittest.TestCase):
         page = NS(pdf_paragraph=[paragraph], pdf_curve=curves)
         self.assertEqual(split_at_list_markers(page, lambda p, line: None, lambda p: p.debug_id + '-b'), 1)
 
+    def test_items_with_bullet_characters_become_paragraphs(self):
+        paragraph = self.list_paragraph([['– Some servers', 'wrap here'], ['– In most cases'], ['– If you use']])
+        self.assertEqual(self.run_split(paragraph, []),
+                         (2, ['– Some serverswrap here', '– In most cases', '– If you use']))
+
+    def test_a_dash_inside_running_text_does_not_split_it(self):
+        paragraph = self.list_paragraph([['Prices rose', '– and fell', 'again']])
+        self.assertEqual(self.run_split(paragraph, [])[0], 0)
+
     def test_paragraphs_without_bullets_beside_them_stay_whole(self):
         paragraph = self.list_paragraph([['Plain text'], ['continues']])
         self.assertEqual(self.run_split(paragraph, [])[0], 0)
