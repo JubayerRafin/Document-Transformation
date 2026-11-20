@@ -10,43 +10,14 @@ import pymupdf
 from extraction.models import Document, Page, Region
 
 
-# Fonts for the invisible OCR text layer, tried in order: MuPDF's CJK font, then fonts covering
-# Arabic and the Indic scripts. With the CJK font alone every Arabic and Hindi scan failed once those
-# languages got their own recognizers (2026-11-21). TRANSFORMX_OCR_FONTS adds font files (":"-separated).
-_FONT_FILES = ['~/.cache/babeldoc/fonts/GoNotoKurrent-Regular.ttf',
-               '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
-               '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf']
-
-
 def handoff_fonts():
-    import os
-    fonts = [('ocrfont', pymupdf.Font('cjk'))]
-    extra = [p for p in os.environ.get('TRANSFORMX_OCR_FONTS', '').split(os.pathsep) if p]
-    for number, path in enumerate(extra + _FONT_FILES):
-        path = os.path.expanduser(path)
-        if os.path.isfile(path):
-            try:
-                fonts.append((f'ocrfont{number + 1}', pymupdf.Font(fontfile=path)))
-            except Exception:
-                continue
-    return fonts
+    from transformation.pdf.native_text import fonts
+    return fonts()
 
 
 def drawing_order(text):
-    """text as a PDF draws it, left to right. Right-to-left text is drawn in visual order (runs of
-    digits and Latin letters left to right inside it), as real PDFs do, so that the reader that
-    puts right-to-left lines back into reading order (unmapped_text.py) reads it correctly."""
-    import unicodedata
-    from transformation.pdf.unmapped_text import RTL, visual_to_logical
-    if not RTL.search(text):
-        return text
-    clusters = []
-    for c in text:
-        if clusters and unicodedata.combining(c):
-            clusters[-1] += c
-        else:
-            clusters.append(c)
-    return visual_to_logical([(i, c) for i, c in enumerate(clusters)])
+    from transformation.pdf.native_text import drawing_order as order
+    return order(text)
 
 
 def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=False):

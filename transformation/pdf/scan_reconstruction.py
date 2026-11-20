@@ -385,6 +385,7 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                         grouped[best].append(dict(span, source_line=line_number))
         font = pymupdf.Font('cjk')
         records, placements, shaped_placements, planned = [], [], [], []
+        native_fonts = {}
         for index, (region, spans) in enumerate(zip(regions, grouped)):
             correction = corrections.get(region['id'])
             region_style = styles[index] if styles else None
@@ -493,6 +494,18 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                         fitting_box |= line_box
                 if any(not region_font.has_glyph(ord(c)) for c in text if not c.isspace()):
                     reason = reason or 'Output font lacks required characters; preserve original text.'
+            elif needs_shaping(text) and force_native:
+                # A scan made native for translation needs text the translator can read: shaped
+                # outlines are not text, and such lines stayed untranslated (Arabic scan, 2026-11-21).
+                # The letters are drawn unshaped, in a font that has them, in drawing order.
+                from transformation.pdf.native_text import covering_font
+                choice = covering_font(text)
+                if choice:
+                    font_name, region_font = choice
+                    native_fonts[font_name] = region_font
+                fitted = fit_text(fitting_box, text.strip(), region_font, max_size=font_policy['maximum'], min_size=font_policy['minimum'])
+                if fitted and not validate_placements(fitting_box, fitted, region_font):
+                    fitted = None
             elif needs_shaping(text):
                 # Arabic, Hebrew and Indic text is laid out shaped (complex_script.fit_shaped); the
                 # per-glyph CJK font below can neither shape nor cover these scripts.
@@ -546,7 +559,12 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             records.append(record)
         harmonize_sizes(planned, font)
         for item in planned:
-            placements.extend((baseline, line, size, item['ink'], item.get('fontname', 'scanfont')) for baseline, line, size in item['fitted'])
+            name = item.get('fontname', 'scanfont')
+            if name in native_fonts:
+                from transformation.pdf.native_text import drawing_order
+                placements.extend((baseline, drawing_order(line), size, item['ink'], name) for baseline, line, size in item['fitted'])
+                continue
+            placements.extend((baseline, line, size, item['ink'], name) for baseline, line, size in item['fitted'])
         pixels[rules] = original_pixels[rules]
         erase_mask[rules]=False
         with pymupdf.open() as result:
@@ -564,6 +582,8 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             from transformation.pdf.scan_style import EMBEDDED, font as style_font
             for name in sorted({fontname for *_, fontname in placements if fontname in EMBEDDED}):
                 p.insert_font(fontname=EMBEDDED[name], fontbuffer=style_font(name).buffer)
+            for name in sorted({fontname for *_, fontname in placements if fontname in native_fonts}):
+                p.insert_font(fontname=name, fontbuffer=native_fonts[name].buffer)
             for baseline, text, size, ink, fontname in placements:
                 p.insert_text(baseline, text, fontname=EMBEDDED.get(fontname, fontname), fontsize=size, color=ink)
             for rect, outlines in shaped_placements:
