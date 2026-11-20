@@ -97,18 +97,26 @@ def meaning_missing(source_pages, output_text, source, target):
     if target != 'en':
         return None
     from evaluation.robustness.make_corpus import OTHER
-    if source not in OTHER:
+    from evaluation.robustness.make_fullpage import SENTENCES, KEYS
+    pools = []
+    if source in OTHER:
+        pools.append((OTHER[source], MEANING))
+    if source in SENTENCES and source != 'en':
+        # make_fullpage's statements; their {pct}/{n} numbers vary, so pieces around them may not match.
+        pools.append(([s.replace('{pct}', '').replace('{n}', '') for s in SENTENCES[source]], KEYS))
+    if not pools:
         return None
     text = normal('\n'.join(source_pages))
     checked, missing = 0, []
-    for index, sentence in enumerate(OTHER[source]):
-        compact = normal(sentence)
-        pieces = [compact[k:k + 6] for k in range(0, max(1, len(compact) - 5), 6)]
-        if sum(piece in text for piece in pieces) < max(2, len(pieces) // 3):
-            continue
-        checked += 1
-        if not all(re.search(word, output_text, re.I) for word in MEANING[index]):
-            missing.append(index)
+    for offset, (sentences, keys) in enumerate(pools):
+        for index, sentence in enumerate(sentences):
+            compact = normal(sentence)
+            pieces = [compact[k:k + 6] for k in range(0, max(1, len(compact) - 5), 6)]
+            if sum(piece in text for piece in pieces) < max(2, len(pieces) // 3):
+                continue
+            checked += 1
+            if not all(re.search(word, output_text, re.I) for word in keys[index]):
+                missing.append(index + 100 * offset)
     return checked, missing
 
 
