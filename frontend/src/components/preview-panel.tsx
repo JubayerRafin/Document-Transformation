@@ -173,7 +173,7 @@ export function PreviewPanel({
               className="select-input !h-9 !w-20"
             >
               {Array.from(
-                { length: Math.max(1, Math.min(200, job.pages || 1)) },
+                { length: Math.max(1, Math.min(1000, job.pages || 1)) },
                 (_, i) => (
                   <option key={i} value={i + 1}>
                     {i + 1}

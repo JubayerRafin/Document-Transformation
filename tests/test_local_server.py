@@ -93,6 +93,25 @@ class LocalServerTests(unittest.TestCase):
         self.assertNotIn('pii_model', self.store.get(translation)['options'])
         self.assertNotIn('pii_model', self.store.get(default)['options'])
 
+    def test_parallel_workers_each_claim_a_different_job(self):
+        import threading
+        ids = {self.submit().json()['job_id'] for _ in range(6)}
+        claimed, lock = [], threading.Lock()
+
+        def worker():
+            while True:
+                job = self.store.claim_next()
+                if not job:
+                    return
+                with lock:
+                    claimed.append(job['id'])
+
+        threads = [threading.Thread(target=worker) for _ in range(3)]
+        for t in threads: t.start()
+        for t in threads: t.join()
+        self.assertEqual(sorted(claimed), sorted(ids))   # every job once, none twice
+        self.assertTrue(all(self.store.get(i)['status'] == 'running' for i in ids))
+
     def test_same_idempotency_key_returns_the_same_job(self):
         first = self.submit(key='same-key-123').json()['job_id']
         second = self.submit(key='same-key-123').json()['job_id']

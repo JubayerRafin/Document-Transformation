@@ -19,6 +19,8 @@ import {
   PII_CATEGORIES,
   type PiiStyle,
   validatePdf,
+  MAX_PAGES,
+  MAX_MB,
   type Operation,
   type TransformOptions,
   type Worker,
@@ -68,7 +70,8 @@ export function UploadPanel({
     attempt = useRef<{ file: File; options: string; key: string } | null>(null),
     reduced = useReducedMotion();
   // One server: the GPU server this website runs on.
-  const worker = workers[0];
+  const worker = workers[0],
+    limits = worker?.capabilities?.limits ?? { max_pages: MAX_PAGES, max_mb: MAX_MB };
   // Translation models the chosen server offers; the selector appears only when there is a choice.
   const models = worker?.capabilities?.translation_models ?? [],
     model = models.find((m) => m.id === translationModel) ?? models[0];
@@ -79,7 +82,7 @@ export function UploadPanel({
     if (!f) return;
     const version = ++selection.current;
     setFileError("");
-    const problem = await validatePdf(f);
+    const problem = await validatePdf(f, undefined, worker?.capabilities?.limits);
     if (version !== selection.current) return;
     if (problem) {
       setFile(null);
@@ -283,7 +286,7 @@ export function UploadPanel({
               id="upload-hint"
               className="mb-0 mt-3 text-xs leading-5 text-muted-foreground"
             >
-              One PDF per job. Maximum 50 MB and 200 pages. Encrypted PDFs are
+              One PDF per job. Maximum {limits.max_mb} MB and {limits.max_pages} pages. Encrypted PDFs are
               not supported.
             </p>
             {fileError && (

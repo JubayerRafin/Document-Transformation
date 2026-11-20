@@ -32,8 +32,9 @@ sys.path[:0] = [str(HERE), str(HERE.parents[1])]  # the site worker's runner, an
 import cloud_worker as runner  # noqa: E402  (the site worker's job runner, reused as it is)
 
 PROJECT = runner.PROJECT
-MAX_BYTES = runner.MAX
-MAX_PAGES = 200
+# Largest upload and longest document accepted (the website reads them from /v1/workers).
+MAX_BYTES = int(float(os.environ.get('TRANSFORMX_SERVICE_MAX_MB', '100')) * 1_000_000)
+MAX_PAGES = int(os.environ.get('TRANSFORMX_MAX_PAGES', '250'))
 SERVER_ID = 'local'
 STATUS_SECONDS = 45
 CATEGORIES = ['Names', 'Email addresses', 'Phone numbers', 'Addresses', 'Identifiers', 'Bank accounts', 'Dates of birth']
@@ -212,6 +213,15 @@ class Store:
             queued = [j for j in self.jobs.values() if j['status'] == 'queued']
             return min(queued, key=lambda j: j['created']) if queued else None
 
+    def claim_next(self):
+        """The oldest queued job, marked running in the same step, so two workers never take one job."""
+        with self.lock:
+            job = self.next_queued()
+            if job:
+                job.update(status='running', stage='starting', error_code=None)
+                self.save(job)
+            return job
+
     def event(self, job, stage, seconds):
         with self.lock:
             events = job.setdefault('events', [])
@@ -270,32 +280,39 @@ class Engine:
                 'ready': bool(s.get('ready')),
                 'capabilities': {'gpu': s.get('gpu', ''), 'operations': s.get('operations', []),
                                  'note': s.get('note', ''), 'translation_models': s.get('translation_models', []),
-                                 'pii_models': s.get('pii_models', [])}}
+                                 'pii_models': s.get('pii_models', []),
+                                 'limits': {'max_pages': MAX_PAGES, 'max_mb': MAX_BYTES // 1_000_000}}}
+
+    def maintain(self):
+        """Every STATUS_SECONDS: keep the OCR and layout services loaded, delete old job folders and
+        check the models, GPU and disk."""
+        while not self.stopping:
+            try:
+                if not self.fake:
+                    runner.keep_ocr_warm(self.ocr_session)
+                    from transformation.pdf.layout_service import ping
+                    ping()
+                    runner.clean_old_jobs(self.store.root)
+                self.refresh_status()
+            except Exception:
+                traceback.print_exc()
+            time.sleep(STATUS_SECONDS)
 
     def loop(self):
-        last = 0.0
+        """One job worker: runs queued jobs one after another. TRANSFORMX_SERVICE_WORKERS workers run
+        side by side; the model servers take their requests together."""
         while not self.stopping:
-            if time.monotonic() - last > STATUS_SECONDS:
-                try:
-                    if not self.fake:
-                        runner.keep_ocr_warm(self.ocr_session)
-                        from transformation.pdf.layout_service import ping
-                        ping()
-                        runner.clean_old_jobs(self.store.root)
-                    self.refresh_status()
-                except Exception:
-                    traceback.print_exc()
-                last = time.monotonic()
-            job = self.store.next_queued()
-            if not job or (not self.fake and runner.low_disk(self.store.root)):
+            job = None if (not self.fake and runner.low_disk(self.store.root)) else self.store.claim_next()
+            if not job:
                 self.wake.wait(2)
                 self.wake.clear()
                 continue
             self.run(job)
 
     def run(self, job):
-        job.update(status='running', stage='starting', error_code=None)
-        self.store.save(job)
+        if job['status'] != 'running':
+            job.update(status='running', stage='starting', error_code=None)
+            self.store.save(job)
         print('Starting job', job['id'], flush=True)
         try:
             if job['options']['operation'] == 'manual_redaction':
@@ -783,7 +800,11 @@ def main():
         engine.refresh_status()
         print('Server ready for: ' + (', '.join(engine.status['operations']) or 'none; ' + engine.status['note']),
               flush=True)
-        threading.Thread(target=engine.loop, name='jobs', daemon=True).start()
+        threading.Thread(target=engine.maintain, name='status', daemon=True).start()
+        workers = max(1, int(os.environ.get('TRANSFORMX_SERVICE_WORKERS', '1')))
+        for index in range(workers):
+            threading.Thread(target=engine.loop, name=f'jobs-{index + 1}', daemon=True).start()
+        print(f'{workers} job worker(s).', flush=True)
         print(f'TransformX website: http://{args.host}:{args.port}/', flush=True)
         uvicorn.run(app, host=args.host, port=args.port, log_level='warning')
         engine.stopping = True

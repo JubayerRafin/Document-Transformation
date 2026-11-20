@@ -52,6 +52,14 @@ if ! "$python" -c 'import fastapi, uvicorn, multipart' 2>/dev/null; then
   fi
 fi
 
+# Jobs run side by side when the GPU has room for both models and two jobs' OCR and layout work
+# (40 GB or more: L40S, A100, H100); [service] parallel_jobs in transformx.toml sets it explicitly.
+if [ -z "${TRANSFORMX_SERVICE_WORKERS:-}" ]; then
+  gpu_mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | head -1)
+  export TRANSFORMX_SERVICE_WORKERS=1
+  [ "${gpu_mib:-0}" -ge 40000 ] && export TRANSFORMX_SERVICE_WORKERS=2
+fi
+
 # A new start loads the current code: stop pre-load servers left from a previous start.
 pkill -f '^[^ ]*python[0-9.]* -m transformation[.]preload ' 2>/dev/null || true
 rm -f /tmp/transformx-preload-"$(id -u)"/*.sock 2>/dev/null || true

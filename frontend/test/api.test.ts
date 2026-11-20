@@ -70,8 +70,8 @@ describe("existing API contract", () => {
     expect(await validatePdf(new File(["%PDF-"], "sample.txt"))).toContain(
       "PDF",
     );
-    const large = { name: "large.pdf", size: 50_000_001 } as File;
-    expect(await validatePdf(large)).toContain("50 MB");
+    const large = { name: "large.pdf", size: 100_000_001 } as File;
+    expect(await validatePdf(large)).toContain("100 MB");
   });
   it("retains cancellation authorization errors", async () => {
     const api = new ApiClient(

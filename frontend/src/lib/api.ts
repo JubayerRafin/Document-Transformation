@@ -161,6 +161,8 @@ export type Worker = {
     note?: string;
     /** Translation models this server offers (its settings file); "default" is its own. */
     translation_models?: TranslationModel[];
+    /** Largest upload and longest document this server accepts. */
+    limits?: { max_pages: number; max_mb: number };
     /** PII models this server offers (its settings file); "default" is its own. */
     pii_models?: TranslationModel[];
   };
@@ -221,7 +223,7 @@ const MESSAGES: Record<string, string> = {
     "The service needs administrator configuration. Please try again later.",
   DATABASE_OR_STORAGE_REQUEST_FAILED:
     "The document service is unavailable. Try again without changing your document.",
-  REQUEST_TOO_LARGE: "The file is too large. Choose a PDF under 50 MB.",
+  REQUEST_TOO_LARGE: "The file is larger than this server accepts. Choose a smaller PDF.",
   INVALID_PDF: "Choose a valid PDF document.",
   CSRF_INVALID:
     "Your session needs refreshing. Reload this page and sign in again.",
@@ -357,10 +359,14 @@ export class ApiClient {
     });
   }
 }
-export async function validatePdf(file: File, facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts) {
+export async function validatePdf(
+  file: File,
+  facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts,
+  limits: { max_pages: number; max_mb: number } = { max_pages: MAX_PAGES, max_mb: MAX_MB },
+) {
   if (!/\.pdf$/i.test(file.name) || file.size < 5)
     return "Choose a PDF document.";
-  if (file.size > 50_000_000) return "Choose a PDF smaller than 50 MB.";
+  if (file.size > limits.max_mb * 1_000_000) return `Choose a PDF smaller than ${limits.max_mb} MB.`;
   try {
     if (
       new TextDecoder().decode(await file.slice(0, 5).arrayBuffer()) !== "%PDF-"
@@ -372,11 +378,12 @@ export async function validatePdf(file: File, facts: (file: File) => Promise<{ p
   const { pages, encrypted } = await facts(file);
   if (encrypted)
     return "This PDF is password-protected. Remove the password, then upload it again.";
-  if (pages !== undefined && pages > MAX_PAGES)
-    return `This PDF has ${pages} pages; the limit is ${MAX_PAGES}. Split it into parts of up to ${MAX_PAGES} pages.`;
+  if (pages !== undefined && pages > limits.max_pages)
+    return `This PDF has ${pages} pages; the limit is ${limits.max_pages}. Split it into parts of up to ${limits.max_pages} pages.`;
   return null;
 }
-export const MAX_PAGES = 200;
+export const MAX_PAGES = 250;
+export const MAX_MB = 100;
 type PdfJs = {
   GlobalWorkerOptions: { workerSrc: string };
   getDocument: (src: { data: ArrayBuffer; isEvalSupported: boolean }) => {
