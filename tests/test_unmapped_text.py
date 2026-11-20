@@ -115,3 +115,13 @@ class RightToLeftOrderTests(unittest.TestCase):
             {'c': 'ع', 'bbox': (67.2, 0, 73.3, 9)}, {'c': 'ّ', 'bbox': (61.9, 0, 67.2, 9)},
             {'c': 'و', 'bbox': (62.9, 0, 62.9, 9)}, {'c': 'ض', 'bbox': (51.4, 0, 61.9, 9)}]}]}
         self.assertEqual([t for _, t in _clusters(line)], ['ع', 'وّ', 'ض'])
+
+
+class IndicRereadTests(unittest.TestCase):
+    def test_nul_characters_count_as_unread_and_mupdf_order_is_accepted(self):
+        from transformation.pdf.unmapped_text import acceptable, CID
+        babeldoc = 'सभी िशपम\x00ट की प\x00ँचने पर जाँच की जानी चािहए।'
+        mupdf = 'सभी शिपमेंट की पहुँचने पर जाँच की जानी चाहिए।'
+        self.assertEqual(len(CID.findall(babeldoc)), 2)
+        self.assertTrue(acceptable(babeldoc, mupdf))
+        self.assertFalse(acceptable(babeldoc, ' '.join([mupdf] * 3)))   # neighbouring text pulled in

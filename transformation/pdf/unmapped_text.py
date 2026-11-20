@@ -16,7 +16,7 @@ from collections import Counter
 import re
 import unicodedata
 
-CID = re.compile(r'\(cid:\d+\)')
+CID = re.compile(r'\(cid:\d+\)|\x00')  # an unread glyph: "(cid:12)", or a NUL character (Chromium PDFs)
 # Brahmic scripts (Devanagari to Sinhala) and Thai/Lao: clusters written with ActualText report boxes
 # narrower than the drawn glyphs, so pieces of one word on a line seem to be separated by a gap.
 _JOINED_SCRIPTS = re.compile(r'[ऀ-෿฀-໿]')
@@ -181,13 +181,18 @@ def repair_page(page, source):
     for paragraph in page.pdf_paragraph:
         text = paragraph.unicode or ''
         unread, reversed_order = bool(CID.search(text)), bool(RTL.search(text))
-        if not paragraph.box or not (unread or reversed_order):
+        # Indic text BabelDOC reads with each vowel sign where it is drawn, before its consonant
+        # ("िशपम" for "शिपम"), and the model translated it into invented sentences (Hindi report,
+        # 2026-11-21). MuPDF reads these clusters in order, so every such paragraph is read again.
+        shaped = bool(_JOINED_SCRIPTS.search(text))
+        if not paragraph.box or not (unread or reversed_order or shaped):
             continue
         box = paragraph.box
         rect = pymupdf.Rect(box.x - 1, height - box.y2 - 1, box.x2 + 1, height - box.y + 1)
         replacement = read_area(source, rect)
         record = {'page': page.page_number + 1, 'paragraph_id': paragraph.debug_id,
-                  'unread_characters': len(CID.findall(text)), 'right_to_left': reversed_order}
+                  'unread_characters': len(CID.findall(text)), 'right_to_left': reversed_order,
+                  'shaped_script': shaped}
         if acceptable(text, replacement):
             paragraph.unicode = replacement
             overrides[id(paragraph)] = replacement
