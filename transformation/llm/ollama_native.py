@@ -156,9 +156,48 @@ def _openai_chat(endpoint, model, messages, max_output, response_format, purpose
     return content.strip(), {**result, **stats, "done": True}
 
 
+_REQUEST_LIMITER = None  # BabelDOC's request-rate limiter, applied to real model requests only
+
+
+class _LimitRequestsOnly:
+    """Stands in for BabelDOC's module-level rate limiter (babeldoc.translator.translator).
+
+    BabelDOC waits on it before every paragraph, also those answered without the model (numbers,
+    codes, cached text), and sleeps while holding its lock, so its 16 translation threads queued
+    behind about 100 waits per page for about 20 real requests: 1-2 s of every job (2026-11-21).
+    The same limit now applies in chat(), to each request actually sent."""
+    def __init__(self, limiter):
+        self.limiter = limiter
+
+    def wait(self, *args, **kwargs):
+        return None
+
+    def set_max_qps(self, max_qps):
+        return self.limiter.set_max_qps(max_qps)
+
+    def __getattr__(self, name):
+        return getattr(self.limiter, name)
+
+
+def limit_requests_only():
+    """Install _LimitRequestsOnly; returns whether it is installed."""
+    global _REQUEST_LIMITER
+    try:
+        import babeldoc.translator.translator as vendor
+    except ImportError:
+        return False
+    if isinstance(vendor._translate_rate_limiter, _LimitRequestsOnly):
+        return True
+    _REQUEST_LIMITER = vendor._translate_rate_limiter
+    vendor._translate_rate_limiter = _LimitRequestsOnly(_REQUEST_LIMITER)
+    return True
+
+
 def chat(endpoint, model, messages, max_output=4096, response_format=None, purpose=None):
     from transformation.llm import endpoints
     endpoints.check(endpoint)
+    if _REQUEST_LIMITER is not None:
+        _REQUEST_LIMITER.wait()
     parsed = urlparse(endpoint)
     base = f"{parsed.scheme}://{parsed.netloc}"
     # On a GPU shared by several model servers, the one about to be called gets it (see gpu_share;
@@ -488,6 +527,7 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
         json.dumps([protected_values, document_context,external_context,terminology,glossary_key], ensure_ascii=False,sort_keys=True).encode("utf-8")
     ).hexdigest()
     from babeldoc.translator.translator import OpenAITranslator
+    limit_requests_only()
     original_init = OpenAITranslator.__init__
     policy_digest=translation_policy_digest()
 
