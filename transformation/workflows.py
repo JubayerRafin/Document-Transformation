@@ -53,6 +53,10 @@ def run_workflow(data,filename,workflow='Translation only',**options):
     options.setdefault('translation_model',DEFAULT_TRANSLATION_MODEL)
     options.setdefault('pii_model',DEFAULT_PII_MODEL)
     translate,redact=modes[workflow]
+    # Results name the file the customer sent: the worker checks this fingerprint against the
+    # upload, and the upright/levelled copy below has a different one.
+    import hashlib
+    original=hashlib.sha256(bytes(data)).hexdigest()
     if str(filename).lower().endswith('.pdf'):
         # Rotated pages came out blank; they are processed as unrotated pages that look the same.
         from transformation.pdf.rotation import unrotated
@@ -60,7 +64,9 @@ def run_workflow(data,filename,workflow='Translation only',**options):
         # Scanned pages a degree or two off level are turned level before OCR (see deskew).
         from transformation.pdf.deskew import deskewed
         data=deskewed(data)
-    yield from run_pipeline(data,filename,translate=translate,redact=redact,**options)
+    for event in run_pipeline(data,filename,translate=translate,redact=redact,**options):
+        if isinstance(event,dict) and 'source_sha256' in event:event=dict(event,source_sha256=original)
+        yield event
 
 
 def run_translation(data,filename,**options):
