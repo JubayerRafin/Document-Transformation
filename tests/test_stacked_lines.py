@@ -195,5 +195,43 @@ class OverlappingFragmentTests(unittest.TestCase):
         self.assertEqual(join_overlapping_fragments(page, lambda p: None), 0)
 
 
+class BrokenLineTests(unittest.TestCase):
+    def piece(self, pid, text, x, x2, y=78.7, size=7.0):
+        step = (x2 - x) / max(1, len(text))
+        chars = []
+        for i, c in enumerate(text):
+            box = NS(x=x + i * step, y=y, x2=x + (i + 1) * step, y2=y + size)
+            chars.append(NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=size)))
+        return NS(debug_id=pid, box=NS(x=x, y=y, x2=x2, y2=y + size), vertical=False, xobj_id=0,
+                  pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=chars))])
+
+    def run_join(self, pieces, curves=()):
+        from transformation.layout.stacked_lines import join_broken_line
+        page = NS(pdf_paragraph=list(pieces), pdf_curve=[NS(box=c) for c in curves])
+        count = join_broken_line(page, lambda p: None)
+        texts = [''.join(c.char_unicode for comp in p.pdf_paragraph_composition for c in comp.pdf_line.pdf_character)
+                 for p in page.pdf_paragraph]
+        return count, texts
+
+    def test_a_contents_line_cut_into_letters_becomes_one_paragraph_without_its_leader(self):
+        # Measured in an HP manual's contents (x positions of the pieces of one line).
+        pieces = [self.piece('a', 'A', 44.8, 50.9), self.piece('b', 'ppen', 51.6, 72.7), self.piece('c', 'di', 73.6, 80.4),
+                  self.piece('d', 'x', 81.1, 85.6), self.piece('e', 'B E', 88.3, 103.1), self.piece('f', 'nv', 104.1, 113.7),
+                  self.piece('g', 'program', 254.5, 290.9, y=76.8), self.piece('h', 'stewardshi', 199.0, 245.8),
+                  self.piece('i', 'p', 246.9, 251.6, y=77.1), self.piece('j', '.' * 40, 291.6, 523.1),
+                  self.piece('k', '206', 524.6, 540.6)]
+        count, texts = self.run_join(pieces)
+        self.assertIn('AppendixB Env', texts[0])
+        self.assertIn('.' * 40, texts)
+        self.assertIn('206', texts)
+
+    def test_separate_cells_and_words_of_unbroken_lines_stay_apart(self):
+        count, texts = self.run_join([self.piece('a', 'Total', 50, 70), self.piece('b', 'USD 12', 72.5, 100)])
+        self.assertEqual(count, 0)                                  # word gap only, nothing cut mid-word
+        count, _ = self.run_join([self.piece('a', 'Qua', 50, 62), self.piece('b', 'ntity', 62.5, 80)],
+                                 curves=[NS(x=62.1, y=70, x2=62.4, y2=95)])
+        self.assertEqual(count, 0)                                  # a table rule between them
+
+
 if __name__ == '__main__':
     unittest.main()

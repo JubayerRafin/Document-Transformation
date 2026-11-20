@@ -11,6 +11,8 @@ translated as "Product / Neck", Korean newsletter, 2026-11-21); its lines are jo
 which may join two words, as the model reads "열감지라벨" correctly but not "Heat / 라 / Bell".
 """
 
+import re
+
 SENTENCE_END = set('。．！？!?：:；;')
 GAP = 0.8          # largest gap between stacked lines, in character heights
 ALIGN = 0.5        # largest difference of their left edges, in character heights
@@ -355,6 +357,80 @@ def join_overlapping_fragments(page, update):
     return joined
 
 
+def _plain_chars(paragraph):
+    return [c for c in _characters(paragraph) if getattr(c, 'visual_bbox', None)]
+
+
+def join_broken_line(page, update):
+    """Join the pieces of one line that the page layout cut apart, often letter by letter.
+
+    In an HP manual's contents, "Appendix B Environmental product stewardship program" came out as 28
+    paragraphs ("A", "ppen", "di", "x", "B E", "nv", ...), each translated alone into nonsense
+    (2026-11-21): the layout model's boxes crossed the line. Pieces on one baseline, of one size, are
+    joined where a word runs on across the cut (letters on both sides, a gap under 0.2 of the
+    size), and, on a line found broken that way, also across word spaces (a gap under 0.6 of the
+    size). Leader dots and numbers stay apart, as on unbroken contents lines; nothing is joined
+    across a table rule. Returns how many pieces were joined into others."""
+    rules = vertical_rules(page)
+    single = []
+    for p in page.pdf_paragraph:
+        chars = _plain_chars(p)
+        size = _size(p) or next((getattr(getattr(c, 'pdf_style', None), 'font_size', 0) for c in chars), 0)
+        if (not chars or not size or getattr(p, 'vertical', False) or not getattr(p, 'box', None)
+                or p.box.y2 - p.box.y > 1.8 * size):
+            continue
+        text = ''.join(c.char_unicode or '' for c in chars).strip()
+        if not text or re.fullmatch(r'[\d.,:;·…\s-]+', text):
+            continue  # leader dots, page numbers
+        base = min(c.visual_bbox.box.y for c in chars if (c.char_unicode or '').strip()) if any(
+            (c.char_unicode or '').strip() for c in chars) else p.box.y
+        single.append({'p': p, 'chars': chars, 'size': float(size), 'base': base, 'text': text})
+    joined = 0
+    lines = []
+    for item in sorted(single, key=lambda i: i['base']):
+        for line in lines:
+            ref = line[0]
+            if (abs(item['base'] - ref['base']) <= 0.25 * ref['size'] and abs(item['size'] - ref['size']) <= 0.1 * ref['size']
+                    and getattr(item['p'], 'xobj_id', None) == getattr(ref['p'], 'xobj_id', None)):
+                line.append(item)
+                break
+        else:
+            lines.append([item])
+    for line in lines:
+        if len(line) < 2:
+            continue
+        line.sort(key=lambda i: i['p'].box.x)
+        def ruled(a, b):
+            return any(a['p'].box.x2 - 0.5 <= (r.x + r.x2) / 2 <= b['p'].box.x + 0.5
+                       and r.y <= a['p'].box.y + 1 and r.y2 >= a['p'].box.y2 - 1 for r in rules)
+        pairs = []
+        for a, b in zip(line, line[1:]):
+            gap = b['p'].box.x - a['p'].box.x2
+            size = a['size']
+            mid_word = (gap <= 0.2 * size and a['text'][-1:].isalpha() and b['text'][:1].isalpha())
+            pairs.append((a, b, gap, mid_word))
+        if not any(mid for *_, mid in pairs):
+            continue
+        groups, current = [], [line[0]]
+        for a, b, gap, mid in pairs:
+            if (mid or gap <= 0.6 * a['size']) and gap > -0.5 * a['size'] and not ruled(a, b):
+                current.append(b)
+            else:
+                groups.append(current)
+                current = [b]
+        groups.append(current)
+        for group in groups:
+            if len(group) < 2:
+                continue
+            head = group[0]['p']
+            for item in group[1:]:
+                head.pdf_paragraph_composition.extend(item['p'].pdf_paragraph_composition)
+                page.pdf_paragraph.remove(item['p'])
+                joined += 1
+            update(head)
+    return joined
+
+
 def _characters(paragraph):
     """All characters of a paragraph: those of its lines, formulas and same-style runs."""
     out = []
@@ -428,7 +504,8 @@ def install(ParagraphFinder):
             self.update_line_data(line)
             self.update_paragraph_data(paragraph, update_unicode=True)
 
-        changed = split_at_rules(page, update, make_id)
+        changed = join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
+        changed += split_at_rules(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
         changed += join_overlapping_fragments(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),

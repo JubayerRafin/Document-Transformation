@@ -83,7 +83,9 @@ def in_script(text, code):
 def untranslated(line, source, target):
     text = line['text']
     if source in ('en', 'fr', 'de', 'es', 'pt') and target not in ('en', 'fr', 'de', 'es', 'pt'):
-        return len(LATIN_WORDS.findall(text)) >= 4
+        # Web addresses, paths and e-mail addresses are kept as written; they are not prose.
+        prose = re.sub(r'(?:https?://|www\.)\S+|\S+@\S+|\\\S+|\S+[/\]\S+', ' ', text)
+        return len(LATIN_WORDS.findall(prose)) >= 4
     if source in SCRIPTS:
         return in_script(text, source) and len(text) >= 4
     return False
