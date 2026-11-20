@@ -71,6 +71,18 @@ class LayoutModelTests(unittest.TestCase):
             self.assertNotEqual(model_digest(model), first)
 
 
+class ChildPollingTests(unittest.TestCase):
+    def test_the_pdf_writer_checks_its_child_process_every_10_ms(self):
+        import time
+        writer = SimpleNamespace(time=time)
+        babeldoc_speed._quick_child_polling(writer)
+        babeldoc_speed._quick_child_polling(writer)                 # installing twice is harmless
+        started = time.monotonic()
+        writer.time.sleep(0.5)
+        self.assertLess(time.monotonic() - started, 0.1)
+        self.assertIs(writer.time.time, time.time)                  # timeouts still use the real clock
+
+
 class MemoryMonitorTests(unittest.TestCase):
     def test_memory_monitor_starts_no_thread(self):
         started = []

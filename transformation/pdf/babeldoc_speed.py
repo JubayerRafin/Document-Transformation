@@ -105,6 +105,23 @@ def _model_path(assets, doclayout):
     doclayout.get_doclayout_onnx_model_path = get_doclayout_onnx_model_path
 
 
+def _quick_child_polling(pdf_creater):
+    """BabelDOC subsets fonts and saves the final PDF in a child process and checks every half second
+    whether it has finished; both stages took about 0.55 s for work that ends sooner (2026-11-21). The
+    writer module's only sleeps are those two checks, so its sleep is capped at 10 ms. The timeouts and
+    the work done are unchanged."""
+    if getattr(pdf_creater.time, '_transformx_quick', False): return
+    import time as real_time
+
+    class Time:
+        _transformx_quick = True
+        def __getattr__(self, name): return getattr(real_time, name)
+        @staticmethod
+        def sleep(seconds): real_time.sleep(min(seconds, 0.01))
+
+    pdf_creater.time = Time()
+
+
 def _quiet_memory_monitor(high_level):
     monitor = high_level.MemoryMonitor
     if getattr(monitor, '_transformx_quiet', False): return
@@ -118,6 +135,8 @@ def install():
     from babeldoc.format.pdf.document_il.utils import fontmap
     from babeldoc.format.pdf import high_level
     from babeldoc.docvision import doclayout
+    from babeldoc.format.pdf.document_il.backend import pdf_creater
+    _quick_child_polling(pdf_creater)
     _font_assets(assets)
     _parsed_fonts(fontmap)
     _model_path(assets, doclayout)
