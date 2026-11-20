@@ -110,5 +110,25 @@ class ListMarkerTests(unittest.TestCase):
         self.assertEqual(self.run_split(paragraph, [400])[0], 0)   # a bullet elsewhere on the page
 
 
+class LoneMarkTests(unittest.TestCase):
+    def test_a_vowel_sign_split_off_below_its_line_joins_that_line(self):
+        from transformation.layout.stacked_lines import attach_lone_marks
+        word = NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='स', pdf_style=NS(font_size=9))]))],
+                  box=NS(x=55, y=528.4, x2=120, y2=537.4), xobj_id=0, debug_id='w')
+        mark = NS(pdf_paragraph_composition=[NS(pdf_line=None, pdf_formula=NS(pdf_character=[
+                      NS(char_unicode='ु', pdf_style=NS(font_size=9))]))],
+                  box=NS(x=60.4, y=526.1, x2=65.2, y2=528.7), xobj_id=0, debug_id='m')
+        far = NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='x', pdf_style=NS(font_size=9))]))],
+                 box=NS(x=300, y=528.4, x2=340, y2=537.4), xobj_id=0, debug_id='f')
+        page = NS(pdf_paragraph=[word, mark, far])
+        self.assertEqual(attach_lone_marks(page, lambda p: None), 1)
+        self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['w', 'f'])
+        self.assertEqual(len(word.pdf_paragraph_composition), 2)
+
+    def test_letters_are_not_lone_marks(self):
+        from transformation.layout.stacked_lines import _is_lone_mark
+        self.assertFalse(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='स')]))])))
+
+
 if __name__ == '__main__':
     unittest.main()

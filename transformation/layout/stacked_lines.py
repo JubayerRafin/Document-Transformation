@@ -255,6 +255,59 @@ def split_at_list_markers(page, update, make_id):
     return added
 
 
+def _characters(paragraph):
+    """All characters of a paragraph: those of its lines, formulas and same-style runs."""
+    out = []
+    for c in paragraph.pdf_paragraph_composition or []:
+        for part in (getattr(c, 'pdf_line', None), getattr(c, 'pdf_formula', None),
+                     getattr(c, 'pdf_same_style_characters', None)):
+            if part is not None:
+                out.extend(part.pdf_character or [])
+        if getattr(c, 'pdf_character', None) is not None:
+            out.append(c.pdf_character)
+    return out
+
+
+def _is_lone_mark(paragraph):
+    import unicodedata
+    text = ''.join(getattr(ch, 'char_unicode', '') or '' for ch in _characters(paragraph)).strip()
+    return bool(text) and all(unicodedata.category(c) in ('Mn', 'Mc', 'Me') for c in text)
+
+
+def attach_lone_marks(page, update):
+    """Move paragraphs made only of combining marks into the paragraph whose letters they belong to.
+
+    A Devanagari vowel sign drawn below its consonant ("ु") became a paragraph of its own; with no
+    letter to typeset, table fitting stopped and the whole Hindi report failed (2026-11-21). The mark
+    joins the nearest paragraph that overlaps it horizontally and lies within a line height of it.
+    Returns how many were moved."""
+    moved = 0
+    for lone in [p for p in page.pdf_paragraph if _is_lone_mark(p)]:
+        box = getattr(lone, 'box', None)
+        if box is None:
+            continue
+        reach = max(box.y2 - box.y, 1.0) + max((getattr(getattr(ch, 'pdf_style', None), 'font_size', 0) or 0
+                                                for ch in _characters(lone)), default=0)
+        best = None
+        for other in page.pdf_paragraph:
+            ob = getattr(other, 'box', None)
+            if other is lone or ob is None or _is_lone_mark(other) or getattr(other, 'xobj_id', None) != getattr(lone, 'xobj_id', None):
+                continue
+            if min(ob.x2, box.x2) - max(ob.x, box.x) < 0:
+                continue
+            distance = max(ob.y - box.y2, box.y - ob.y2, 0)
+            if distance <= reach and (best is None or distance < best[0]):
+                best = (distance, other)
+        if best is None:
+            continue
+        target = best[1]
+        target.pdf_paragraph_composition.extend(lone.pdf_paragraph_composition)
+        page.pdf_paragraph.remove(lone)
+        update(target)
+        moved += 1
+    return moved
+
+
 def install(ParagraphFinder):
     if getattr(ParagraphFinder, '_transformx_stacked_lines', False):
         return
@@ -275,6 +328,7 @@ def install(ParagraphFinder):
         changed = split_at_rules(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True))
+        changed += attach_lone_marks(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         if changed:
             self._set_paragraph_render_order(page)
         return result

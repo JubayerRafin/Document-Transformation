@@ -10,6 +10,45 @@ import pymupdf
 from extraction.models import Document, Page, Region
 
 
+# Fonts for the invisible OCR text layer, tried in order: MuPDF's CJK font, then fonts covering
+# Arabic and the Indic scripts. With the CJK font alone every Arabic and Hindi scan failed once those
+# languages got their own recognizers (2026-11-21). TRANSFORMX_OCR_FONTS adds font files (":"-separated).
+_FONT_FILES = ['~/.cache/babeldoc/fonts/GoNotoKurrent-Regular.ttf',
+               '/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf',
+               '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf']
+
+
+def handoff_fonts():
+    import os
+    fonts = [('ocrfont', pymupdf.Font('cjk'))]
+    extra = [p for p in os.environ.get('TRANSFORMX_OCR_FONTS', '').split(os.pathsep) if p]
+    for number, path in enumerate(extra + _FONT_FILES):
+        path = os.path.expanduser(path)
+        if os.path.isfile(path):
+            try:
+                fonts.append((f'ocrfont{number + 1}', pymupdf.Font(fontfile=path)))
+            except Exception:
+                continue
+    return fonts
+
+
+def drawing_order(text):
+    """text as a PDF draws it, left to right. Right-to-left text is drawn in visual order (runs of
+    digits and Latin letters left to right inside it), as real PDFs do, so that the reader that
+    puts right-to-left lines back into reading order (unmapped_text.py) reads it correctly."""
+    import unicodedata
+    from transformation.pdf.unmapped_text import RTL, visual_to_logical
+    if not RTL.search(text):
+        return text
+    clusters = []
+    for c in text:
+        if clusters and unicodedata.combining(c):
+            clusters[-1] += c
+        else:
+            clusters.append(c)
+    return visual_to_logical([(i, c) for i, c in enumerate(clusters)])
+
+
 def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=False):
     """Build verified OCR IR; verification-only mode retains unreadable boxes.
 
@@ -115,16 +154,23 @@ def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=
                       warnings=warnings)
         ir.validate()
         # Invisible text lets the existing PDF parser read the OCR. Never erase pixels.
-        font = pymupdf.Font("cjk")
-        page.insert_font(fontname="ocrfont", fontbuffer=font.buffer)
+        fonts = handoff_fonts()
+        inserted = set()
         for region in regions:
             if region.metadata.get('requires_review'):
                 # Keep uncertain evidence in IR, but do not feed it to translation.
                 continue
-            if any(not font.has_glyph(ord(c)) for c in region.text if not c.isspace()):
+            choice = next(((name, font) for name, font in fonts
+                           if all(font.has_glyph(ord(c)) for c in region.text if not c.isspace())), None)
+            if choice is None:
                 raise ValueError("OCR text contains a character unsupported by the handoff font.")
+            fontname, font = choice
+            if fontname not in inserted:
+                page.insert_font(fontname=fontname, fontbuffer=font.buffer)
+                inserted.add(fontname)
+            drawn = drawing_order(region.text)
             box = pymupdf.Rect(region.bbox)
-            size = min(box.height / 1.5, box.width / max(font.text_length(region.text, fontsize=1), .01))
+            size = min(box.height / 1.5, box.width / max(font.text_length(drawn, fontsize=1), .01))
             if size < 3:
                 # High-resolution recognition can correctly recover text that is
                 # physically too small for the parser's invisible text layer.
@@ -133,7 +179,7 @@ def prepare(data, recognition_dir, output_dir, source_name, *, allow_unreadable=
                 region.metadata['source_layer_omitted']=True
                 region.warnings.append('Source text is below the 3 pt handoff limit; retained in OCR IR and original pixels.')
                 continue
-            page.insert_text((box.x0, box.y0 + size), region.text, fontsize=size, fontname="ocrfont", render_mode=3)
+            page.insert_text((box.x0, box.y0 + size), drawn, fontsize=size, fontname=fontname, render_mode=3)
         out = Path(output_dir)
         out.mkdir(parents=True, exist_ok=True)
         pdf.save(out / 'ocr-input.pdf')
