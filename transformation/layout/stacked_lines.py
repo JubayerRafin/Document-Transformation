@@ -57,7 +57,14 @@ def _same_cell(upper, lower, rules):
     a, b = upper, lower
     top, bottom = max(a.y2, b.y2), min(a.y, b.y)
     left, right = min(a.x, b.x), max(a.x2, b.x2)
-    vertical, horizontal = rules
+    vertical, horizontal = rules[0], rules[1]
+    # A cell of a table found on the page (PyMuPDF, babeldoc_worker.source_table_cells) holding both
+    # lines: cell borders drawn as boxes are no thin rules. A Hindi item name wrapped in its cell
+    # ("सुरक्षा" / "दस्ताने") was two paragraphs, translated "Security" and "Safety Gloves" and drawn
+    # over each other (2026-11-23).
+    cells = rules[2] if len(rules) > 2 else ()
+    if any(c.x - 1 <= left and right <= c.x2 + 1 and c.y - 1 <= bottom and top <= c.y2 + 1 for c in cells):
+        return True
     covering = [r for r in vertical if r.y <= bottom + 1 and r.y2 >= top - 1]
     if not any(r.x2 <= left + 1 for r in covering) or not any(r.x >= right - 1 for r in covering):
         return False
@@ -131,6 +138,9 @@ def mergeable(upper, lower, rules=None):
     # row came out in tiny type, in every language (newsletter, 2026-11-23).
     if upper_text.endswith('-') and not upper_text.endswith(' -') and upper_text[-2:-1].isalnum():
         return True
+    # A list item below starts a paragraph of its own, in a cell too (split_at_list_markers).
+    if _item_number(lower_text) is not None or (lower_text[:1] in TEXT_BULLETS and lower_text[1:2].isspace()):
+        return False
     in_cell = bool(rules) and _same_cell(last, first, rules)
     if is_compact_cjk(upper_text) and is_compact_cjk(lower_text):
         return in_cell or not rules or not any(
@@ -818,6 +828,16 @@ def join_lead_labels(page, update):
     return joined
 
 
+def table_cells(finder, page):
+    """Boxes of the table cells PyMuPDF finds on this page of the input PDF (PDF coordinates), or ()."""
+    try:
+        from transformation.pdf.babeldoc_worker import source_table_cells
+        path = finder.translation_config.input_file
+        return tuple(c.box for c in source_table_cells(str(path)).get(page.page_number, []))
+    except Exception:  # no cells is the old behaviour: rules only
+        return ()
+
+
 def install(ParagraphFinder):
     if getattr(ParagraphFinder, '_transformx_stacked_lines', False):
         return
@@ -845,7 +865,7 @@ def install(ParagraphFinder):
         changed += join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_overlapping_fragments(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),
-                                      (vertical_rules(page), horizontal_rules(page)))
+                                      (vertical_rules(page), horizontal_rules(page), table_cells(self, page)))
         changed += attach_lone_marks(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_lead_labels(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         if changed:

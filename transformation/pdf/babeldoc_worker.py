@@ -1,4 +1,5 @@
 """Version-pinned BabelDOC integration hooks; no vendor files are modified."""
+import functools
 import json
 import os
 import sys
@@ -323,8 +324,10 @@ def cells_with_undrawn_borders(cells, words, ink, scale):
     return out
 
 
+@functools.lru_cache(maxsize=4)
 def source_table_cells(path):
-    """Read strict table-cell boundaries in bottom-left coordinates."""
+    """Read strict table-cell boundaries in bottom-left coordinates (once per file: paragraph
+    finding and typesetting both use them). Callers must not change the result."""
     import pymupdf
 
     result = {}
@@ -680,7 +683,7 @@ def main():
         # These refer to the same immutable input PDF throughout this hook.
         # Reuse geometry for before/after audits rather than detecting its
         # tables three times and enumerating its images twice.
-        source_cells = source_table_cells(input_file)
+        source_cells = source_table_cells(str(input_file))
         source_images = source_image_boxes(input_file)
         source_tables = source_table_boxes(input_file)
         if folder:

@@ -44,6 +44,14 @@ class StackedLineTests(unittest.TestCase):
         self.assertFalse(mergeable(para('Notes -', 89.0, 260.0), para('later', 89.0, 248.6)))   # a dash, not a hyphen
         self.assertFalse(mergeable(para('GQX-', 89.0, 260.0), para('2024', 140.0, 248.6)))     # another column
 
+    def test_lines_inside_one_found_table_cell_join_unless_the_lower_one_is_a_list_item(self):
+        cell = NS(x=40.0, y=230.0, x2=120.0, y2=275.0)
+        upper, lower = para('सुरक्षा', 49.2, 260.0), para('दस्ताने', 49.2, 247.1)
+        self.assertFalse(mergeable(upper, lower, ([], [])))                     # no rules: apart
+        self.assertTrue(mergeable(upper, lower, ([], [], (cell,))))              # one found cell
+        self.assertFalse(mergeable(upper, para('दस्ताने', 49.2, 200.0), ([], [], (cell,))))   # outside it
+        self.assertFalse(mergeable(para('Open the tray', 49.2, 260.0), para('2. Close it', 49.2, 247.1), ([], [], (cell,))))
+
     def test_lines_of_other_scripts_join_only_inside_one_ruled_cell(self):
         upper, lower = para('परामर्श ', 49.2, 260.0), para('घंटे', 49.2, 247.1)
         cell = ([NS(x=45, y=240, x2=45.8, y2=275), NS(x=120, y=240, x2=120.8, y2=275)], [])
