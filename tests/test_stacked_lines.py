@@ -37,6 +37,13 @@ class StackedLineTests(unittest.TestCase):
         self.assertFalse(mergeable(para('完成。', 49.2, 260.0), para('手套', 49.2, 247.1)))
         self.assertTrue(mergeable(upper, para('手套', 49.2, 247.1)))
 
+    def test_a_code_wrapped_at_its_hyphens_is_one_paragraph(self):
+        lines = [para('GQX-', 89.0, 260.0), para('2024-', 89.0, 248.6), para('99135', 89.0, 237.2)]
+        self.assertEqual(join_stacked_lines(lines, lambda p: None), 2)
+        self.assertEqual([text(p) for p in lines], ['GQX-2024-99135'])
+        self.assertFalse(mergeable(para('Notes -', 89.0, 260.0), para('later', 89.0, 248.6)))   # a dash, not a hyphen
+        self.assertFalse(mergeable(para('GQX-', 89.0, 260.0), para('2024', 140.0, 248.6)))     # another column
+
     def test_lines_of_other_scripts_join_only_inside_one_ruled_cell(self):
         upper, lower = para('परामर्श ', 49.2, 260.0), para('घंटे', 49.2, 247.1)
         cell = ([NS(x=45, y=240, x2=45.8, y2=275), NS(x=120, y=240, x2=120.8, y2=275)], [])

@@ -126,6 +126,11 @@ def mergeable(upper, lower, rules=None):
     upper_text, lower_text = _text(upper).strip(), _text(lower).strip()
     if not upper_text or not lower_text or upper_text[-1:] in SENTENCE_END:
         return False
+    # A line that ends in a hyphen goes on below: a code wrapped in a narrow table cell
+    # ("GQX-" / "2024-" / "99135") was three paragraphs, the cell could not be laid out and its
+    # row came out in tiny type, in every language (newsletter, 2026-11-23).
+    if upper_text.endswith('-') and not upper_text.endswith(' -') and upper_text[-2:-1].isalnum():
+        return True
     in_cell = bool(rules) and _same_cell(last, first, rules)
     if is_compact_cjk(upper_text) and is_compact_cjk(lower_text):
         return in_cell or not rules or not any(
