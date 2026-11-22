@@ -468,6 +468,12 @@ def _shaped_script(text):
     return bool(_JOINED_SCRIPTS.search(text) or RTL.search(text))
 
 
+def _char_size(paragraph):
+    """The font size of a paragraph's first character with one, or 0."""
+    return next((getattr(getattr(c, 'pdf_style', None), 'font_size', 0) or 0 for c in _characters(paragraph)
+                 if getattr(getattr(c, 'pdf_style', None), 'font_size', 0)), 0)
+
+
 def join_overlapping_fragments(page, update):
     """Join one-line pieces of one Indic or Arabic line whose boxes overlap side by side.
 
@@ -476,7 +482,7 @@ def join_overlapping_fragments(page, update):
     and drawn over the others (Hindi report, 2026-11-21). Pieces of these scripts whose boxes
     overlap horizontally and share most of their height are parts of one line: they are joined and
     the line is read again as a whole (unmapped_text.repair_page). Text of other scripts, and pieces
-    that only touch, are left alone. Returns how many pieces were joined into others."""
+    that only touch (0.1 pt or less), are left alone. Returns how many pieces were joined into others."""
     joined = 0
     changed = True
     while changed:
@@ -491,10 +497,14 @@ def join_overlapping_fragments(page, update):
                 if getattr(a, 'xobj_id', None) != getattr(b, 'xobj_id', None) or b.box.x < a.box.x:
                     continue
                 height = min(a.box.y2 - a.box.y, b.box.y2 - b.box.y)
-                size = max(_size(a) or 0, _size(b) or 0, 1.0)
+                # A paragraph without a style of its own takes its characters' size; with 1 pt
+                # instead, no piece of a Hindi invoice counted as one line, and "प्रबंधक" (manager)
+                # came out as "Management" and "Mortgage" drawn over each other (2026-11-23).
+                size = max(_size(a) or _char_size(a), _size(b) or _char_size(b), 1.0)
+                # Pieces overlapping by more than a hair are one word ("कु" | "ल" of "कुल": 0.3 pt).
                 if (a.box.y2 - a.box.y > 1.8 * size or b.box.y2 - b.box.y > 1.8 * size
                         or min(a.box.y2, b.box.y2) - max(a.box.y, b.box.y) < 0.5 * height
-                        or min(a.box.x2, b.box.x2) - max(a.box.x, b.box.x) <= 0.5):
+                        or min(a.box.x2, b.box.x2) - max(a.box.x, b.box.x) <= 0.1):
                     continue
                 a.pdf_paragraph_composition.extend(b.pdf_paragraph_composition)
                 page.pdf_paragraph.remove(b)

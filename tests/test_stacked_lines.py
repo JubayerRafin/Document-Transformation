@@ -228,6 +228,20 @@ class OverlappingFragmentTests(unittest.TestCase):
         self.assertEqual(join_overlapping_fragments(page, update), 2)
         self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['a', 'd'])
 
+    def test_pieces_held_as_style_runs_take_their_characters_size(self):
+        """Hindi invoice, 2026-11-23: "प्रब" | "ंधक" (manager) had no paragraph size, counted as 1 pt
+        tall lines and were translated "Management" and "Mortgage" over each other."""
+        from transformation.layout.stacked_lines import join_overlapping_fragments
+        def run(pid, text, x, y, x2, y2):
+            chars = [NS(char_unicode=c, pdf_style=NS(font_size=9)) for c in text]
+            return NS(debug_id=pid, box=NS(x=x, y=y, x2=x2, y2=y2), vertical=False, xobj_id=0,
+                      pdf_paragraph_composition=[NS(pdf_line=None, pdf_same_style_characters=NS(pdf_character=chars))])
+        a, b = run('a', 'प्रब', 271.7, 582.9, 283.7, 589.7), run('b', 'ंधक', 281.5, 583.2, 298.3, 591.8)
+        c, d = run('c', 'कु', 381.6, 541.9, 390.0, 550.7), run('d', 'ल', 389.7, 544.0, 396.9, 550.7)
+        page = NS(pdf_paragraph=[a, b, c, d])
+        self.assertEqual(join_overlapping_fragments(page, lambda p: None), 2)
+        self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['a', 'c'])
+
     def test_touching_or_latin_pieces_stay_apart(self):
         from transformation.layout.stacked_lines import join_overlapping_fragments
         left = self.piece('l', 'परामर्श', 49.0, 507.3, 74.6, 512.9)
