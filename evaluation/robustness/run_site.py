@@ -31,7 +31,7 @@ def call(url, data=None, headers=None, method=None):
 def submit(base, pdf, source, target, operation='translation'):
     options = {'operation': operation, 'source_language': source, 'target_language': target, 'output_format': 'pdf',
                'protected_values': [], 'document_context': '', 'worker_id': 'local',
-               'pii_categories': [] if operation == 'translation' else ['Names', 'Email addresses', 'Phone numbers', 'Addresses', 'Identifiers']}
+               'pii_categories': [] if operation == 'translation' else ['Names', 'Email addresses', 'Phone numbers', 'Addresses', 'Identifiers', 'Bank accounts', 'Dates of birth']}
     boundary = '----tx' + uuid.uuid4().hex
     body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{pdf.name}"\r\n'
             f'Content-Type: application/pdf\r\n\r\n').encode() + pdf.read_bytes() + \

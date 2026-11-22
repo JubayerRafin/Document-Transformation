@@ -17,7 +17,7 @@ The sentences are the same twelve statements in each language, written for this 
 translated), so a translation into English can be checked for meaning (KEYS). Codes, dates, amounts,
 emails and phone numbers are random per seed. manifest.json lists every file, its language, page
 count and the sentences it contains. `--set heldout` uses other seeds: measure on it, never fix
-against its individual files.
+against its individual files. `--set competition` is a third, separate set for demos.
 """
 import argparse
 import io
@@ -465,13 +465,14 @@ def scanned(src_path, out_path, rng):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('out')
-    parser.add_argument('--set', choices=['dev', 'heldout'], default='dev')
+    parser.add_argument('--set', choices=['dev', 'heldout', 'competition'], default='dev')
     parser.add_argument('--langs', default=','.join(LANGS))
     parser.add_argument('--edge', default=r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe')
     args = parser.parse_args()
-    out = Path(args.out)
+    # Absolute: the browser resolves a relative --print-to-pdf path against its own folder.
+    out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    seed = {'dev': 20261121, 'heldout': 99117}[args.set]
+    seed = {'dev': 20261121, 'heldout': 99117, 'competition': 20261204}[args.set]
     manifest = []
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)
