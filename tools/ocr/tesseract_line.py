@@ -45,7 +45,12 @@ class TesseractRecognizer:
             if text:
                 words.append(text)
                 confidences.append(max(0.0, conf) / 100)
-        return {'rec_text': ' '.join(words), 'rec_score': min(confidences) if confidences else 0.0}
+        # The line's score is its words' confidence weighted by length, as PaddleOCR scores a line by
+        # its characters. The lowest word's confidence put long Bengali lines that every view read
+        # identically below the consensus threshold, and they stayed untranslated (2026-11-23).
+        weight = sum(len(w) for w in words)
+        score = sum(len(w) * c for w, c in zip(words, confidences)) / weight if weight else 0.0
+        return {'rec_text': ' '.join(words), 'rec_score': score}
 
     @staticmethod
     def _png(image):

@@ -9,6 +9,7 @@ same OCR the engine uses (transformation.ocr.paddle_pipeline.run_ocr) and compar
   char_recall / char_precision   multiset of non-space characters (reading order does not matter)
   token_recall                   whitespace tokens of the truth found verbatim in the OCR text
   value_recall                   tokens with a digit (codes, amounts, dates) found verbatim
+  review_share                   OCR lines left for review (kept as source pixels, not translated)
   seconds                        OCR wall time
 
 OUT/<label>/<lang>/ keeps the OCR evidence; OUT/<label>/scores.json the numbers. Measure on the dev
@@ -34,13 +35,19 @@ def truth_text(pdf):
         return normalize('\n'.join(page.get_text() for page in doc))
 
 
-def ocr_text(recognition_dir):
-    lines = []
+def ocr_lines(recognition_dir):
     path = Path(recognition_dir) / 'lines.jsonl'
-    for row in path.read_text(encoding='utf-8').splitlines():
-        if row.strip():
-            lines.append(json.loads(row).get('text', ''))
-    return normalize('\n'.join(lines))
+    return [json.loads(row) for row in path.read_text(encoding='utf-8').splitlines() if row.strip()]
+
+
+def ocr_text(recognition_dir):
+    return normalize('\n'.join(line.get('text', '') for line in ocr_lines(recognition_dir)))
+
+
+def review_share(recognition_dir):
+    """Share of OCR lines left for review: they keep their source pixels and are not translated."""
+    lines = [l for l in ocr_lines(recognition_dir) if l.get('text', '').strip()]
+    return round(sum(bool(l.get('requires_review')) for l in lines) / max(1, len(lines)), 4)
 
 
 def split_scripts(text):
@@ -93,6 +100,7 @@ def main():
                 done = event
             found = ocr_text(done['recognition_dir'])
             row = score(truth_text(truth), found)
+            row['review_share'] = review_share(done['recognition_dir'])
         except Exception as exc:  # one language failing must not hide the others
             row = {'error': f'{type(exc).__name__}: {exc}'[:300]}
         row['seconds'] = round(time.monotonic() - started, 1)

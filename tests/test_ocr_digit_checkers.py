@@ -64,7 +64,7 @@ class TesseractBengaliTests(unittest.TestCase):
             self.assertNotEqual(recognition_model_name('bn'), TESSERACT_RECOGNIZER)
         self.assertIn(TESSERACT_RECOGNIZER, DIGIT_CHECKERS)
 
-    def test_tesseract_tsv_becomes_one_line_with_its_lowest_word_confidence(self):
+    def test_tesseract_tsv_becomes_one_line_scored_by_its_words_weighted_by_length(self):
         from unittest.mock import patch, Mock
         from tools.ocr.tesseract_line import TesseractRecognizer
         rows = [['level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num', 'left', 'top', 'width', 'height', 'conf', 'text'],
@@ -74,4 +74,5 @@ class TesseractBengaliTests(unittest.TestCase):
         import numpy as np
         with patch('tools.ocr.tesseract_line.subprocess.run', return_value=Mock(stdout=tsv.encode())):
             out = TesseractRecognizer('bn').predict(np.full((20, 60, 3), 255, np.uint8))
-        self.assertEqual(out, [{'rec_text': 'আমার 123', 'rec_score': 0.88}])
+        self.assertEqual(out[0]['rec_text'], 'আমার 123')
+        self.assertAlmostEqual(out[0]['rec_score'], (4 * .965 + 3 * .88) / 7)
