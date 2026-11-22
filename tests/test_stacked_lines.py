@@ -412,3 +412,19 @@ class InstallOrderTests(unittest.TestCase):
         texts = [''.join(c.char_unicode for comp in p.pdf_paragraph_composition for c in comp.pdf_line.pdf_character)
                  for p in page.pdf_paragraph]
         self.assertEqual(texts, ['1. Open the tab', '2. Click the link.'])
+
+
+class DrawnBoxTests(unittest.TestCase):
+    def test_a_line_of_a_picture_past_its_frame_is_not_a_table_border(self):
+        """HP manual, 2026-11-23: a printer drawing's line ran below its picture through "Tray 1" and
+        cut the word into "Tr" | "ay"."""
+        from transformation.layout.stacked_lines import vertical_rules, drawn_boxes
+        picture = NS(xobj_id=575, box=NS(x=111.6, y=476.8, x2=416.8, y2=709.2))
+        stray = NS(xobj_id=575, box=NS(x=316.9, y=301.0, x2=318.3, y2=478.2))
+        border = NS(xobj_id=None, box=NS(x=200.0, y=300.0, x2=200.5, y2=400.0))
+        inside = NS(xobj_id=575, box=NS(x=150.0, y=500.0, x2=151.0, y2=600.0))
+        page = NS(pdf_curve=[stray, border, inside], pdf_xobject=[picture])
+        rules = vertical_rules(page)
+        self.assertEqual([(r.x, r.y2) for r in rules], [(200.0, 400.0), (150.0, 600.0)])
+        self.assertEqual(stray.box.y, 301.0)                       # the IR itself is left as it was
+        self.assertEqual(len(drawn_boxes(NS(pdf_curve=[stray], pdf_xobject=[]))), 1)

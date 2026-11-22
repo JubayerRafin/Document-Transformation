@@ -64,12 +64,37 @@ def _same_cell(upper, lower, rules):
     return not any(r.x <= left and r.x2 >= right and b.y2 - 1 <= (r.y + r.y2) / 2 <= a.y + 1 for r in horizontal)
 
 
+def drawn_boxes(page):
+    """Boxes of the page's drawings, each cut to the frame of the picture (form XObject) it belongs to.
+
+    A drawing inside a picture can reach past the picture's frame, where it is clipped and never seen.
+    A line of a printer drawing ran 160 pt below its picture, through a sentence above the next
+    picture, and was taken for a table border that cut "Tray" into "Tr" | "ay" (HP manual,
+    2026-11-23)."""
+    import copy
+    frames = {getattr(x, 'xobj_id', None): getattr(x, 'box', None) for x in getattr(page, 'pdf_xobject', None) or []}
+    out = []
+    for curve in getattr(page, 'pdf_curve', None) or []:
+        box = getattr(curve, 'box', None)
+        if box is None:
+            continue
+        frame = frames.get(getattr(curve, 'xobj_id', None))
+        if frame is not None and frame.x2 > frame.x and frame.y2 > frame.y:
+            x, y, x2, y2 = max(box.x, frame.x), max(box.y, frame.y), min(box.x2, frame.x2), min(box.y2, frame.y2)
+            if x2 < x or y2 < y:
+                continue
+            if (x, y, x2, y2) != (box.x, box.y, box.x2, box.y2):
+                box = copy.copy(box)
+                box.x, box.y, box.x2, box.y2 = x, y, x2, y2
+        out.append(box)
+    return out
+
+
 def horizontal_rules(page):
     """Boxes of thin horizontal lines on the page (table row borders)."""
     rules = []
-    for curve in getattr(page, 'pdf_curve', None) or []:
-        box = getattr(curve, 'box', None)
-        if box is not None and box.y2 - box.y <= RULE_WIDTH and box.x2 - box.x > 2 * (box.y2 - box.y):
+    for box in drawn_boxes(page):
+        if box.y2 - box.y <= RULE_WIDTH and box.x2 - box.x > 2 * (box.y2 - box.y):
             rules.append(box)
     return rules
 
@@ -138,9 +163,8 @@ RULE_WIDTH = 1.5   # a vertical rule (cell border) is at most this wide, in poin
 def vertical_rules(page):
     """Boxes of thin vertical lines on the page (table cell borders)."""
     rules = []
-    for curve in getattr(page, 'pdf_curve', None) or []:
-        box = getattr(curve, 'box', None)
-        if box is not None and box.x2 - box.x <= RULE_WIDTH and box.y2 - box.y > 2 * (box.x2 - box.x):
+    for box in drawn_boxes(page):
+        if box.x2 - box.x <= RULE_WIDTH and box.y2 - box.y > 2 * (box.x2 - box.x):
             rules.append(box)
     return rules
 
@@ -209,10 +233,7 @@ def badges(page):
     """Boxes of small, roughly square shapes that can hold a character: callout circles, numbered
     badges, keycaps."""
     out = []
-    for curve in getattr(page, 'pdf_curve', None) or []:
-        box = getattr(curve, 'box', None)
-        if box is None:
-            continue
+    for box in drawn_boxes(page):
         w, h = box.x2 - box.x, box.y2 - box.y
         if BADGE_SIZE[0] <= w <= BADGE_SIZE[1] and BADGE_SIZE[0] <= h <= BADGE_SIZE[1] and 0.6 <= w / h <= 1.6:
             out.append(box)
@@ -292,10 +313,7 @@ MARKER_SIZE = 7.0  # a bullet drawn as a shape is at most this wide and high, in
 def list_markers(page):
     """Boxes of small, roughly square shapes: bullets drawn as graphics (a dot, a square)."""
     markers = []
-    for curve in getattr(page, 'pdf_curve', None) or []:
-        box = getattr(curve, 'box', None)
-        if box is None:
-            continue
+    for box in drawn_boxes(page):
         w, h = box.x2 - box.x, box.y2 - box.y
         if 0.8 <= w <= MARKER_SIZE and 0.8 <= h <= MARKER_SIZE and 0.5 <= w / h <= 2:
             markers.append(box)

@@ -280,6 +280,49 @@ def constrain_table_headings(document, source_tables):
                 box.y2 = top
 
     return changes
+def cells_with_undrawn_borders(cells, words, ink, scale):
+    """Indexes of found table cells with a border that runs through a word and is not drawn there:
+    such a border is a line of a picture's drawing, clipped away outside the picture, or an edge
+    PyMuPDF extended across text when it merged two tables; that cell is not a cell.
+
+    Two printer drawings of an HP manual page made a "table" whose cells reached over the text above
+    them; a list step was moved to the top of a cell in the picture area and drawn over the heading
+    (2026-11-23). Borders drawn through words (a newsletter's date column spilling over its table)
+    are kept. `ink` is a 2-D boolean array of the rendered page (True where something is drawn),
+    `scale` its pixels per point; cells are (x0, top, x1, bottom) and words as from
+    get_text("words")."""
+    height, width = ink.shape
+
+    def drawn(edge):
+        kind, at, start, stop = edge
+        a, b = max(0, int(start * scale)), int(stop * scale)
+        c = int(round(at * scale))
+        lo, hi = max(0, c - 1), c + 2
+        if kind == 'v':
+            strip = ink[a:min(height, b), lo:min(width, hi)].any(axis=1) if lo < width else None
+        else:
+            strip = ink[lo:min(height, hi), a:min(width, b)].any(axis=0) if lo < height else None
+        return strip is not None and strip.size and strip.mean() >= 0.8
+
+    seen, out = {}, set()
+    for number, cell in enumerate(cells):
+        if cell is None:
+            continue
+        x0, top, x1, bottom = cell
+        for word in words:
+            wx0, wy0, wx1, wy1 = word[:4]
+            middle, centre = (wy0 + wy1) / 2, (wx0 + wx1) / 2
+            edges = [('v', x, top, bottom) for x in (x0, x1) if wx0 + 1 < x < wx1 - 1 and top < middle < bottom]
+            edges += [('h', y, x0, x1) for y in (top, bottom) if wy0 + 1 < y < wy1 - 1 and x0 < centre < x1]
+            for edge in edges:
+                if edge not in seen:
+                    seen[edge] = drawn(edge)
+            if any(not seen[edge] for edge in edges):
+                out.add(number)
+                break
+    return out
+
+
 def source_table_cells(path):
     """Read strict table-cell boundaries in bottom-left coordinates."""
     import pymupdf
@@ -298,9 +341,16 @@ def source_table_cells(path):
 
             cells = []
             tables = page.find_tables(strategy="lines_strict")
+            words = ink = None
 
             for table_number, table in enumerate(tables.tables):
-                seen = set()
+                if words is None:
+                    words = page.get_text("words")
+                    pix = page.get_pixmap(dpi=100, colorspace=pymupdf.csGRAY, alpha=False)
+                    import numpy as np
+                    ink = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width) < 245
+                undrawn = {tuple(table.cells[i]) for i in cells_with_undrawn_borders(table.cells, words, ink, 100 / 72)}
+                seen = set(undrawn)
 
                 for row_number, row in enumerate(table.rows):
                     for column_number, boundary in enumerate(row.cells):
