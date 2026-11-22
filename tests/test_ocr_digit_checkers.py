@@ -50,4 +50,28 @@ class LanguageRecognizerTests(unittest.TestCase):
         self.assertEqual(recognition_model_name('ja'), GENERAL_RECOGNIZER)
         self.assertNotIn('en', OWN_SCRIPT)
         for language in OWN_SCRIPT:
-            self.assertIn(RECOGNIZERS[language], DIGIT_CHECKERS)
+            # Bengali is read by Tesseract where it is installed, by the general model otherwise.
+            self.assertIn(recognition_model_name(language), DIGIT_CHECKERS)
+
+
+class TesseractBengaliTests(unittest.TestCase):
+    def test_bengali_uses_tesseract_only_when_its_model_is_installed(self):
+        from unittest.mock import patch
+        from tools.ocr.recognize_paddle_boxes import recognition_model_name, TESSERACT_RECOGNIZER, DIGIT_CHECKERS
+        with patch('tools.ocr.tesseract_line.available', return_value=True):
+            self.assertEqual(recognition_model_name('bn'), TESSERACT_RECOGNIZER)
+        with patch('tools.ocr.tesseract_line.available', return_value=False):
+            self.assertNotEqual(recognition_model_name('bn'), TESSERACT_RECOGNIZER)
+        self.assertIn(TESSERACT_RECOGNIZER, DIGIT_CHECKERS)
+
+    def test_tesseract_tsv_becomes_one_line_with_its_lowest_word_confidence(self):
+        from unittest.mock import patch, Mock
+        from tools.ocr.tesseract_line import TesseractRecognizer
+        rows = [['level', 'page_num', 'block_num', 'par_num', 'line_num', 'word_num', 'left', 'top', 'width', 'height', 'conf', 'text'],
+                ['5', '1', '1', '1', '1', '1', '0', '0', '10', '10', '96.5', 'আমার'],
+                ['5', '1', '1', '1', '1', '2', '12', '0', '10', '10', '88.0', '123']]
+        tsv = '\n'.join('\t'.join(r) for r in rows) + '\n'
+        import numpy as np
+        with patch('tools.ocr.tesseract_line.subprocess.run', return_value=Mock(stdout=tsv.encode())):
+            out = TesseractRecognizer('bn').predict(np.full((20, 60, 3), 255, np.uint8))
+        self.assertEqual(out, [{'rec_text': 'আমার 123', 'rec_score': 0.88}])

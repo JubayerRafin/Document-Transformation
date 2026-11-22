@@ -173,7 +173,7 @@ RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec
                'es': LATIN_RECOGNIZER, 'pt': LATIN_RECOGNIZER}
 GENERAL_RECOGNIZER = 'PP-OCRv5_server_rec'
 # Languages whose pages need their own model: the general one cannot read their letters.
-OWN_SCRIPT = {language for language in RECOGNIZERS if language != 'en'}
+OWN_SCRIPT = {language for language in RECOGNIZERS if language != 'en'} | {'bn'}
 # For a language read by one model, a second installed model that reads digits (it need not read the
 # language) confirms the numbers of a line. Chinese and Japanese lines with a number had none, so
 # every such line kept its source pixels and scanned contracts stayed half untranslated (2026-11-19).
@@ -182,7 +182,15 @@ DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, 'arabic_PP-O
                   GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
 
 
+TESSERACT_RECOGNIZER = 'tesseract_ben'   # tools/ocr/tesseract_line.py: Bengali, which PaddleOCR cannot read
+DIGIT_CHECKERS[TESSERACT_RECOGNIZER] = GENERAL_RECOGNIZER
+
+
 def recognition_model_name(language):
+    if language == 'bn':
+        from tools.ocr.tesseract_line import available
+        if available('bn'):
+            return TESSERACT_RECOGNIZER
     return RECOGNIZERS.get(language, GENERAL_RECOGNIZER)
 
 
@@ -223,6 +231,39 @@ SINGLE_MODEL_VIEWS = 3
 
 def digits(text):
     return ''.join(re.findall(r'\d', text or ''))
+
+
+# Arabic lines mixing letters and numbers ("شروط الدفع: 30 يومًا", "المجموع الفرعي: 70,802.19"): the
+# Arabic model read the letters but dropped the digits and colon (about 50 digits of one invoice,
+# evaluation/ocr/bench.py, 2026-11-23), so the line stayed unresolved and kept its source pixels.
+# Tesseract's Arabic model reads such lines whole but misreads more letters on plain lines. Its read
+# replaces an unresolved line only when its digits equal those of the independent digit model and its
+# letters match the Arabic model's (spaces and marks aside, at least 60% alike: the same line, where
+# the Arabic model's own letters were also misread, "المبلاق" for "المبلغ المستحق").
+DIGIT_RESCUE = {'ar'}
+
+
+def digit_rescue(crop, best, digit_model, language):
+    import difflib
+    import unicodedata
+    from tools.ocr.tesseract_line import TesseractRecognizer, available
+    if not available(language):
+        return None
+    try:
+        checker = digit_model()
+        general = str(list(checker.predict(crop))[0]['rec_text'])
+        other = TesseractRecognizer(language).predict(crop)[0]
+    except Exception:
+        return None
+    wanted = digits(general)
+    if not wanted or digits(other['rec_text']) != wanted or digits(best['text']) == wanted:
+        return None
+    letters = lambda t: ''.join(c for c in t if unicodedata.category(c).startswith('L') and not c.isascii())
+    a, b = letters(best['text']), letters(other['rec_text'])
+    if not a or difflib.SequenceMatcher(None, a, b).ratio() < 0.6:
+        return None
+    return {'text': other['rec_text'], 'score': max(other['rec_score'], best.get('score', 0)),
+            'variant': 'digit_rescue', 'model': 'tesseract_' + language}
 
 
 def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digit_checker=None):
@@ -561,9 +602,11 @@ def main(argv=None, model_factory=None):
         # A Korean, Arabic, Hindi or accented Latin page always needs its own model: the general one
         # cannot read its letters.
         model_name = recognition_model_name(args.source_language) if args.profile=='bounded' or args.source_language in OWN_SCRIPT else GENERAL_RECOGNIZER
+        if args.source_language == 'bn':
+            model_name = recognition_model_name('bn')
         secondary_model = None
         cache = Path.home() / '.paddlex/official_models' / model_name
-        if not cache.is_dir():
+        if model_name != TESSERACT_RECOGNIZER and not cache.is_dir():
             raise ValueError(f'Existing recognition model not found: {cache}')
         metadata = {'status': 'processing', 'model': model_name, 'device': args.device, 'cpu_threads': 10,'profile':args.profile,
                     'targeted_retry':'source-density-tight-word-gaps-v1' if args.profile=='bounded' else None,
@@ -584,7 +627,11 @@ def main(argv=None, model_factory=None):
         started = time.monotonic()
         try:
             print(f'Loading existing recognition model on {args.device}...', flush=True)
-            model = (model_factory or TextRecognition)(model_name=model_name, model_dir=str(cache), device=args.device, enable_mkldnn=False, cpu_threads=10)
+            if model_name == TESSERACT_RECOGNIZER:
+                from tools.ocr.tesseract_line import TesseractRecognizer
+                model = TesseractRecognizer('bn')
+            else:
+                model = (model_factory or TextRecognition)(model_name=model_name, model_dir=str(cache), device=args.device, enable_mkldnn=False, cpu_threads=10)
             general_model=None
             def digit_model():
                 # A second opinion on a line's numbers only (DIGIT_CHECKERS): the general model reads
@@ -600,6 +647,15 @@ def main(argv=None, model_factory=None):
                     name='PP-OCRv5_server_rec' if model_name=='en_PP-OCRv5_mobile_rec' else 'en_PP-OCRv5_mobile_rec'
                     secondary_model=(model_factory or TextRecognition)(model_name=name,device=args.device,enable_mkldnn=False,cpu_threads=10)
                 return secondary_model
+            if model_name == TESSERACT_RECOGNIZER:
+                import cv2
+                import numpy as np
+                def contrast(crop):   # the same view bounded_recognition builds
+                    gray=cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY)
+                    if float(np.median(np.concatenate([gray[0],gray[-1]])))<128: gray=255-gray
+                    return cv2.cvtColor(cv2.resize(gray,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC),cv2.COLOR_GRAY2BGR)
+                double=lambda c:cv2.resize(c,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC)
+                model.prefetch([v for c,p in zip(unpadded_crops,crops) for v in (c,double(c),contrast(c),p,double(p))])
             with (out / 'lines.jsonl').open('w', encoding='utf-8') as evidence:
                 for i, record in enumerate(records):
                     if args.profile=='bounded':
@@ -609,6 +665,11 @@ def main(argv=None, model_factory=None):
                             detail=source_detail_crop(report['source'],record['bbox'],crops[i])
                             best,review,decision,retries=refine_recognition(detail,model,verification_model,args.source_language,candidates)
                             candidates.extend(retries)
+                        if review and args.source_language in DIGIT_RESCUE:
+                            rescued=digit_rescue(unpadded_crops[i],best,digit_model,args.source_language)
+                            if rescued:
+                                candidates.append(rescued)
+                                best,review,decision=rescued,False,'second_engine_digits_verified'
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
                         # Localization evidence supplements the transcription. It
