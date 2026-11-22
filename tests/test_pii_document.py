@@ -368,3 +368,23 @@ class NameSweepWrapTests(unittest.TestCase):
         with patch('transformation.llm.ollama_native.chat', side_effect=chat):
             self.assertEqual(name_sweep(units, 'e', 'm'), {'Witkoff'})
         self.assertEqual(seen[0], 'Witkoff insisted progress had  been made.\nFull name: Ann\nEmail: a@b.example')
+
+
+class RightToLeftFormTests(unittest.TestCase):
+    def test_a_right_to_left_form_pairs_each_label_with_the_value_on_its_left(self):
+        """Arabic invoice, 2026-11-23: "value | label" rows were read as "label | value", the first row
+        became column headers and an employee number was never selected."""
+        name, full_name = '\u064a\u0648\u0633\u0641 \u0627\u0644\u062e\u0637\u064a\u0628', '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644'
+        number, department, ops = '\u0631\u0642\u0645 \u0627\u0644\u0645\u0648\u0638\u0641', '\u0627\u0644\u0642\u0633\u0645', '\u0627\u0644\u0639\u0645\u0644\u064a\u0627\u062a'
+        rows = [[name, full_name], ['EMP-2020-36418', number], [ops, department]]
+        cells = [{'id': f't:cell-{r}-{c}', 'text': rows[r][c], 'metadata': {'table_parent': 't', 'row': r, 'column': c,
+                  'column_header': rows[0][c], 'row_values': rows[r]}} for r in range(3) for c in range(2)]
+        pairs = {(p['label'], p['value']) for p in field_pairs([], cells, [])}
+        self.assertEqual(pairs, {(full_name, name), (number, 'EMP-2020-36418'), (department, ops)})
+
+    def test_a_left_to_right_form_is_unchanged(self):
+        rows = [['Full name', 'Ann Moor'], ['Employee number', 'EMP-1'], ['Team', 'Ops']]
+        cells = [{'id': f't:cell-{r}-{c}', 'text': rows[r][c], 'metadata': {'table_parent': 't', 'row': r, 'column': c,
+                  'column_header': rows[0][c], 'row_values': rows[r]}} for r in range(3) for c in range(2)]
+        pairs = {(p['label'], p['value']) for p in field_pairs([], cells, [])}
+        self.assertEqual(pairs, {('Full name', 'Ann Moor'), ('Employee number', 'EMP-1'), ('Team', 'Ops')})

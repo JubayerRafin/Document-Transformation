@@ -28,6 +28,9 @@ PHONE = re.compile(r'\+?\d[\d ()\t.-]{6,}\d')
 IPV4 = re.compile(r'(?:\d{1,3}\.){3}\d{1,3}')
 
 
+RTL_LETTERS = re.compile(r'[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefe]')
+
+
 def label_like(text):
     """A field label: short, has letters, no digits, not a sentence."""
     text = text.strip().rstrip(':：').strip()
@@ -91,18 +94,29 @@ def field_pairs(units, cells, blocks):
     for table_cells in by_table.values():
         columns = {}
         for cell in table_cells: columns.setdefault(cell['metadata']['column'], []).append(cell)
-        # Columns whose cells (below the first row) all look like labels.
-        label_columns = {c for c, items in columns.items() if c + 1 in columns
+        # A right-to-left form reads from the right: its labels are in the right-hand column of each
+        # pair, "value | label" left to right. Read as "label | value", an Arabic form's first row
+        # (a person's name and "Full name") became column headers and its employee number stayed in
+        # the output (Arabic invoice, 2026-11-23).
+        rtl = sum(bool(RTL_LETTERS.search(c['text'])) for c in table_cells) > sum(
+            bool(re.search(r'[A-Za-z]', c['text'])) and not RTL_LETTERS.search(c['text']) for c in table_cells)
+        step = -1 if rtl else 1
+        # Columns whose cells (below the first row) all look like labels, with a value column beside.
+        label_columns = {c for c, items in columns.items() if c + step in columns
                          and all(label_like(i['text']) for i in items if i['metadata']['row'] > 0)}
         # A form table pairs labels with values across each row: "label | value", or
-        # "label | value | label | value" with a label in every even column. Any other table is a
-        # data table (rosters, invoices, schedules): its column headers describe its cells, and its
-        # short text columns (names, departments, tasks) only look like labels.
-        form = len(columns) % 2 == 0 and all(c in label_columns for c in columns if c % 2 == 0)
+        # "label | value | label | value" with a label in every even column (every odd column from
+        # the left in a right-to-left form). Any other table is a data table (rosters, invoices,
+        # schedules): its column headers describe its cells, and its short text columns (names,
+        # departments, tasks) only look like labels.
+        label_parity = 1 if rtl else 0
+        form = len(columns) % 2 == 0 and all(c in label_columns for c in columns if c % 2 == label_parity)
         for cell in table_cells:
             meta = cell['metadata']; row, col = meta['row'], meta['column']
             values = meta.get('row_values') or []
-            label = str(values[col - 1]).strip() if form and col % 2 == 1 and col - 1 < len(values) else ''
+            beside = col - step
+            label = (str(values[beside]).strip() if form and col % 2 != label_parity and 0 <= beside < len(values)
+                     else '')
             if row == 0:
                 # A form may have no header row: its first row is a field too ("Full name | Ann
                 # Moor"). Pair it; the label classifier decides whether the label is personal,
