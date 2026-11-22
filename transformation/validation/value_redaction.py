@@ -3,6 +3,8 @@ from collections import Counter
 import re
 import pymupdf
 
+from transformation.validation.scripts import changes as script_changes
+
 
 class RedactionLocalizationError(ValueError):
     def __init__(self, regions):
@@ -47,7 +49,8 @@ def literal_spans(text, value):
         # ("정시우에게", "田中さん"), so a following character in those scripts does not
         # extend the value. Han/Kana text has no spaces at all, so the same holds before.
         if trailing and _NO_SPACE_SCRIPT.match(needle[-1]) and _NO_SPACE_SCRIPT.match(text[b]): trailing=False
-        leading = a and re.match(token_chars,text[a-1]) and not (_HAN_KANA.match(needle[0]) and _HAN_KANA.match(text[a-1]))
+        if trailing and script_changes(needle[-1], text[b]): trailing=False
+        leading = a and re.match(token_chars,text[a-1]) and not (_HAN_KANA.match(needle[0]) and _HAN_KANA.match(text[a-1]))             and not script_changes(text[a-1], needle[0])
         if needle[0].isalnum() and leading: continue
         if needle[-1].isalnum() and trailing: continue
         result.append((a,b))
