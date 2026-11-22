@@ -124,7 +124,17 @@ class RegionTests(unittest.TestCase):
         r={'id':'a','bbox':[20,30,180,50]}
         self.assertEqual(list(available_line_box(r,[r],image,mask)),[20,26,180,54])
         mask[29,:]=True
+        # a rule just above stops the top margin only
+        self.assertEqual(list(available_line_box(r,[r],image,mask)),[20,30,180,54])
+        mask[50,:]=True
         self.assertEqual(list(available_line_box(r,[r],image,mask)),r['bbox'])
+
+    def test_a_line_close_below_another_still_gets_its_margin_below(self):
+        image=np.full((100,200,3),255,dtype=np.uint8)
+        mask=np.zeros((100,200),dtype=bool)
+        upper={'id':'u','bbox':[10,20,190,30]}
+        small={'id':'s','bbox':[10,33,60,40]}   # "cover.": small letters only, 3 px under the line above
+        self.assertEqual(list(available_line_box(small,[upper,small],image,mask)),[10,30,60,44])
 
     def test_protection_matches_spacing_not_changed_characters(self):
         self.assertIn('EliteBook840', observed_protected_values('EliteBook840', ['EliteBook 840']))

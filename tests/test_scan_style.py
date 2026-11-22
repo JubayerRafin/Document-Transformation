@@ -141,7 +141,7 @@ class LinePieceTests(unittest.TestCase):
 
 
 class WrappedLineTests(unittest.TestCase):
-    def join(self, lines, inks=None, rule_rows=()):
+    def join(self, lines, inks=None, rule_rows=(), sizes=None):
         from transformation.pdf.scan_lines import join_wrapped_lines
         regions = [{'id': f'r{k}', 'bbox': box, 'text': text, 'metadata': {}} for k, (text, box) in enumerate(lines)]
         mapping = {r['id']: {'source_text': r['text'], 'text': r['text']} for r in regions}
@@ -149,7 +149,14 @@ class WrappedLineTests(unittest.TestCase):
         for row in rule_rows:
             rules[row, :] = True
         styles = [{'ink': (inks or {}).get(k, (0, 0, 0))} for k in range(len(regions))]
-        return join_wrapped_lines(regions, mapping, rules, lambda r: True, styles)
+        return join_wrapped_lines(regions, mapping, rules, lambda r: True, styles, sizes)
+
+    def test_a_wrapped_line_of_small_letters_joins_when_the_measured_sizes_match(self):
+        lines = [('Disconnect the power supply before opening the', [8, 26, 199, 36]), ('cover.', [8.4, 38.9, 32, 45.6])]
+        self.assertEqual(len(self.join(lines)[0]), 2)       # boxes alone: 9.9 vs 6.8 high
+        joined = self.join(lines, sizes={'r0': 9.0, 'r1': 8.8})[0]
+        self.assertEqual([r['text'] for r in joined], ['Disconnect the power supply before opening the cover.'])
+        self.assertEqual(len(self.join(lines, sizes={'r0': 14.0, 'r1': 8.8})[0]), 2)
 
     def test_a_sentence_wrapped_onto_a_lower_case_line_is_one_paragraph(self):
         joined, mapping, styles = self.join([('Picnics beneath blooming sakura trees in parks and', [380, 237, 696, 254]),

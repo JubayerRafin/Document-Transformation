@@ -201,23 +201,26 @@ def validate_placements(box,placements,font):
 
 def available_line_box(region, regions, pixels, rules):
     """Use a small clear vertical margin without crossing other text or rules."""
+    # The margin above and the margin below are found separately. A line with no tall letters
+    # ("cover.") has a box only as high as its small letters; with one margin for both sides, the line
+    # above limited the space below too, the line could not be redrawn at its own size and kept its
+    # source pixels (warning picture of a manual, 2026-11-23).
     box = pymupdf.Rect(region['bbox'])
     height, width = pixels.shape[:2]
     x0,x1 = max(0,math.floor(box.x0)), min(width,math.ceil(box.x1))
-    for pad in (4,3,2,1):
-        candidate = pymupdf.Rect(box.x0,max(0,box.y0-pad),box.x1,min(height,box.y1+pad))
+    color,_ = background(pixels[math.floor(box.y0):math.ceil(box.y1),x0:x1])
+
+    def clear(candidate, strip_rows):
         if any(r['id'] != region['id'] and (candidate & pymupdf.Rect(r['bbox'])).get_area() > 0 for r in regions):
-            continue
-        top, bottom = math.floor(candidate.y0), math.ceil(candidate.y1)
-        strips = [pixels[top:math.floor(box.y0),x0:x1],pixels[math.ceil(box.y1):bottom,x0:x1]]
-        masks = [rules[top:math.floor(box.y0),x0:x1],rules[math.ceil(box.y1):bottom,x0:x1]]
-        if any(m.any() for m in masks):
-            continue
-        sample = pixels[math.floor(box.y0):math.ceil(box.y1),x0:x1]
-        color,_ = background(sample)
-        if all(s.size and np.mean(np.max(abs(s.astype(float)-color),axis=2)<30) > .98 for s in strips):
-            return candidate
-    return box
+            return False
+        strip, mask = pixels[strip_rows, x0:x1], rules[strip_rows, x0:x1]
+        return bool(strip.size) and not mask.any() and np.mean(np.max(abs(strip.astype(float)-color),axis=2)<30) > .98
+
+    above = next((pad for pad in (4,3,2,1) if box.y0 - pad >= 0 and clear(
+        pymupdf.Rect(box.x0, box.y0-pad, box.x1, box.y1), slice(math.floor(box.y0-pad), math.floor(box.y0)))), 0)
+    below = next((pad for pad in (4,3,2,1) if box.y1 + pad <= height and clear(
+        pymupdf.Rect(box.x0, box.y0, box.x1, box.y1+pad), slice(math.ceil(box.y1), math.ceil(box.y1+pad)))), 0)
+    return pymupdf.Rect(box.x0, box.y0-above, box.x1, box.y1+below)
 
 
 def rule_pixels(pixels):
@@ -366,7 +369,9 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 items.append((region['bbox'], background(crop)[0] if crop.size else np.array([255, 255, 255]), region.get('text', '')))
             styles = page_styles(source[0], items)
             from transformation.pdf.scan_lines import join_wrapped_lines
-            regions, mapping, styles = join_wrapped_lines(regions, mapping, rules, reliable, styles)
+            from transformation.layout.ocr_fitting import source_fit_policy
+            sizes = {r['id']: source_fit_policy(r, source[0]).get('source_font_estimate') for r in regions}
+            regions, mapping, styles = join_wrapped_lines(regions, mapping, rules, reliable, styles, sizes)
         grouped = [[] for _ in regions]
         unmatched = []
         line_number = 0
