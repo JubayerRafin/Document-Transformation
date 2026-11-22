@@ -373,7 +373,7 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
         remove_hidden_values(pdf,values)
         for unit in ir['units']:
             index=unit['number']-1;page=pdf[index];blocks=native_blocks(page)
-            native_rects=[]; native_labels=[]; native_values=[]; boxes_by_value={v:[] for v in values}
+            native_rects=[]; native_labels=[]; native_values=[]; boxes_by_value={v:[] for v in values}; page_unselected=[]
             for block in blocks:
                 selected=set()
                 for value in values:
@@ -390,6 +390,21 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
                         boxes_by_value[value].extend(line_boxes.values())
                 unselected.setdefault(index,Counter()).update(_glyph_key(c) for i,c in enumerate(block['chars'])
                     if c is not None and not c['c'].isspace() and i not in selected)
+                page_unselected.extend(c for i,c in enumerate(block['chars'])
+                                       if c is not None and not c['c'].isspace() and i not in selected)
+            # A character drawn mostly on top of a removed value (a value overflowing its table cell
+            # under the next column's letter, Korean roster 2026-11-23) cannot stay without the value
+            # under it showing around it; it is removed with the value and reported for review,
+            # instead of failing the whole document.
+            covered=Counter()
+            for char in page_unselected:
+                box=pymupdf.Rect(char['bbox'])
+                if box.get_area()>0 and any((box&rect).get_area()>.5*box.get_area() for rect in native_rects):
+                    covered[_glyph_key(char)]+=1
+            if covered:
+                unselected[index]=unselected.get(index,Counter())-covered
+                audit.append({'page':index+1,'method':'covered_by_removed_value','glyphs_removed_with_value':sum(covered.values()),
+                              'review_required':True})
             for rect,label,value in zip(native_rects,native_labels,native_values):
                 page.add_redact_annot(rect,fill=(0,0,0),**_label_annotation(label,rect))
                 if boxes is not None:boxes.append((index+1,pymupdf.Rect(rect)*page.rotation_matrix,value))
@@ -459,3 +474,4 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
             if _missing_glyphs(unselected.get(index,Counter()),remaining):
                 raise RedactionVerificationError('Precise redaction would remove surrounding text; review is required.','REDACTION_REVIEW_REQUIRED')
     return result,audit
+

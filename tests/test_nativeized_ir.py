@@ -65,7 +65,8 @@ class RefreshTests(unittest.TestCase):
             self.assertEqual(events[-1]['status'],'generated',events[-1].get('error'))
             self.assertIn('--no-dual',process.call_args.args[0])
             self.assertFalse(events[-1]['bilingual_output_requested'])
-            self.assertNotIn('--skip-scanned-detection',process.call_args.args[0])
+            # Our own OCR finds scans first; BabelDOC's scan detector is always skipped (2026-11-23).
+            self.assertIn('--skip-scanned-detection',process.call_args.args[0])
 
     def test_a_scan_rebuilt_by_our_ocr_skips_babeldocs_scan_detector(self):
         import sys
