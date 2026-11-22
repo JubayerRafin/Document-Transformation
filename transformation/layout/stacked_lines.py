@@ -817,6 +817,9 @@ def install(ParagraphFinder):
         changed += split_at_rules(page, update, make_id)
         changed += split_at_badges(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
+        # A piece cut off the end of a list item's line ("... click the Email Setup lin" | "k.", HP
+        # manual, 2026-11-23) is found only once the list is split into one-line items.
+        changed += join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_overlapping_fragments(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),
                                       (vertical_rules(page), horizontal_rules(page)))

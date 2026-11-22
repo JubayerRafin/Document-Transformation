@@ -372,3 +372,43 @@ class LeadLabelTests(unittest.TestCase):
             self.assertEqual(self.run_join(case)[0], 0)
         rule = NS(x=132, y=495, x2=132.6, y2=515)
         self.assertEqual(self.run_join([self.paragraph('Item:', 100, 500), self.paragraph('Text', 135, 500)], [rule])[0], 0)
+
+
+class InstallOrderTests(unittest.TestCase):
+    def test_a_piece_cut_off_a_list_item_joins_it_once_the_list_is_split(self):
+        """HP manual, 2026-11-23: "3. ... click the Email Setup lin" | "k." stayed two paragraphs because
+        the cut was looked for while the three items were still one paragraph."""
+        from transformation.layout.stacked_lines import install
+
+        def chars(text, x, y, size=9.0, step=5.0):
+            return [NS(char_unicode=c, visual_bbox=NS(box=NS(x=x + i * step, y=y, x2=x + (i + 1) * step, y2=y + size)),
+                       box=NS(x=x + i * step, y=y, x2=x + (i + 1) * step, y2=y + size), pdf_style=NS(font_size=size))
+                    for i, c in enumerate(text)]
+
+        items = chars('1. Open the tab', 60, 600) + chars('2. Click the lin', 60, 588)
+        listed = NS(debug_id='list', vertical=False, xobj_id=0, box=NS(x=60, y=588, x2=140, y2=609),
+                    pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=items, box=NS(x=60, y=588, x2=140, y2=609)))])
+        tail = chars('k.', 140.5, 588)
+        cut = NS(debug_id='cut', vertical=False, xobj_id=0, box=NS(x=140.5, y=588, x2=150.5, y2=597),
+                 pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=tail, box=NS(x=140.5, y=588, x2=150.5, y2=597)))])
+        page = NS(pdf_paragraph=[listed, cut], pdf_curve=[], pdf_character=[])
+
+        def refresh(paragraph, update_unicode=True):
+            cs = [c for comp in paragraph.pdf_paragraph_composition for c in comp.pdf_line.pdf_character]
+            paragraph.box = NS(x=min(c.box.x for c in cs), y=min(c.box.y for c in cs),
+                               x2=max(c.box.x2 for c in cs), y2=max(c.box.y2 for c in cs))
+
+        class Finder:
+            def process_page(self, page):
+                return None
+            def update_line_data(self, line):
+                pass
+            update_paragraph_data = staticmethod(refresh)
+            def _set_paragraph_render_order(self, page):
+                pass
+
+        install(Finder)
+        Finder().process_page(page)
+        texts = [''.join(c.char_unicode for comp in p.pdf_paragraph_composition for c in comp.pdf_line.pdf_character)
+                 for p in page.pdf_paragraph]
+        self.assertEqual(texts, ['1. Open the tab', '2. Click the link.'])
