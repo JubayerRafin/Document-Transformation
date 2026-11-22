@@ -135,6 +135,12 @@ class ListMarkerTests(unittest.TestCase):
         self.assertEqual(self.run_split(paragraph, []),
                          (2, ['1. Any changewraps here', '2. Customer', '3. All goods']))
 
+    def test_numbered_items_without_a_stored_space_split_too(self):
+        paragraph = self.list_paragraph([['1.Die Prüfung'], ['2.Bitte'], ['3.Alle']])
+        self.assertEqual(self.run_split(paragraph, [])[0], 2)
+        self.assertEqual(self.run_split(self.list_paragraph([['1.5 percent'], ['2.5 more']]), [])[0], 0)
+        self.assertEqual(self.run_split(self.list_paragraph([['1 . Die'], ['2. Bitte'], ['3 . Alle']]), [])[0], 2)
+
     def test_lettered_sub_steps_become_paragraphs(self):
         paragraph = self.list_paragraph([['a. Click Add', 'on the page'], ['b. Open another'], ['c. Paste']])
         self.assertEqual(self.run_split(paragraph, []),

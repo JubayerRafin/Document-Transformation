@@ -322,7 +322,11 @@ def _visual_lines(chars):
 TEXT_BULLETS = set('•●○◦▪■□–—‣⁃∙')
 
 
-ITEM_NUMBER = re.compile(r'(\d{1,2}|[a-z])[.)]\s')
+# Followed by a space or directly by a letter: BabelDOC often stores no space after "1." (German
+# manual, items stayed one paragraph, 2026-11-23). A digit after the dot is a decimal, not an item.
+# A gap before the period may read as a space when letters are set apart ("1 . Die Prüfung", German
+# manual, 2026-11-23), and the space after it may be missing ("1.Die").
+ITEM_NUMBER = re.compile(r'(\d{1,2}|[a-z]) ?[.)](?=\s|[^\W\d_])')
 
 
 def _item_number(text):
