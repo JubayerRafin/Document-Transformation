@@ -536,6 +536,9 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
     original_init = OpenAITranslator.__init__
     policy_digest=translation_policy_digest()
 
+    import threading
+    last = threading.local()
+
     def initialize(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
         self.add_cache_impact_parameters(
@@ -546,6 +549,23 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
                 else "v1-think-false-context8192-output4096"
             ),
         )
+        # A paragraph kept in its source language after every attempt failed its checks is not
+        # cached: the cache returned that failure on every later run of the same document, so a
+        # paragraph that the model translates most of the time stayed untranslated (Japanese scan,
+        # 32 such entries on one server, 2026-11-23). BabelDOC caches in the same thread right after
+        # do_translate returns.
+        cache = getattr(self, 'cache', None)
+        if cache is None or not hasattr(cache, 'set'):
+            return
+        cache_set = cache.set
+
+        def set_unless_failed(text, translation):
+            if getattr(last, 'kept_source', False):
+                last.kept_source = False
+                return None
+            return cache_set(text, translation)
+
+        cache.set = set_unless_failed
 
     def request(self, messages):
         text, stats = chat(endpoint, self.model, messages)
@@ -589,6 +609,7 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
                 glossary=glossary,
             )
 
+            last.kept_source = bool(stats.get("kept_source_requires_review"))
             prompt_tokens = stats.get("prompt_eval_count", 0)
             output_tokens = stats.get("eval_count", 0)
 

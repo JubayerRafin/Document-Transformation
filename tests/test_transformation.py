@@ -114,3 +114,25 @@ class TransformationBoundaries(unittest.TestCase):
             self.assertFalse(payload["think"])
             self.assertEqual(payload["options"]["num_ctx"], 8192)
             self.assertEqual(text, "translated")
+
+
+class FailedTranslationCacheTests(unittest.TestCase):
+    def test_a_paragraph_kept_in_its_source_language_is_not_cached(self):
+        stored = {}
+
+        class FakeTranslator:
+            def __init__(self):
+                self.lang_out, self.lang_in, self.model = "ko", "en", "m"
+                self.prompt_token_count = self.completion_token_count = self.token_count = NS(inc=lambda n: None)
+                self.cache = NS(set=lambda text, translation: stored.__setitem__(text, translation))
+            def add_cache_impact_parameters(self, *args):
+                pass
+        with patch.dict(sys.modules, {"babeldoc.translator.translator": NS(OpenAITranslator=FakeTranslator)}):
+            install("http://localhost:11434", paragraph_mode=True)
+            translator = FakeTranslator()
+            with patch('transformation.llm.ollama_native.translate_paragraph',
+                       return_value=('Failed source', {'kept_source_requires_review': True})):
+                translator.cache.set('Failed source', translator.do_translate('Failed source'))
+            with patch('transformation.llm.ollama_native.translate_paragraph', return_value=('번역', {})):
+                translator.cache.set('Good source', translator.do_translate('Good source'))
+        self.assertEqual(stored, {'Good source': '번역'})
