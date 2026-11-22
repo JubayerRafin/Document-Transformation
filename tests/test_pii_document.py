@@ -340,6 +340,33 @@ class OcrColumnPairTests(unittest.TestCase):
         self.assertIn(('20-947', 'Identifiers'), found)
         self.assertNotIn('Finance', {f['value'] for f in findings})
 
+    def invoice(self):
+        rows = [('Item', 'Code', 'Quantity'), ('Office chair', 'QZT-2024-81101', '12'),
+                ('Thermal labels', 'KMH-2022-18381', '40'), ('Office chair', 'RBZ-2022-11110', '7')]
+        return [self.line(f'{r}{c}', 50 + 120 * c, 100 + 18 * r, t) for r, row in enumerate(rows) for c, t in enumerate(row)]
+
+    def detect_scan(self, lines, model_guesses, names=()):
+        from transformation.validation import pii_document
+        ir = {'units': [{'number': 1, 'ocr_folder': 'x', 'regions': lines}]}
+        guess = lambda text: [g for g in model_guesses if g['value'] in text]
+        with patch('extraction.coordinator.text_regions', side_effect=lambda ir: ir['units'][0]['regions']),              patch.object(pii_document, 'native_pattern_regions', return_value=[]),              patch('transformation.llm.ollama_native.chat', side_effect=stub(names=names, region=guess)):
+            findings, _, evidence = pii_document.detect_document(b'', ir, ['Names', 'Identifiers'], 'e', 'm')
+        return {(f['value'], f['category']) for f in findings}, evidence
+
+    def test_scanned_item_and_code_columns_overrule_model_guesses(self):
+        """Hindi scan, 2026-11-23: product codes were masked as identifiers and item names as names."""
+        guesses = [{'value': 'KMH-2022-18381', 'category': 'Identifiers'}, {'value': 'Thermal labels', 'category': 'Names'}]
+        found, evidence = self.detect_scan(self.invoice(), guesses)
+        self.assertEqual(found, set())
+        self.assertEqual({s['value'] for s in evidence['suppressed']}, {'KMH-2022-18381', 'Thermal labels'})   # for review
+
+    def test_a_form_row_read_as_a_header_overrules_nothing(self):
+        rows = [('Full name', 'Priya Verma', 'Team'), ('Office', 'EMP-2026-79755', 'Ops'), ('Desk', 'EMP-2026-11111', 'Ops'),
+                ('Floor', 'EMP-2026-22222', 'Ops')]
+        lines = [self.line(f'{r}{c}', 50 + 120 * c, 100 + 18 * r, t) for r, row in enumerate(rows) for c, t in enumerate(row)]
+        found, _ = self.detect_scan(lines, [{'value': 'EMP-2026-79755', 'category': 'Identifiers'}], names=('Priya Verma',))
+        self.assertIn(('EMP-2026-79755', 'Identifiers'), found)
+
     def test_label_value_form_and_side_by_side_titles_are_not_tables(self):
         from transformation.validation.pii_document import ocr_column_pairs
         form = [('Full name', 'Isaac Okonkwo'), ('Employee ID', 'GOY-531250'), ('Date of birth', '1992-03-01'), ('Email', 'i.o@x.example')]

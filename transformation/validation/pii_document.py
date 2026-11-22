@@ -189,7 +189,8 @@ def ocr_column_pairs(lines):
         for inside in table:
             for cell, j in inside:
                 pairs.append({'label': headers[j]['text'].strip().rstrip(':：').strip(), 'value': cell['text'].strip(),
-                              'region_id': cell['id'], 'kind': 'ocr_column'})
+                              'region_id': cell['id'], 'kind': 'ocr_column',
+                              'header_row': [h['text'].strip() for h in headers]})
     return pairs
 
 
@@ -497,16 +498,21 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
     if smart:
         evidence['field_labels'] = decisions
         sensitive, plain = {}, {}
+        # A scanned "header row" with a person's name in it is a form row read as a table header
+        # ("Full name | Priya Verma"); its columns overrule nothing.
+        named = lambda pair: any(compact(n) in compact(h) for h in pair.get('header_row', ()) for n in names if compact(n))
         for pair in pairs:
             decision = decisions.get(pair['label'])
             if decision is None: continue
             key = compact(pair['value'])
             if decision != 'none':
                 sensitive.setdefault(key, []).append((pair, decision))
-            elif pair.get('kind') == 'column':
+            elif pair.get('kind') in ('column', 'ocr_column') and not named(pair):
                 # Only a table column header suppresses model guesses: the same header covers
                 # every row, so one decision keeps a column consistent. Inline labels never
-                # suppress, so a single label misclassification cannot hide real PII.
+                # suppress, so a single label misclassification cannot hide real PII. Headers read
+                # from a scan count too: without them every product code of a scanned invoice was
+                # masked as an identifier (2026-11-23).
                 plain.setdefault(key, []).append((pair, decision))
         # In key/value tables a cell's own row label ("Start Date") decides; a generic
         # column header ("Value") must not override it.
@@ -517,9 +523,12 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
                 if pair['value'].strip() and format_ok(pair['value'], decision):
                     findings.append({'region_id': pair['region_id'], 'value': pair['value'], 'category': decision,
                                      'method': 'field_label', 'label': pair['label']})
-        # A value seen only under non-personal labels is not an identifier/account by model guess.
+        # A value seen only under non-personal column headers is not an identifier, account or name by
+        # model guess: item names under "Item" were masked as names on a Hindi scan, and one, read
+        # differently by OCR on another row, then blocked the whole result (2026-11-23). Names the
+        # model lists as people across the document (name sweep below) are still masked.
         only_plain = {k for k in plain if k not in sensitive}
-        overruled = lambda f: (f.get('method') == 'model_proposal' and f['category'] in {'Identifiers', 'Bank accounts'}
+        overruled = lambda f: (f.get('method') == 'model_proposal' and f['category'] in {'Identifiers', 'Bank accounts', 'Names'}
                                and compact(f['value']) in only_plain)
         # Kept for the review queue: the model and the column label disagreed, so a person decides.
         suppressed = [dict(f) for f in findings if overruled(f)]
