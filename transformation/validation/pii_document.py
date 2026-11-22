@@ -575,9 +575,12 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
     findings = [f for f in findings if compact(f['value']) not in headers]
     # A model-proposed identifier/account looks like one: it has a digit or an ID symbol.
     # Plain words ("API key", "Device Console") are labels or headings, not values.
+    # The same shape rules as the final check (privacy.plausible), so a head count ("618") proposed
+    # as an identifier is dropped here too (Arabic invoice, 2026-11-23).
+    from transformation.validation.privacy import plausible
     findings = [f for f in findings if not (f.get('method') == 'model_proposal'
                 and f['category'] in {'Identifiers', 'Bank accounts'}
-                and not re.search(r'[\d_@.:/#\-]', f['value']))]
+                and not plausible(f['value'], f['category']))]
     # "minjun.kim" is a user handle, not a written name. Where it only appears inside email
     # addresses (already masked) it is dropped; elsewhere it is a user name (an identifier).
     handle = re.compile(r'[a-z0-9]+(?:[._][a-z0-9]+)+')

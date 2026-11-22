@@ -20,6 +20,7 @@ def extract_pdf(path,folder,strategy='auto',analysis=None,*,defer_figures=False)
                 raise RuntimeError('Explicit Docling extraction requires the Deep Doc dependencies in this Python environment: '+str(exc)) from exc
             result.warnings.append('Deep-Doc dependency unavailable: '+str(exc)+'. Native fallback used.')
             result.settings['extraction_evidence']={'strategy':strategy,'status':'native_fallback','error':str(exc)}
+    logical_table_text(path,result)
     for page in result.pages:
         page.regions.sort(key=lambda r:(r.bbox[1],r.bbox[0]))
         for i,region in enumerate(page.regions): region.id=f'p{page.number}_r{i+1}'
@@ -29,6 +30,43 @@ def extract_pdf(path,folder,strategy='auto',analysis=None,*,defer_figures=False)
         apply_routing_hints(result,analysis)
     result.validate()
     return result
+
+
+RTL_LETTERS=__import__('re').compile(r'[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefe]')
+
+
+def logical_table_text(path,document):
+    """Right-to-left table cells read in the PDF's own character order.
+
+    The table engines (Docling, Camelot, pdfplumber) join a cell's characters from left to right,
+    which writes Arabic and Hebrew backwards ("زمرلا" for "الرمز", "code"). The PII label check then
+    read every Arabic field label backwards, judged "Full name" and "Employee number" not personal,
+    and an employee number stayed in the output (Arabic invoice, 2026-11-23). A cell with
+    right-to-left letters takes the text PyMuPDF reads in its box, only when that has exactly the
+    same characters."""
+    from collections import Counter
+    with pymupdf.open(path) as pdf:
+        for page in document.pages:
+            source=pdf[page.number-1]
+            if source.rotation: continue
+            for region in page.regions:
+                if region.kind!='table': continue
+                for name in ('cell_records','native_grid_cell_records'):
+                    for cell in region.metadata.get(name) or []:
+                        text=str(cell.get('text') or '')
+                        if not RTL_LETTERS.search(text) or not cell.get('bbox'): continue
+                        x0,y0,x1,y1=cell['bbox']
+                        clip=pymupdf.Rect(x0+.5,y0+.5,x1-.5,y1-.5)
+                        if clip.is_empty: continue
+                        found=source.get_text('text',clip=clip).strip()
+                        same=lambda a,b:Counter(c for c in a if not c.isspace())==Counter(c for c in b if not c.isspace())
+                        if found==text or not same(found,text): continue
+                        if '\n' not in text: found=' '.join(found.split())
+                        cell['text']=found
+                        row,column=cell.get('row'),cell.get('column')
+                        if (name=='cell_records' and isinstance(row,int) and isinstance(column,int) and region.cells
+                                and row<len(region.cells) and column<len(region.cells[row]) and region.cells[row][column]==text):
+                            region.cells[row][column]=found
 
 
 def content_ir(document):
