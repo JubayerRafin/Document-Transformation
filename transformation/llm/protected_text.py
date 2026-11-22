@@ -87,6 +87,10 @@ def protect_values(text, values=()):
                     # "OCR-aware", which then had to stay in English inside translations (2026-11-17).
                     r'\b[A-Z]{2,}(?:-(?=[A-Za-z0-9]*[0-9A-Z])[A-Za-z0-9]+)+\b',
                     r'\b\d{4}-\d{2}-\d{2}\b',
+                    # A phone number is one literal: protected digit group by digit group, "+1 415 555
+                    # 5551" came back as "+1, 415, 555, 5551" from a Hindi invoice (2026-11-23).
+                    r'(?<![\w+])\+\d{1,3}(?:[ .-]\(?\d{1,8}\)?){2,5}(?![\w-])',
+                    r'(?<![\w(])\(\d{2,4}\)[ .-]?\d{3,4}[ .-]\d{3,4}(?![\w-])',
                     r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
                     r'\bsk_[A-Za-z0-9_.-]+\b',
                     r'(?<!\w)\d+(?:,\d+)*(?:\.\d+)?%?(?!\w)',

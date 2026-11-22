@@ -81,3 +81,15 @@ class TranslationGuardTests(unittest.TestCase):
     def test_legitimate_expansion_without_new_facts(self):
         validate_candidate('ABC','제품 코드 (ABC)')
         validate_candidate('User report','사용자 보고서')
+
+
+class PhoneLiteralTests(unittest.TestCase):
+    def test_a_phone_number_is_kept_whole(self):
+        """Hindi invoice, 2026-11-23: "+1 415 555 5551" came back as "+1, 415, 555, 5551"."""
+        from transformation.llm.protected_text import protect_values
+        from transformation.llm.translation_guard import validate_candidate
+        for phone in ('+1 415 555 5551', '+49 30 846107', '+44 20 7946 0958', '(312) 555-0147'):
+            self.assertEqual(list(protect_values(f'Tel {phone} now')[1].values()), [phone])
+        with self.assertRaises(ValueError):
+            validate_candidate('Priya Verma +1 415 555 5551', 'Priya Verma, +1, 415, 555, 5551')
+        validate_candidate('Phone +1 415 555 5551', 'Telefon +1 415 555 5551')
