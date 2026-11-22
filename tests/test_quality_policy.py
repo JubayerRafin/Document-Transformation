@@ -122,3 +122,25 @@ class QualityPolicyTests(unittest.TestCase):
         self.assertTrue(independent_literal_evidence(reads,'MX-718'))
         reads[-1]['text']='MX-719'
         self.assertFalse(independent_literal_evidence(reads,'MX-718'))
+
+
+class NeighbourPolicyTests(unittest.TestCase):
+    def test_an_unmeasured_line_takes_its_neighbours_size(self):
+        from transformation.layout.ocr_fitting import neighbour_policy
+        floor = {'minimum': 8.0, 'maximum': 6.3, 'basis': 'default_readability_floor'}
+        line = {'bbox': [10, 10, 60, 16.6], 'text': 'Supplies'}
+        near = [({'bbox': [10, 30, 80, 36.0]}, {'source_font_estimate': 6.0}),
+                ({'bbox': [10, 40, 80, 46.4]}, {'source_font_estimate': 5.8}),
+                ({'bbox': [10, 60, 80, 90.0]}, {'source_font_estimate': 20.0})]   # a much taller line: not comparable
+        policy = neighbour_policy(line, floor, [(line, floor)] + near)
+        self.assertEqual(policy['basis'], 'neighbouring_lines_estimate')
+        self.assertAlmostEqual(policy['maximum'], 5.9)
+        self.assertLess(policy['minimum'], 8.0)
+
+    def test_measured_lines_and_lines_without_neighbours_keep_their_policy(self):
+        from transformation.layout.ocr_fitting import neighbour_policy
+        measured = {'minimum': 5, 'maximum': 6, 'source_font_estimate': 6, 'basis': 'source_relative_ink_height_estimate'}
+        line = {'bbox': [0, 0, 50, 7]}
+        self.assertIs(neighbour_policy(line, measured, []), measured)
+        floor = {'minimum': 8.0, 'maximum': 6.6, 'basis': 'default_readability_floor'}
+        self.assertIs(neighbour_policy(line, floor, [(line, floor)]), floor)

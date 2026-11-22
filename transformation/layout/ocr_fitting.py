@@ -59,3 +59,26 @@ def source_fit_policy(region,page):
             'source_font_estimate':estimate,'source_pixels_per_point':density,
             'measured_source_ink_height':measured_ink_height,
             'basis':'source_relative_ink_height_estimate','requires_visual_review':True}
+
+
+def neighbour_policy(region,policy,measured):
+    """A line whose own size could not be measured takes the size measured for lines of about its box
+    height in the same picture, instead of the 8 pt readability floor.
+
+    In a screenshot of an HP manual most labels measured 4-6 pt, but "Supplies", "Plain" and "Media"
+    fell back to the floor and were drawn at 8 pt, twice their neighbours (2026-11-23). measured:
+    (region, policy) for every line of the picture. A line with no comparable neighbour keeps its
+    policy."""
+    if policy.get('basis')!='default_readability_floor' or region.get('metadata',{}).get('requires_review'):
+        return policy
+    box=pymupdf.Rect(region['bbox'])
+    if box.is_empty:return policy
+    estimates=[p['source_font_estimate'] for r,p in measured
+               if r is not region and p.get('source_font_estimate')
+               and 0.75<=pymupdf.Rect(r['bbox']).height/box.height<=1.33]
+    if not estimates:return policy
+    from statistics import median
+    estimate=median(estimates)
+    minimum=max(4.0,min(8.0,estimate*.85))
+    return {'minimum':minimum,'maximum':max(minimum,estimate),'source_font_estimate':estimate,
+            'basis':'neighbouring_lines_estimate','neighbours':len(estimates),'requires_visual_review':True}

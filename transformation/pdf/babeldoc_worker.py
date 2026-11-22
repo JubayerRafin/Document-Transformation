@@ -384,11 +384,16 @@ def resolve_cell_claims(candidates):
     return None
 
 
-def plan_table_text_slots(cell_report, padding=1.0, gap=1.0):
+def plan_table_text_slots(cell_report, padding=1.0, gap=1.0, images=None):
     """Plan bounded text areas without modifying the document.
 
     Supports one block or vertically separated blocks per cell.
     More complex arrangements are flagged for review.
+
+    images: {page index: [objects with .box (bottom-left coordinates)]}. In a cell holding a picture
+    (a warning triangle between "CAUTION:" and its text), each block's slot starts where the block
+    starts and ends above the next block or picture below it. Equal shares of the cell put the text
+    below the triangle over the triangle (HP manual tables, 2026-11-23).
     """
     plans = []
 
@@ -441,9 +446,21 @@ def plan_table_text_slots(cell_report, padding=1.0, gap=1.0):
             plan["reason"] = "Insufficient space for separate text slots."
             continue
 
+        pictures = [im.box for im in (images or {}).get(cell["page"] - 1, [])
+                    if im.box.x < right and im.box.x2 > left and im.box.y < top and im.box.y2 > bottom
+                    and (im.box.x2 - im.box.x) < (right - left) * 0.95]
         for index, block in enumerate(blocks):
             slot_top = top - padding - index * (slot_height + gap)
             slot_bottom = slot_top - slot_height
+            if pictures:
+                block_top, block_bottom = block["bbox"][3], block["bbox"][1]
+                slot_top = top - padding if index == 0 else min(top - padding, block_top + padding)
+                slot_bottom = (blocks[index + 1]["bbox"][3] + gap) if index + 1 < len(blocks) else bottom + padding
+                for picture in pictures:
+                    if block_bottom + 1 >= picture.y2 > slot_bottom:
+                        slot_bottom = picture.y2 + gap
+                if slot_top - slot_bottom < 6:
+                    slot_bottom = slot_top - 6
 
             plan["slots"].append({
                 "paragraph_id": block["paragraph_id"],
@@ -644,7 +661,8 @@ def main():
         plans = plan_table_text_slots(
             inspect_table_cell_text(
                 document, source_cells
-            )
+            ),
+            images=source_images,
         )
 
         self._transformx_table_slots = {}

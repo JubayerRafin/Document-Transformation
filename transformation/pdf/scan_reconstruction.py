@@ -386,6 +386,8 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
         font = pymupdf.Font('cjk')
         records, placements, shaped_placements, planned = [], [], [], []
         native_fonts = {}
+        from transformation.layout.ocr_fitting import source_fit_policy, neighbour_policy
+        measured_policies = [(r, source_fit_policy(r, source[0])) for r in regions]
         for index, (region, spans) in enumerate(zip(regions, grouped)):
             correction = corrections.get(region['id'])
             region_style = styles[index] if styles else None
@@ -452,8 +454,7 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 top=max(0,math.floor(box.y0)-3)
                 bottom=min(pix.height,math.ceil(box.y1)+3)
                 rules[top:bottom,edge]=True
-            from transformation.layout.ocr_fitting import source_fit_policy
-            font_policy=source_fit_policy(region,source[0])
+            font_policy=neighbour_policy(region,measured_policies[index][1],measured_policies)
             record['font_policy']=font_policy
             from transformation.pdf.complex_script import needs_shaping, fit_shaped
             shaped = None

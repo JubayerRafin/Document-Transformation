@@ -77,6 +77,27 @@ def merge_overlapping(regions,page_rect):
     return merged
 
 
+def figure_candidates(figures,words,page_rect):
+    """The figure regions to process: overlapping ones merged (merge_overlapping), except that a
+    merged region covering native text is replaced by its members that do not.
+
+    Two extractors can box one picture differently: the picture itself, and a wider box that also
+    takes in the text beside it. Their union then covered text and the whole picture was skipped,
+    its text left untranslated (a warning label in a manual, 2026-11-21 competition set)."""
+    def on_text(region):
+        box=pymupdf.Rect(region['bbox'])&page_rect
+        return not box.is_empty and any(overlaps_text(w,box) for w in words)
+    candidates=[]
+    for region in merge_overlapping(figures,page_rect):
+        members=[r for r in figures if r['id'] in region.get('merged_region_ids',[])]
+        if members and on_text(region):
+            clean=[r for r in members if not on_text(r)]
+            if clean:
+                candidates.extend(merge_overlapping(clean,page_rect)); continue
+        candidates.append(region)
+    return candidates
+
+
 def process(data,ir,run,translate,redact,categories,assist,options):
     reports=[]
     started=time.monotonic()
@@ -85,7 +106,8 @@ def process(data,ir,run,translate,redact,categories,assist,options):
         for unit in ir['units']:
             if unit.get('ocr_folder'): continue
             page=pdf[unit['number']-1]
-            candidates=merge_overlapping([r for r in unit['regions'] if r['kind']=='figure'],page.rect)
+            words=[pymupdf.Rect(w[:4]) for w in page.get_text('words')]
+            candidates=figure_candidates([r for r in unit['regions'] if r['kind']=='figure'],words,page.rect)
             for region in candidates:
                 box=pymupdf.Rect(region['bbox']) & page.rect
                 if box.is_empty:
@@ -94,7 +116,7 @@ def process(data,ir,run,translate,redact,categories,assist,options):
                 # A word box includes empty space above its letters, so a caption just below a
                 # picture can touch its edge. Only text meaningfully inside the figure (more
                 # than 30% of the word's box) means the figure overlaps native text.
-                if any(overlaps_text(pymupdf.Rect(w[:4]),box) for w in page.get_text('words')):
+                if any(overlaps_text(w,box) for w in words):
                     reports.append({'region_id':region['id'],'status':'blocked','reason':'Figure overlaps native text; preserve original geometry.'}); continue
                 from tools.ocr.raster_policy import render_page
                 pixels,raster=render_page(page,box)

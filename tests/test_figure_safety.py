@@ -90,3 +90,27 @@ class TextOverlapTests(unittest.TestCase):
         self.assertFalse(overlaps_text(pymupdf.Rect(50, 494, 73, 508), figure))   # 1 pt of the word's box
         self.assertTrue(overlaps_text(pymupdf.Rect(100, 300, 160, 314), figure))  # text printed over the image
         self.assertTrue(overlaps_text(pymupdf.Rect(390, 300, 420, 314), figure))  # a third of the word inside
+
+
+class CandidateTests(unittest.TestCase):
+    page = pymupdf.Rect(0, 0, 612, 792)
+
+    def test_a_wide_box_taking_in_text_falls_back_to_the_picture_alone(self):
+        from transformation.ocr.pdf_assets import figure_candidates
+        picture, wide = fig('p', [43, 361, 255, 450]), fig('w', [41, 304, 555, 452])
+        words = [pymupdf.Rect(60, 310, 120, 322)]                      # warning text above the picture
+        out = figure_candidates([picture, wide], words, self.page)
+        self.assertEqual([r['id'] for r in out], ['p'])
+
+    def test_a_picture_with_text_printed_on_it_is_still_refused_whole(self):
+        from transformation.ocr.pdf_assets import figure_candidates
+        a, b = fig('a', [60, 100, 300, 300]), fig('b', [250, 100, 500, 300])
+        words = [pymupdf.Rect(270, 200, 290, 212)]                     # inside both members
+        out = figure_candidates([a, b], words, self.page)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(sorted(out[0]['merged_region_ids']), ['a', 'b'])
+
+    def test_merged_pictures_without_text_stay_merged(self):
+        from transformation.ocr.pdf_assets import figure_candidates
+        out = figure_candidates([fig('a', [0, 0, 100, 100]), fig('b', [90, 0, 190, 100])], [], self.page)
+        self.assertEqual(len(out), 1)
