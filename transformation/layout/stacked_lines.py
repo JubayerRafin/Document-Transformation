@@ -645,7 +645,9 @@ def _rtl_segments(chars):
         current, right = [ordered[0]], chars[ordered[0]].visual_bbox.box.x2
         for k in ordered[1:]:
             box = chars[k].visual_bbox.box
-            if box.x - right > 2.5 * max(box.y2 - box.y, 1.0):
+            # Word spaces and the gap between a line's runs stay under half the font size; columns
+            # of a newsletter can be as close as two (Arabic newsletter, 2026-11-23).
+            if box.x - right > 1.2 * max(box.y2 - box.y, 1.0):
                 groups.append(sorted(current))
                 current, right = [], box.x2
             current.append(k)
