@@ -137,7 +137,31 @@ def verified_ocr_words(line, text, bbox):
     return result
 
 
-def pixel_word_boxes(page, bbox, text, cache=None):
+def visual_length(token):
+    """Width of a word in ordinary letters: combining marks and format characters take no width of
+    their own (a Bengali or Hindi word has many), wide CJK characters take two."""
+    import unicodedata
+    return sum(0 if unicodedata.category(c) in ('Mn', 'Me', 'Cf') else 2 if unicodedata.east_asian_width(c) in 'WF' else 1
+               for c in token)
+
+
+def space_tokens(text):
+    return [(m.start(), m.end()) for m in re.finditer(r'\S+', text)]
+
+
+def script_tokens(text):
+    """Words of an OCR line, also split where the writing system changes ("請求書INV-2022-75013")."""
+    spans = []
+    for a, b in space_tokens(text):
+        start = a
+        for i in range(a + 1, b):
+            if script_changes(text[i - 1], text[i]):
+                spans.append((start, i)); start = i
+        spans.append((start, b))
+    return spans
+
+
+def pixel_word_boxes(page, bbox, text, cache=None, tokens=None):
     """Split one OCR line into its whitespace-separated words using ink gaps.
 
     Works on the rendered pixels inside the line box, so it needs no second OCR
@@ -148,7 +172,7 @@ def pixel_word_boxes(page, bbox, text, cache=None):
     None is returned. Returns one display-coordinate Rect per word, or None.
     """
     import numpy as np
-    tokens=list(re.finditer(r'\S+',text))
+    tokens=[text[a:b] for a,b in (tokens if tokens is not None else space_tokens(text))]
     rect=pymupdf.Rect(bbox)&page.rect
     if not tokens or rect.is_empty:return None
     # Render the page as displayed (rotation applied) once, then crop the line in
@@ -187,7 +211,10 @@ def pixel_word_boxes(page, bbox, text, cache=None):
     segments=[];first=0
     for i in cuts+[len(runs)-1]:
         segments.append((runs[first][0],runs[i][1]));first=i+1
-    widths=[b-a+1 for a,b in segments];lengths=[len(t.group()) for t in tokens]
+    # Word widths against their visual lengths: counted in code points, a Bengali word with its
+    # vowel signs looked twice as long as its ink, the split was refused and the whole line,
+    # label included, was masked (Bengali scan, 2026-11-23).
+    widths=[b-a+1 for a,b in segments];lengths=[max(1,visual_length(t)) for t in tokens]
     for width,length in zip(widths,lengths):
         actual=width/sum(widths);expected=length/sum(lengths)
         if length>=2 and not .5<=actual/expected<=2:return None
@@ -220,19 +247,30 @@ def _ocr_rectangles(region, values, page=None, localization=None, renders=None):
             if page is None:raise
     elif page is None:
         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
-    boxes=pixel_word_boxes(page,region['bbox'],text,renders)
-    if boxes:
-        tokens=list(re.finditer(r'\S+',text));result=[]
+    # Words split at spaces first. When a value starts or ends inside such a word, the split at
+    # changes of script is tried too: a label stored against its value ("請求書INV-2022-75013")
+    # was trimmed by character counts and the mask covered part of the label (2026-11-23).
+    fallback=None
+    for tokenizer in (space_tokens,script_tokens):
+        tokens=tokenizer(text)
+        boxes=pixel_word_boxes(page,region['bbox'],text,renders,tokens)
+        if not boxes:continue
+        result=[];aligned=True
         for a,b in matches:
-            chosen=[(token,box) for token,box in zip(tokens,boxes) if token.start()<b and token.end()>a]
+            chosen=[(span,box) for span,box in zip(tokens,boxes) if span[0]<b and span[1]>a]
             if chosen:
+                aligned=aligned and chosen[0][0][0]>=a and chosen[-1][0][1]<=b
                 union=None
-                for token,box in chosen:
-                    box=_trim_to_span(box,token,a,b)
+                for span,box in chosen:
+                    box=_trim_to_span(box,_Span(*span),a,b)
                     union=box if union is None else union|box
                 result.append(union+(-.75,-.5,.75,.5))
-        if len(result)==len(matches):
+        if len(result)!=len(matches):continue
+        if aligned:
             record['localization']='pixel_word_gaps';return result
+        fallback=fallback or result
+    if fallback:
+        record['localization']='pixel_word_gaps';return fallback
     if pixel_word_boxes(page,region['bbox'],'x',renders) is None:
         # Nothing visible in the line box: its geometry does not match the page.
         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
@@ -254,6 +292,12 @@ def _clip_padding(base,padded,neighbours):
         if n.y1<=base.y0+.25*base.height:padded.y0=max(padded.y0,min(base.y0,n.y1))
         elif n.y0>=base.y1-.25*base.height:padded.y1=min(padded.y1,max(base.y1,n.y0))
     return padded
+
+
+class _Span:
+    def __init__(self, start, end): self._start, self._end = start, end
+    def start(self): return self._start
+    def end(self): return self._end
 
 
 def _trim_to_span(box,token,a,b,margin=.75):
