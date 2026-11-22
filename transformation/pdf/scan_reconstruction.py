@@ -216,9 +216,27 @@ def available_line_box(region, regions, pixels, rules):
         strip, mask = pixels[strip_rows, x0:x1], rules[strip_rows, x0:x1]
         return bool(strip.size) and not mask.any() and np.mean(np.max(abs(strip.astype(float)-color),axis=2)<30) > .98
 
-    above = next((pad for pad in (4,3,2,1) if box.y0 - pad >= 0 and clear(
+    # Toward another line, a margin takes at most half the gap: that line may grow toward this one
+    # too, and two lines grown into the same gap drew a wrapped word over the next line (German
+    # warning box of a scan, 2026-11-23).
+    def room(side):
+        gaps = []
+        for r in regions:
+            other = pymupdf.Rect(r['bbox'])
+            if r['id'] == region['id'] or other.x0 >= box.x1 or other.x1 <= box.x0:
+                continue
+            if side == 'above' and other.y1 <= box.y0 + .5:
+                gaps.append(box.y0 - other.y1)
+            elif side == 'below' and other.y0 >= box.y1 - .5:
+                gaps.append(other.y0 - box.y1)
+        return min([4.0] + [max(0.0, g / 2) for g in gaps])
+
+    def pads(limit):
+        return [p for p in (limit, limit - 1, limit - 2, limit - 3) if p >= .5]
+
+    above = next((pad for pad in pads(room('above')) if box.y0 - pad >= 0 and clear(
         pymupdf.Rect(box.x0, box.y0-pad, box.x1, box.y1), slice(math.floor(box.y0-pad), math.floor(box.y0)))), 0)
-    below = next((pad for pad in (4,3,2,1) if box.y1 + pad <= height and clear(
+    below = next((pad for pad in pads(room('below')) if box.y1 + pad <= height and clear(
         pymupdf.Rect(box.x0, box.y0, box.x1, box.y1+pad), slice(math.ceil(box.y1), math.ceil(box.y1+pad)))), 0)
     return pymupdf.Rect(box.x0, box.y0-above, box.x1, box.y1+below)
 

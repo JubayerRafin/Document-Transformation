@@ -118,6 +118,10 @@ def _continues(upper, lower):
     # English did not fit the line (scanned newsletter and contract, 2026-11-19).
     if (HANGUL.search(a) and HANGUL.search(b)) or (HAN_KANA.search(a) and HAN_KANA.search(b)):
         return len(a) >= 12 and not NEW_ITEM.match(b)
+    # An email or web address on its own line is a field of its own, not the end of a sentence,
+    # though it starts in lower case (a name and the email under it were joined, 2026-11-23).
+    if '@' in b.split()[0] or '://' in b or b.lower().startswith('www.'):
+        return False
     last = a.split()[-1].lower()
     return b[0].islower() or a[-1] in ',&-–' or last in CONNECTORS
 

@@ -158,6 +158,10 @@ class WrappedLineTests(unittest.TestCase):
         self.assertEqual([r['text'] for r in joined], ['Disconnect the power supply before opening the cover.'])
         self.assertEqual(len(self.join(lines, sizes={'r0': 14.0, 'r1': 8.8})[0]), 2)
 
+    def test_an_email_under_a_name_is_not_its_continuation(self):
+        joined = self.join([('Thomas Becker', [380, 237, 460, 250]), ('ops26@corp.example', [380, 251, 490, 264])])[0]
+        self.assertEqual(len(joined), 2)
+
     def test_a_sentence_wrapped_onto_a_lower_case_line_is_one_paragraph(self):
         joined, mapping, styles = self.join([('Picnics beneath blooming sakura trees in parks and', [380, 237, 696, 254]),
                                              ('along rivers.', [383, 254, 457, 269])])

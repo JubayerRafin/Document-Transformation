@@ -134,7 +134,14 @@ class RegionTests(unittest.TestCase):
         mask=np.zeros((100,200),dtype=bool)
         upper={'id':'u','bbox':[10,20,190,30]}
         small={'id':'s','bbox':[10,33,60,40]}   # "cover.": small letters only, 3 px under the line above
-        self.assertEqual(list(available_line_box(small,[upper,small],image,mask)),[10,30,60,44])
+        # toward the line above at most half the 3 pt gap; nothing below, so up to 4 pt
+        self.assertEqual(list(available_line_box(small,[upper,small],image,mask)),[10,31.5,60,44])
+
+    def test_two_lines_never_grow_into_the_same_gap(self):
+        image=np.full((100,200,3),255,dtype=np.uint8)
+        mask=np.zeros((100,200),dtype=bool)
+        a={'id':'a','bbox':[10,20,190,30]}; b={'id':'b','bbox':[10,36,190,46]}
+        self.assertLessEqual(available_line_box(a,[a,b],image,mask).y1,available_line_box(b,[a,b],image,mask).y0)
 
     def test_protection_matches_spacing_not_changed_characters(self):
         self.assertIn('EliteBook840', observed_protected_values('EliteBook840', ['EliteBook 840']))
