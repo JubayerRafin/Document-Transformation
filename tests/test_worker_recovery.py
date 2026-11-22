@@ -149,6 +149,10 @@ class ReportingTests(unittest.TestCase):
             'translation_errors':2,'privacy_verification':'failed'})
         self.assertNotIn('Jane',json.dumps(summary))
         self.assertEqual(cw.summarize_checks({})['privacy_verification'],'not_run')
+        text_only={'validation':{'independent_checks':{'acceptable':True,'uninspected_content':[]}}}
+        self.assertEqual(cw.summarize_checks(text_only)['privacy_verification'],'not_needed')
+        with_picture={'validation':{'independent_checks':{'acceptable':False,'uninspected_content':[{'kind':'raster'}]}}}
+        self.assertEqual(cw.summarize_checks(with_picture)['privacy_verification'],'not_run')
 
     def test_agent_reports_only_the_reason_code_and_keeps_polling(self):
         job={'id':JOB['id'],'lease':'lease','options':{'operation':'pii'}}

@@ -254,7 +254,11 @@ def summarize_checks(result):
             'uninspected_content':count(independent.get('uninspected_content')),
             'scan_acceptance_blockers':count(result.get('scan_acceptance_blockers')),
             'translation_errors':errors if type(errors) is int and errors>=0 else 0,
-            'privacy_verification':'not_run' if not isinstance(privacy,dict) else 'passed' if privacy.get('passed') is True else 'failed'}
+            # Fresh OCR of the output is needed only for pictures; without any, the text layer is the
+            # whole output and was checked directly ("not run" read as a missing check).
+            'privacy_verification':('passed' if privacy.get('passed') is True else 'failed') if isinstance(privacy,dict)
+                                    else 'not_needed' if independent and not (independent.get('uninspected_content') or independent.get('ocr_checked_content')
+                                                              or independent.get('pictures')) else 'not_run'}
 
 PROFILE_OVERRIDES=(('pii_endpoint','TRANSFORMX_PII_ENDPOINT'),('pii_model','TRANSFORMX_PII_MODEL'),
                    ('translation_endpoint','TRANSFORMX_TRANSLATION_ENDPOINT'),('translation_model','TRANSFORMX_TRANSLATION_MODEL'),

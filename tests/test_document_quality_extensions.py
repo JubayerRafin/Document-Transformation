@@ -94,3 +94,17 @@ class DocumentQualityExtensions(unittest.TestCase):
             self.assertFalse(result['acceptable'])
             proof['text']='Other text'
             self.assertEqual(inspect_output(pdf.tobytes(),'pdf',intended_overlays=[proof])['layout_review_candidates'][0]['classification'],'unverified_overlap')
+
+
+class ExpectedFindingsTests(unittest.TestCase):
+    def test_intended_picture_text_and_pictures_of_a_translation_do_not_mark_a_result_for_review(self):
+        from transformation.validation.output_validation import set_aside_expected
+        found = lambda: {'layout_review_candidates': [{'kind': 'image_text_overlap', 'classification': 'intended_raster_text_placement_requires_review'},
+                                                      {'kind': 'text_text_overlap'}],
+                         'uninspected_content': [{'kind': 'raster', 'page': 1}, {'kind': 'attachment', 'name': 'a.txt'}]}
+        translated = set_aside_expected(found(), redact=False)
+        self.assertEqual(translated['layout_review_candidates'], [{'kind': 'text_text_overlap'}])
+        self.assertEqual(len(translated['picture_text_placements']), 1)
+        self.assertEqual(translated['uninspected_content'], [{'kind': 'attachment', 'name': 'a.txt'}])
+        redacted = set_aside_expected(found(), redact=True)
+        self.assertEqual(len(redacted['uninspected_content']), 2)    # pictures still need the privacy check

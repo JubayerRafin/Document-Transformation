@@ -97,7 +97,7 @@ export function reviewSummary(items?: ReviewItem[]) {
 /** Counts of automated-check findings reported by the worker; no document content. */
 export type JobChecks = {
   acceptable: boolean;
-  privacy_verification: "passed" | "failed" | "not_run";
+  privacy_verification: "passed" | "failed" | "not_run" | "not_needed";
   known_sensitive_residuals: number;
   partial_name_residuals?: number;
   geometry_blockers: number;
@@ -143,6 +143,10 @@ const CHECK_LABELS: [keyof JobChecks, string][] = [
   ["scan_acceptance_blockers", "scanned regions needing review"],
   ["translation_errors", "untranslated passages"],
 ];
+/** True when every automated check passed and found nothing, with no review queue left. */
+export function passedChecks(checks?: JobChecks) {
+  return Boolean(checks?.acceptable) && checkFindings(checks).length === 0 && checks?.privacy_verification !== "failed";
+}
 export function checkFindings(checks?: JobChecks) {
   if (!checks) return [];
   return CHECK_LABELS.filter(([k]) => Number(checks[k]) > 0).map(

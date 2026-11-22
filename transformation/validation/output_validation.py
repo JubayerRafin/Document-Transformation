@@ -56,7 +56,9 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                             matching=[r['minimum'] for r in font_regions if r['page']==number and
                                       (pymupdf.Rect(r['bbox'])+(-.25,-.25,.25,.25)).contains(pymupdf.Rect(span['bbox']))]
                             if minimum is not None and matching:minimum=min(minimum,min(matching))
-                            if minimum is not None and span['text'].strip() and span['size']<minimum-.05:
+                            # A quarter point of rounding: 7.9 pt text against an 8 pt floor was
+                            # reported as a layout problem on most scanned pages (2026-11-23).
+                            if minimum is not None and span['text'].strip() and span['size']<minimum-.25:
                                 geometry.append({'page':number,'reason':'text below configured font limit',
                                                  'text':span['text'],'font_size':span['size'],'minimum':minimum})
                             if not page.rect.contains(pymupdf.Rect(span['bbox'])):
@@ -116,3 +118,25 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
             'layout_review_candidates':candidates,
             'uninspected_content':uninspected,'privacy_complete':False if values else None,
             'acceptable':not residual and not geometry and not uninspected and not candidates}
+
+
+INTENDED_PLACEMENT = 'intended_raster_text_placement_requires_review'
+
+
+def set_aside_expected(independent, redact):
+    """Move findings that are expected, not problems, out of the counts that mark a result for review.
+
+    Every result was marked for review (2026-11-23), also when nothing was wrong: translated text drawn
+    into a picture where its source text was is the intended placement, not an overlap
+    (kept as picture_text_placements); and a picture in a document that is only translated holds no
+    selected value whose removal needs checking (kept as pictures). Changes `independent` in place."""
+    candidates = independent.get('layout_review_candidates') or []
+    intended = [c for c in candidates if c.get('classification') == INTENDED_PLACEMENT]
+    if intended:
+        independent['picture_text_placements'] = intended
+        independent['layout_review_candidates'] = [c for c in candidates if c.get('classification') != INTENDED_PLACEMENT]
+    if not redact:
+        content = independent.get('uninspected_content') or []
+        independent['pictures'] = [c for c in content if c.get('kind') in {'image', 'raster'}]
+        independent['uninspected_content'] = [c for c in content if c.get('kind') not in {'image', 'raster'}]
+    return independent

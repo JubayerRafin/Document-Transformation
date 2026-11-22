@@ -12,6 +12,7 @@ import {
   ApiClient,
   checkFindings,
   reviewSummary,
+  passedChecks,
   redactionSummary,
   downloadUrl,
   seconds,
@@ -84,9 +85,15 @@ export function PreviewPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="border-amber-800 bg-amber-950 text-amber-200">
-            Review required
-          </Badge>
+          {passedChecks(job.metrics.checks) && !job.metrics.review_items?.some((i) => i.state === "suggested") ? (
+            <Badge className="border-emerald-800 bg-emerald-950 text-emerald-200">
+              Checks passed
+            </Badge>
+          ) : (
+            <Badge className="border-amber-800 bg-amber-950 text-amber-200">
+              Review suggested
+            </Badge>
+          )}
           {source && result && (
             <Button asChild size="sm" variant="outline">
               <a href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&compare=1`}>
@@ -153,7 +160,9 @@ export function PreviewPanel({
                 ? "passed"
                 : job.metrics.checks.privacy_verification === "failed"
                   ? "found items to review"
-                  : "not run"}
+                  : job.metrics.checks.privacy_verification === "not_needed"
+                    ? "not needed (no pictures; all text was checked directly)"
+                    : "not run"}
               . Automated checks do not replace a full human review.
             </p>
           )}

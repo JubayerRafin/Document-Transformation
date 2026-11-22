@@ -116,3 +116,19 @@ it("reads the page count with pdf.js and recognises a password", async () => {
   expect(await pdfFacts(pdf, fake(async () => Promise.reject(locked)))).toEqual({ encrypted: true });
   expect(await pdfFacts(pdf, async () => Promise.reject(new Error("no pdf.js")))).toEqual({});
 });
+
+import { passedChecks, checkFindings, type JobChecks } from "../src/lib/api";
+describe("result badge", () => {
+  const clean: JobChecks = {
+    acceptable: true, privacy_verification: "not_needed", known_sensitive_residuals: 0, geometry_blockers: 0,
+    layout_review_candidates: 0, uninspected_content: 0, scan_acceptance_blockers: 0, translation_errors: 0,
+  };
+  it("says the checks passed only when nothing was found", () => {
+    expect(passedChecks(clean)).toBe(true);
+    expect(checkFindings(clean)).toEqual([]);
+    expect(passedChecks({ ...clean, layout_review_candidates: 2 })).toBe(false);
+    expect(passedChecks({ ...clean, acceptable: false })).toBe(false);
+    expect(passedChecks({ ...clean, privacy_verification: "failed" })).toBe(false);
+    expect(passedChecks(undefined)).toBe(false);
+  });
+});

@@ -10,7 +10,7 @@ const CHECK_COUNTS=['known_sensitive_residuals','partial_name_residuals','geomet
 export function checks(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
  const c={acceptable:raw.acceptable===true,
-  privacy_verification:['passed','failed','not_run'].includes(raw.privacy_verification)?raw.privacy_verification:'not_run'};
+  privacy_verification:['passed','failed','not_run','not_needed'].includes(raw.privacy_verification)?raw.privacy_verification:'not_run'};
  for(const k of CHECK_COUNTS)c[k]=Number.isInteger(raw[k])&&raw[k]>=0&&raw[k]<=1_000_000?raw[k]:0;
  return c;
 }

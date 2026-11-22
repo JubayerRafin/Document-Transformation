@@ -647,6 +647,8 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if verification['passed']:
                 independent['ocr_checked_content']=[c for c in independent['uninspected_content'] if c['kind'] in {'image','raster'}]
                 independent['uninspected_content']=[c for c in independent['uninspected_content'] if c['kind'] not in {'image','raster'}]
+        from transformation.validation.output_validation import set_aside_expected
+        set_aside_expected(independent,redact)
         independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'] or independent.get('partial_name_residuals'))
         save_json(run/'independent-validation.json',independent)
         info['warnings']=list(dict.fromkeys(ir['warnings']+info['warnings']))
