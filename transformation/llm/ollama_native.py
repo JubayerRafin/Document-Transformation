@@ -27,6 +27,11 @@ def needs_no_translation(text, protected_values=()):
     """Skip only entire protected literals, emails, or nonlinguistic numeric fragments."""
     from transformation.llm.protected_text import EMAIL_PATTERN
     stripped = text.strip()
+    # Nothing to translate: punctuation or symbols only, around formula placeholders at most (a lone
+    # "." left after an inline icon was answered "no text was given, please provide text" and printed
+    # in an HP manual, 2026-11-21).
+    if not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', stripped)):
+        return True
     return (not stripped or stripped in normalize_protected_values(protected_values)
             or re.fullmatch(r'[A-Z]{3}\s*\d[\d,]*(?:\.\d+)?',stripped) is not None
             or re.fullmatch(r'[A-Za-z]+\d[\w.-]*',stripped) is not None

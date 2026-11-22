@@ -101,6 +101,11 @@ def validate_candidate(source, target, values=()):
     # (2026-11-19). Real translations stay within about four times the source, even CJK to English.
     if len(target.strip()) > 6 * len(source.strip()) + 40:
         raise ValueError('Translation is far longer than its source.')
+    # A source with no letters or digits ("." after an inline icon) has nothing to translate: words in
+    # the answer are the model talking ("no text was given, please provide text"), not a translation.
+    if (not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', source))
+            and any(c.isalpha() for c in re.sub(r'\{v\d+\}', '', target))):
+        raise ValueError('Translation added words to a source without text.')
     for piece, count in Counter(glued_placeholders(source)).items():
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')

@@ -26,6 +26,14 @@ class EfficiencyTests(unittest.TestCase):
                 self.assertEqual(stats['eval_count'], 0)
             chat.assert_not_called()
 
+    def test_punctuation_and_symbols_alone_are_not_sent_to_the_model(self):
+        for source in ['.', ' . ', '—', '→ ', '{v1}.', '•', '( )']:
+            self.assertTrue(needs_no_translation(source), source)
+        from transformation.llm.translation_guard import validate_candidate
+        with self.assertRaises(ValueError):
+            validate_candidate('.', '알려주신 내용이 없습니다. 번역할 텍스트를 제공해주세요.')
+        validate_candidate('.', '.')
+
     def test_prose_and_partial_matches_are_not_skipped(self):
         for source in ['Title', 'Field', 'Exceeds', 'Call 010-2345-6789', 'Kim Min-jun joined', 'A-', 'Price: KRW 100']:
             self.assertFalse(needs_no_translation(source, ['Kim Min-jun']))

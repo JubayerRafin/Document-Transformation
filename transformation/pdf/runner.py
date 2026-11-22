@@ -78,9 +78,12 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
     if not isinstance(document_context, str) or len(document_context) > 2000:
         raise ValueError("Document context must be text of at most 2000 characters.")
     document_context = document_context.strip()
-    from transformation.llm.policy import validate_terminology, context_with_terms
+    from transformation.llm.policy import validate_terminology
     terminology = validate_terminology(terminology)
-    document_context = context_with_terms(document_context, terminology)
+    # Customer terms are applied where they occur (terminology.prepare per paragraph), never as
+    # background for every paragraph: with them in every request, short labels with no glossary word
+    # ("Index", "Label", "?") were answered with the glossary term ("Personnel Data Table" -> "인사 정보
+    # 표" on 60 places of an HP manual, 2026-11-23).
     # Every model translates paragraph by paragraph through TransformX's own transport (API keys,
     # retries, protected values, checks), whatever name its server gives it ("gpt-5-mini",
     # "google/translategemma-12b-it"). BabelDOC's built-in OpenAI client is never used: it has no API
@@ -194,12 +197,12 @@ def run_pdf(data, filename, *, python, model, endpoint="http://127.0.0.1:11434/v
         command.extend(["--min-text-length", "1"])
     if ignore_cache:
         command.append("--ignore-cache")
-    # A scan already read by our OCR and rebuilt as text: BabelDOC's own scan detector refused the
-    # rebuilt slides of a Japanese scan ("Scanned PDF detected", 2026-11-19).
-    if ocr_recognition_dir or (external_ir and any(u.get('locked_regions') or u.get('preserve_source_only') is not None
-                                                   for u in external_ir.get('units', []))):
-        command.append("--skip-scanned-detection")
-        info['scanned_detection_skipped']=True
+    # Scans are found and read by our own OCR before this point, so BabelDOC's scan detector only
+    # refuses documents: the rebuilt slides of a Japanese scan (2026-11-19), and a Korean page whose
+    # personal data had just been removed for a combined job (2026-11-23), both "Scanned PDF
+    # detected". A page that really has no text passes through and is flagged by our own checks.
+    command.append("--skip-scanned-detection")
+    info['scanned_detection_skipped']=True
     yield save()
     try:
         if ocr_python or ocr_remote:
