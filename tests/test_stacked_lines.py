@@ -457,3 +457,33 @@ class DrawnBoxTests(unittest.TestCase):
         self.assertEqual([(r.x, r.y2) for r in rules], [(200.0, 400.0), (150.0, 600.0)])
         self.assertEqual(stray.box.y, 301.0)                       # the IR itself is left as it was
         self.assertEqual(len(drawn_boxes(NS(pdf_curve=[stray], pdf_xobject=[]))), 1)
+
+
+class LonePunctuationTests(unittest.TestCase):
+    def line(self, text, x, y, step=4.0, size=8.0):
+        chars = [NS(char_unicode=c, visual_bbox=NS(box=NS(x=x + i * step, y=y, x2=x + (i + 1) * step, y2=y + size)),
+                    pdf_style=NS(font_size=size)) for i, c in enumerate(text)]
+        return NS(pdf_character=chars, box=NS(x=x, y=y, x2=x + step * len(text), y2=y + size))
+
+    def test_a_hyphen_inside_a_wrapped_code_goes_back_to_its_line(self):
+        from transformation.layout.stacked_lines import attach_lone_punctuation
+        lines = [self.line('GQX', 89.4, 106.3), self.line('2024-', 89.4, 96.9), self.line('99135', 89.4, 87.5)]
+        code = NS(debug_id='c', box=NS(x=89.4, y=87.5, x2=110.6, y2=114.3), xobj_id=0, vertical=False,
+                  pdf_paragraph_composition=[NS(pdf_line=l) for l in lines])
+        hyphen = NS(debug_id='h', box=NS(x=101.4, y=106.3, x2=104.0, y2=114.3), xobj_id=0, vertical=False,
+                    pdf_paragraph_composition=[NS(pdf_line=self.line('-', 101.4, 106.3, step=2.6))])
+        page = NS(pdf_paragraph=[code, hyphen])
+        self.assertEqual(attach_lone_punctuation(page, lambda p, line: None), 1)
+        self.assertEqual(page.pdf_paragraph, [code])
+        self.assertEqual(''.join(c.char_unicode for c in lines[0].pdf_character), 'GQX-')
+
+    def test_bullets_and_punctuation_outside_a_paragraph_stay(self):
+        from transformation.layout.stacked_lines import attach_lone_punctuation
+        text = NS(debug_id='t', box=NS(x=60, y=100, x2=200, y2=108), xobj_id=0, vertical=False,
+                  pdf_paragraph_composition=[NS(pdf_line=self.line('Open the tray', 60, 100))])
+        bullet = NS(debug_id='b', box=NS(x=61, y=100, x2=64, y2=108), xobj_id=0, vertical=False,
+                    pdf_paragraph_composition=[NS(pdf_line=self.line('•', 61, 100))])
+        outside = NS(debug_id='o', box=NS(x=40, y=100, x2=43, y2=108), xobj_id=0, vertical=False,
+                     pdf_paragraph_composition=[NS(pdf_line=self.line('-', 40, 100))])
+        page = NS(pdf_paragraph=[text, bullet, outside])
+        self.assertEqual(attach_lone_punctuation(page, lambda p, line: None), 0)

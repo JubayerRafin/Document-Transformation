@@ -666,6 +666,51 @@ def attach_lone_marks(page, update):
     return moved
 
 
+def attach_lone_punctuation(page, update):
+    """Move a paragraph of one to three punctuation characters into the line of the paragraph whose
+    box holds it, in the line's left-to-right order. update(paragraph, line) refreshes both.
+
+    The hyphen of "GQX-", a code wrapped in a narrow table cell, was a paragraph of its own inside
+    the code's box; the cell then held two overlapping blocks, could not be laid out, and its row
+    came out in tiny type in every language (newsletter, 2026-11-23). Returns how many were moved."""
+    moved = 0
+    for lone in list(page.pdf_paragraph):
+        text = ''.join(getattr(c, 'char_unicode', '') or '' for c in _characters(lone)).strip()
+        box = getattr(lone, 'box', None)
+        lines = [c.pdf_line for c in lone.pdf_paragraph_composition or [] if getattr(c, 'pdf_line', None)]
+        if (not text or len(text) > 3 or any(ch.isalnum() for ch in text) or box is None or len(lines) != 1
+                or getattr(lone, 'vertical', False) or any(ch in TEXT_BULLETS for ch in text)):
+            continue
+        height = max(box.y2 - box.y, .1)
+        best = None
+        for other in page.pdf_paragraph:
+            ob = getattr(other, 'box', None)
+            if other is lone or ob is None or getattr(other, 'xobj_id', None) != getattr(lone, 'xobj_id', None):
+                continue
+            if not (ob.x - .5 <= box.x and box.x2 <= ob.x2 + .5 and ob.y - .5 <= box.y and box.y2 <= ob.y2 + .5):
+                continue
+            for composition in other.pdf_paragraph_composition or []:
+                line = getattr(composition, 'pdf_line', None)
+                lb = getattr(line, 'box', None) if line is not None else None
+                if lb is None:
+                    continue
+                overlap = min(lb.y2, box.y2) - max(lb.y, box.y)
+                if overlap >= .5 * height and (best is None or overlap > best[0]):
+                    best = (overlap, other, line)
+        if best is None:
+            continue
+        _, target, line = best
+        chars = list(line.pdf_character or []) + list(lines[0].pdf_character or [])
+        position = lambda c: getattr(getattr(c, 'visual_bbox', None), 'box', None) or getattr(c, 'box', None)
+        if all(position(c) is not None for c in chars):
+            chars.sort(key=lambda c: position(c).x)
+        line.pdf_character = chars
+        page.pdf_paragraph.remove(lone)
+        update(target, line)
+        moved += 1
+    return moved
+
+
 def _bidi_class(char):
     text = getattr(char, 'char_unicode', '') or ''
     return unicodedata.bidirectional(text[0]) if text else ''
@@ -877,6 +922,9 @@ def install(ParagraphFinder):
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),
                                       (vertical_rules(page), horizontal_rules(page), table_cells(self, page)))
         changed += attach_lone_marks(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
+        changed += attach_lone_punctuation(page, update)
+        # A mark attached above can make two pieces of one word overlap ("प्रब" | "ं" + "धक").
+        changed += join_overlapping_fragments(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_lead_labels(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         if changed:
             self._set_paragraph_render_order(page)
