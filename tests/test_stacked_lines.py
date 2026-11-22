@@ -130,6 +130,28 @@ class ListMarkerTests(unittest.TestCase):
         self.assertEqual(self.run_split(paragraph, []),
                          (2, ['– Some serverswrap here', '– In most cases', '– If you use']))
 
+    def test_numbered_items_become_paragraphs_and_wrapped_lines_stay_with_them(self):
+        paragraph = self.list_paragraph([['1. Any change', 'wraps here'], ['2. Customer'], ['3. All goods']])
+        self.assertEqual(self.run_split(paragraph, []),
+                         (2, ['1. Any changewraps here', '2. Customer', '3. All goods']))
+
+    def test_lettered_sub_steps_become_paragraphs(self):
+        paragraph = self.list_paragraph([['a. Click Add', 'on the page'], ['b. Open another'], ['c. Paste']])
+        self.assertEqual(self.run_split(paragraph, []),
+                         (2, ['a. Click Addon the page', 'b. Open another', 'c. Paste']))
+
+    def test_a_number_out_of_sequence_or_in_running_text_does_not_split(self):
+        self.assertEqual(self.run_split(self.list_paragraph([['1. Steps', '5. later', '2. next']]), []),
+                         (1, ['1. Steps5. later', '2. next']))
+        self.assertEqual(self.run_split(self.list_paragraph([['Revenue rose by', '2. percent']]), [])[0], 0)
+
+    def test_a_numbered_line_indented_from_the_first_does_not_split(self):
+        paragraph = self.list_paragraph([['1. Any change'], ['2. Customer']])
+        for c in paragraph.pdf_paragraph_composition[0].pdf_line.pdf_character[13:]:
+            c.visual_bbox.box.x += 20
+            c.visual_bbox.box.x2 += 20
+        self.assertEqual(self.run_split(paragraph, [])[0], 0)
+
     def test_a_dash_inside_running_text_does_not_split_it(self):
         paragraph = self.list_paragraph([['Prices rose', '– and fell', 'again']])
         self.assertEqual(self.run_split(paragraph, [])[0], 0)
@@ -233,6 +255,12 @@ class BrokenLineTests(unittest.TestCase):
         self.assertNotIn('EMP-2026-14033', ''.join(t for t in texts if '김민준' in t))
         self.assertIn('Copperleaf Software', texts)
 
+    def test_a_sentence_cut_mid_word_into_long_pieces_is_joined(self):
+        pieces = [self.piece('a', 'The control pa', 50, 120), self.piece('b', 'nel provides the printe', 120.5, 240),
+                  self.piece('c', 'r.', 240.4, 250)]
+        count, texts = self.run_join(pieces)
+        self.assertEqual(texts, ['The control panel provides the printer.'.replace(' panel', ' pa' + 'nel')])
+
     def test_separate_cells_and_words_of_unbroken_lines_stay_apart(self):
         count, texts = self.run_join([self.piece('a', 'Total', 50, 70), self.piece('b', 'USD 12', 72.5, 100)])
         self.assertEqual(count, 0)                                  # word gap only, nothing cut mid-word
@@ -243,3 +271,98 @@ class BrokenLineTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SplitAtBadgesTests(unittest.TestCase):
+    """Callout numbers in their own circles stay separate paragraphs (drawn after their circle)."""
+    def line(self, items):
+        chars = []
+        for c, x in items:
+            box = NS(x=x, y=158.9, x2=x + 7.7, y2=172.9)
+            chars.append(NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=14)))
+        line = NS(pdf_character=chars, box=NS(x=items[0][1], y=158.9, x2=items[-1][1] + 7.7, y2=172.9))
+        return NS(pdf_paragraph_composition=[NS(pdf_line=line)], debug_id='c', vertical=False)
+
+    def run_split(self, paragraph, circles):
+        from transformation.layout.stacked_lines import split_at_badges
+        page = NS(pdf_paragraph=[paragraph], pdf_curve=[NS(box=b) for b in circles])
+        count = split_at_badges(page, lambda p, line: None, lambda p: p.debug_id + '-b')
+        return count, [''.join(c.char_unicode for c in p.pdf_paragraph_composition[0].pdf_line.pdf_character)
+                       for p in page.pdf_paragraph]
+
+    def test_two_numbers_in_two_circles_become_two_paragraphs(self):
+        circles = [NS(x=267.8, y=159.3, x2=285.8, y2=177.3), NS(x=286.6, y=159.3, x2=304.6, y2=177.3)]
+        self.assertEqual(self.run_split(self.line([('3', 272.8), (' ', 280.6), ('4', 291.7)]), circles), (1, ['3', '4']))
+
+    def test_one_badge_or_none_keeps_the_line_whole(self):
+        one = [NS(x=267.8, y=159.3, x2=285.8, y2=177.3)]
+        self.assertEqual(self.run_split(self.line([('3', 272.8), (' ', 280.6), ('4', 291.7)]), one)[0], 0)
+        self.assertEqual(self.run_split(self.line([('A', 100), ('B', 108)]), [])[0], 0)
+
+    def test_a_large_box_such_as_a_table_cell_is_not_a_badge(self):
+        cells = [NS(x=260, y=150, x2=289, y2=230), NS(x=289, y=150, x2=400, y2=180)]
+        self.assertEqual(self.run_split(self.line([('3', 272.8), (' ', 280.6), ('4', 291.7)]), cells)[0], 0)
+
+
+class LogicalRtlOrderTests(unittest.TestCase):
+    """Characters of right-to-left lines are put into reading order before paragraphs are built."""
+    def chars(self, items, y=500):
+        return [NS(char_unicode=c, visual_bbox=NS(box=NS(x=x, y=y, x2=x + 5, y2=y + 10))) for c, x in items]
+
+    def order(self, chars):
+        from transformation.layout.stacked_lines import logical_rtl_order
+        page = NS(pdf_character=list(chars))
+        logical_rtl_order(page)
+        return ''.join(c.char_unicode for c in page.pdf_character)
+
+    def test_runs_stored_left_to_right_come_back_in_reading_order(self):
+        # On the page, left to right: "891 " then "نحو" (reading: "نحو 891").
+        line = self.chars([('8', 100), ('9', 105), ('1', 110), (' ', 115), ('ن', 130), ('ح', 125), ('و', 120)])
+        self.assertEqual(self.order(line), 'نحو 891')
+
+    def test_a_line_already_in_reading_order_is_unchanged(self):
+        line = self.chars([('ن', 130), ('ح', 125), ('و', 120), (' ', 115), ('1', 100), ('2', 105)])
+        self.assertEqual(self.order(line), 'نحو 12')
+
+    def test_left_to_right_lines_and_far_apart_cells_are_untouched(self):
+        latin = self.chars([('a', 100), ('b', 105), ('c', 110)])
+        self.assertEqual(self.order(latin), 'abc')
+        cells = self.chars([('4', 100), ('3', 105)]) + self.chars([('ب', 300), ('ا', 295)])
+        self.assertEqual(self.order(cells), '43با')
+
+
+class LogicalRtlRunsTests(LogicalRtlOrderTests):
+    def test_runs_of_one_line_stored_far_apart_are_ordered_as_one_line(self):
+        # Stream: the left run first (".12 "), then the right run ("ارتفعت"), as Chromium writes them.
+        line = self.chars([('.', 100), ('1', 105), ('2', 110), (' ', 115)]) + \
+               self.chars([('ت', 145), ('ف', 140), ('ع', 135), ('ر', 130), ('ا', 125), (' ', 120)])
+        self.assertEqual(self.order(line), 'تفعرا  12.')
+
+
+class LeadLabelTests(unittest.TestCase):
+    def paragraph(self, text, x, y, size=9):
+        chars = [NS(char_unicode=c, visual_bbox=NS(box=NS(x=x + i * 5, y=y, x2=x + i * 5 + 5, y2=y + size)),
+                    pdf_style=NS(font_size=size)) for i, c in enumerate(text)]
+        box = NS(x=x, y=y, x2=x + 5 * len(text), y2=y + size)
+        line = NS(pdf_character=chars, box=box)
+        return NS(pdf_paragraph_composition=[NS(pdf_line=line)], box=box, vertical=False, xobj_id=None, debug_id=text[:4])
+
+    def run_join(self, paragraphs, rules=()):
+        from transformation.layout.stacked_lines import join_lead_labels
+        page = NS(pdf_paragraph=list(paragraphs), pdf_curve=[NS(box=r) for r in rules])
+        joined = join_lead_labels(page, lambda p: None)
+        return joined, [''.join(c.char_unicode for comp in p.pdf_paragraph_composition for c in comp.pdf_line.pdf_character)
+                        for p in page.pdf_paragraph]
+
+    def test_a_note_label_joins_the_text_it_starts(self):
+        label, body = self.paragraph('NOTE:', 100, 500), self.paragraph('Create an account', 135, 500)
+        self.assertEqual(self.run_join([label, body]), (1, ['NOTE:Create an account']))
+
+    def test_far_labels_other_lines_long_texts_and_ruled_cells_stay_apart(self):
+        far = [self.paragraph('Name:', 100, 500), self.paragraph('Kim', 300, 500)]
+        below = [self.paragraph('NOTE:', 100, 500), self.paragraph('Text', 135, 480)]
+        sentence = [self.paragraph('This is a whole sentence:', 100, 500), self.paragraph('Text', 230, 500)]
+        for case in (far, below, sentence):
+            self.assertEqual(self.run_join(case)[0], 0)
+        rule = NS(x=132, y=495, x2=132.6, y2=515)
+        self.assertEqual(self.run_join([self.paragraph('Item:', 100, 500), self.paragraph('Text', 135, 500)], [rule])[0], 0)

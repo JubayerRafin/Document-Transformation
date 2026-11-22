@@ -12,6 +12,7 @@ which may join two words, as the model reads "열감지라벨" correctly but not
 """
 
 import re
+import unicodedata
 
 SENTENCE_END = set('。．！？!?：:；;')
 GAP = 0.8          # largest gap between stacked lines, in character heights
@@ -201,6 +202,90 @@ def split_at_rules(page, update, make_id):
     return added
 
 
+BADGE_SIZE = (6.0, 40.0)  # a callout circle or badge around a number or letter, in points
+
+
+def badges(page):
+    """Boxes of small, roughly square shapes that can hold a character: callout circles, numbered
+    badges, keycaps."""
+    out = []
+    for curve in getattr(page, 'pdf_curve', None) or []:
+        box = getattr(curve, 'box', None)
+        if box is None:
+            continue
+        w, h = box.x2 - box.x, box.y2 - box.y
+        if BADGE_SIZE[0] <= w <= BADGE_SIZE[1] and BADGE_SIZE[0] <= h <= BADGE_SIZE[1] and 0.6 <= w / h <= 1.6:
+            out.append(box)
+    return out
+
+
+def _badge_of(char, shapes):
+    """The index of the shape a character sits inside (its centre in the shape, at least a third of its
+    height), or None."""
+    box = char.visual_bbox.box
+    cx, cy, ch = (box.x + box.x2) / 2, (box.y + box.y2) / 2, box.y2 - box.y
+    for i, s in enumerate(shapes):
+        if s.x <= cx <= s.x2 and s.y <= cy <= s.y2 and ch >= 0.33 * (s.y2 - s.y):
+            return i
+    return None
+
+
+def split_at_badges(page, update, make_id):
+    """Split one-line paragraphs whose characters sit in different callout circles or badges.
+
+    BabelDOC joined two callout numbers on one line ("3" and "4", each in its own circle) into one
+    paragraph and drew it where the "3" was in the page's drawing order, before the second circle,
+    which then covered the "4" (HP manual control-panel figure, 2026-11-21). Each badge's characters
+    become their own paragraph and keep their own drawing order. Returns how many were split off."""
+    import copy
+    shapes = badges(page)
+    if not shapes:
+        return 0
+    added = 0
+    index = 0
+    while index < len(page.pdf_paragraph):
+        paragraph = page.pdf_paragraph[index]
+        lines = _lines(paragraph)
+        compositions = paragraph.pdf_paragraph_composition or []
+        index += 1
+        if len(lines) != 1 or len(compositions) != 1 or getattr(paragraph, 'vertical', False):
+            continue
+        chars = [c for c in (lines[0].pdf_character or []) if getattr(c, 'visual_bbox', None)]
+        visible = [(i, _badge_of(c, shapes)) for i, c in enumerate(chars) if (c.char_unicode or '').strip()]
+        if len({b for _, b in visible if b is not None}) < 2:
+            continue
+        cuts, previous = [], visible[0][1]
+        for i, b in visible[1:]:
+            if b != previous:
+                cuts.append(i)
+            previous = b
+        groups, start = [], 0
+        for cut in cuts + [len(chars)]:
+            group = [c for c in chars[start:cut]]
+            while group and not (group[-1].char_unicode or '').strip():
+                group.pop()
+            if group:
+                groups.append(group)
+            start = cut
+        if len(groups) < 2:
+            continue
+        template = copy.deepcopy(paragraph)
+        pieces = [paragraph] + [copy.deepcopy(template) for _ in groups[1:]]
+        for piece in pieces[1:]:
+            piece.debug_id = make_id(paragraph)
+        for piece, group in zip(pieces, groups):
+            line = copy.copy(compositions[0].pdf_line)
+            line.pdf_character = group
+            composition = copy.copy(compositions[0])
+            composition.pdf_line = line
+            piece.pdf_paragraph_composition = [composition]
+            update(piece, line)
+        page.pdf_paragraph[index:index] = pieces[1:]
+        index += len(pieces) - 1
+        added += len(pieces) - 1
+    return added
+
+
 MARKER_SIZE = 7.0  # a bullet drawn as a shape is at most this wide and high, in points
 
 
@@ -235,6 +320,20 @@ def _visual_lines(chars):
 
 
 TEXT_BULLETS = set('•●○◦▪■□–—‣⁃∙')
+
+
+ITEM_NUMBER = re.compile(r'(\d{1,2}|[a-z])[.)]\s')
+
+
+def _item_number(text):
+    """The number of a numbered or lettered list item ("3. Revenue ..." -> 3, "b. Open ..." -> 2), or
+    None. Lettered sub-steps of a manual ("a. Click Add ... b. Open ...") were joined into one
+    paragraph like numbered ones (HP manual, 2026-11-23)."""
+    match = ITEM_NUMBER.match(text)
+    if not match:
+        return None
+    mark = match.group(1)
+    return int(mark) if mark.isdigit() else ord(mark) - ord('a') + 1
 
 
 def _line_text(line):
@@ -290,6 +389,17 @@ def split_at_list_markers(page, update, make_id):
         if first[:1] in TEXT_BULLETS and first[1:2].isspace():
             starts.extend(n for n, line in enumerate(lines)
                           if _line_text(line)[:1] in TEXT_BULLETS and _line_text(line)[1:2].isspace())
+        # Numbered items ("1. Any change ...", "2. Customer ..."): when the first line starts with a
+        # number, each later line that starts at the same left edge with the next number in sequence
+        # starts an item. A numbered list became one paragraph and its translation ran the items
+        # together ("1. ... 2. ... 3. ..." on one block, 2026-11-21 competition set).
+        number = _item_number(first)
+        if number is not None:
+            expected = number + 1
+            for n, line in enumerate(lines[1:], 1):
+                if _item_number(_line_text(line)) == expected and abs(line['x'] - lines[0]['x']) <= 1.5:
+                    starts.append(n)
+                    expected += 1
         cuts = sorted(set(n for n in starts if n > 0))
         if not cuts:
             continue
@@ -420,10 +530,18 @@ def join_broken_line(page, update):
             short = fragment(a) or fragment(b)
             mid_word = (short and 0 <= gap + 0.1 * size <= 0.3 * size
                         and a['text'][-1:].isalpha() and b['text'][:1].isalpha())
-            pairs.append((a, b, gap, mid_word, short))
+            # A lowercase letter touching a lowercase letter is one word cut in two, whatever the
+            # pieces' lengths ("The control pa" | "nel provides ... printe" | "r.", HP manual,
+            # 2026-11-23); fields of a form row do not start in lowercase.
+            continuation = (-0.1 * size <= gap <= 0.15 * size and a['text'][-1:].islower()
+                            and b['text'][:1].islower())
+            pairs.append((a, b, gap, mid_word or continuation, short or continuation))
         # A line cut by the layout has many such cuts (the HP contents line had over a dozen); one or
-        # two tight gaps between fields of a form row are not a broken line.
-        if sum(1 for p in pairs if p[3]) < 3:
+        # two tight gaps between fields of a form row are not a broken line, unless a word runs on
+        # across a cut in lowercase.
+        if sum(1 for p in pairs if p[3]) < 3 and not any(
+                -0.1 * p[0]['size'] <= p[2] <= 0.15 * p[0]['size'] and p[0]['text'][-1:].islower()
+                and p[1]['text'][:1].islower() for p in pairs):
             continue
         groups, current = [], [line[0]]
         for a, b, gap, mid, short in pairs:
@@ -501,12 +619,183 @@ def attach_lone_marks(page, update):
     return moved
 
 
+def _bidi_class(char):
+    text = getattr(char, 'char_unicode', '') or ''
+    return unicodedata.bidirectional(text[0]) if text else ''
+
+
+def _rtl_segments(chars):
+    """Groups of the page's characters drawn on one line and close together: lists of indices.
+    Lines come from positions, not storage order (a right-to-left line's runs can be stored apart,
+    with other characters between them); a wide horizontal gap (a table cell border, another
+    column) starts a new group."""
+    lines = []   # [centre, size, [indices]]
+    for k, c in enumerate(chars):
+        box = c.visual_bbox.box
+        centre, size = (box.y + box.y2) / 2, max(box.y2 - box.y, 1.0)
+        for line in lines:
+            if abs(line[0] - centre) <= 0.5 * max(size, line[1]):
+                line[2].append(k)
+                break
+        else:
+            lines.append([centre, size, [k]])
+    groups = []
+    for _, _, members in lines:
+        ordered = sorted(members, key=lambda k: chars[k].visual_bbox.box.x)
+        current, right = [ordered[0]], chars[ordered[0]].visual_bbox.box.x2
+        for k in ordered[1:]:
+            box = chars[k].visual_bbox.box
+            if box.x - right > 2.5 * max(box.y2 - box.y, 1.0):
+                groups.append(sorted(current))
+                current, right = [], box.x2
+            current.append(k)
+            right = max(right, box.x2)
+        groups.append(sorted(current))
+    return groups
+
+
+def logical_rtl_order(page):
+    """Put the characters of right-to-left lines into reading order before paragraphs are built.
+
+    Chromium's PDFs store a line mixing Arabic with digits or Latin letters run by run, left to right
+    on the page: ". شخص891 المقبل وسيوظف نحو". BabelDOC read the characters in that order, cut the
+    line into pieces and sent some backwards ("بيردتلا لامكإ"): the model answered with invented
+    sentences ("Welcome to our system", "I do not understand") printed in an Arabic report's English
+    translation (2026-11-23). The reading order comes from the positions instead: right to left, with
+    runs of digits and Latin letters left to right inside it (unmapped_text.visual_to_logical, the
+    rule the checks already use). A combining mark stays after its letter. Each right-to-left line is
+    placed where its first stored character was; other characters keep their places. Lines already
+    stored in reading order come out unchanged. Returns how many lines were reordered."""
+    from transformation.pdf.unmapped_text import RTL
+    chars = getattr(page, 'pdf_character', None) or []
+    if not chars or not any(RTL.search(getattr(c, 'char_unicode', '') or '') for c in chars):
+        return 0
+    if any(getattr(c, 'visual_bbox', None) is None for c in chars):
+        return 0
+    changed = 0
+    placed = {}      # first stored index of a group -> its characters in reading order
+    moved = set()
+    for indices in _rtl_segments(chars):
+        segment = [chars[k] for k in indices]
+        rtl = sum(_bidi_class(c) in ('R', 'AL') for c in segment)
+        ltr = sum(_bidi_class(c) == 'L' for c in segment)
+        if rtl == 0 or rtl < ltr:
+            continue
+        clusters = []
+        for c in segment:
+            text = getattr(c, 'char_unicode', '') or ''
+            if clusters and text and unicodedata.combining(text[0]):
+                clusters[-1][1].append(c)
+            else:
+                clusters.append([(c.visual_bbox.box.x + c.visual_bbox.box.x2) / 2, [c]])
+        order = _logical([(x, members, n) for n, (x, members) in enumerate(clusters)])
+        reordered = [c for n in order for c in clusters[n][1]]
+        if reordered != segment or indices != list(range(indices[0], indices[0] + len(indices))):
+            changed += 1
+        placed[indices[0]] = reordered
+        moved.update(indices)
+    if not changed:
+        return 0
+    out = []
+    for k, c in enumerate(chars):
+        if k in placed:
+            out.extend(placed[k])
+        elif k not in moved:
+            out.append(c)
+    page.pdf_character[:] = out
+    return changed
+
+
+def _logical(keyed):
+    """Indices of clusters (x, members, index) in reading order of a right-to-left line."""
+    from transformation.pdf.unmapped_text import _LTR_CLASSES, _RUN_JOINERS
+    order = sorted(keyed, key=lambda k: -k[0])
+    kind = lambda k: _bidi_class(k[1][0])
+    out, i = [], 0
+    while i < len(order):
+        if kind(order[i]) not in _LTR_CLASSES:
+            out.append(order[i][2]); i += 1; continue
+        j = i + 1
+        while j < len(order):
+            if kind(order[j]) in _LTR_CLASSES:
+                j += 1; continue
+            if kind(order[j]) in _RUN_JOINERS:
+                k = j
+                while k < len(order) and kind(order[k]) in _RUN_JOINERS:
+                    k += 1
+                if k < len(order) and kind(order[k]) in _LTR_CLASSES:
+                    j = k; continue
+            break
+        out.extend(k[2] for k in reversed(order[i:j]))
+        i = j
+    return out
+
+
+def _text(paragraph):
+    return ''.join(getattr(c, 'char_unicode', '') or '' for c in _characters(paragraph))
+
+
+def join_lead_labels(page, update):
+    """Join a short label ending in a colon ("NOTE:", "CAUTION:", "참고:") to the paragraph whose first
+    line it starts.
+
+    A note's label was a paragraph of its own when its colour differed from the text (blue "NOTE:"
+    before black text); the note was translated and laid out from the top of its box while the label
+    stayed at its old height, so the label sat over the note's second line (HP manual, 13 pages,
+    2026-11-23). Where BabelDOC had kept label and text together the note came out right. A label is
+    joined when it is one short line ending in a colon, the paragraph starts on the same line just
+    to its right (within 2.5 of the font size), and no table rule lies between them. Returns how
+    many labels were joined."""
+    rules = vertical_rules(page)
+    joined = 0
+    for label in list(page.pdf_paragraph):
+        if label not in page.pdf_paragraph or getattr(label, 'vertical', False) or not getattr(label, 'box', None):
+            continue
+        lines = _lines(label)
+        text = ' '.join(_text(label).split())
+        if len(lines) != 1 or not text.endswith((':', '：')) or len(text) > 24 or len(text.split()) > 3:
+            continue
+        if not any(ch.isalpha() for ch in text):
+            continue
+        size = _size(label) or 1.0
+        lbox = lines[0].box
+        centre = (lbox.y + lbox.y2) / 2
+        best = None
+        for body in page.pdf_paragraph:
+            if body is label or getattr(body, 'vertical', False) or not getattr(body, 'box', None):
+                continue
+            if getattr(body, 'xobj_id', None) != getattr(label, 'xobj_id', None):
+                continue
+            first = _lines(body)[:1]
+            if not first or not first[0].pdf_character:
+                continue
+            fbox = first[0].box
+            gap = fbox.x - lbox.x2
+            if not (-0.2 * size <= gap <= 2.5 * size):
+                continue
+            if abs((fbox.y + fbox.y2) / 2 - centre) > 0.4 * size:
+                continue
+            if any(lbox.x2 - 0.5 <= r.x <= fbox.x + 0.5 and min(r.y2, lbox.y2) - max(r.y, lbox.y) > 0 for r in rules):
+                continue
+            if best is None or gap < best[0]:
+                best = (gap, body)
+        if best is None:
+            continue
+        body = best[1]
+        body.pdf_paragraph_composition[:0] = label.pdf_paragraph_composition
+        page.pdf_paragraph.remove(label)
+        update(body)
+        joined += 1
+    return joined
+
+
 def install(ParagraphFinder):
     if getattr(ParagraphFinder, '_transformx_stacked_lines', False):
         return
     original = ParagraphFinder.process_page
 
     def process_page(self, page):
+        logical_rtl_order(page)
         result = original(self, page)
         counter = [0]
 
@@ -520,11 +809,13 @@ def install(ParagraphFinder):
 
         changed = join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += split_at_rules(page, update, make_id)
+        changed += split_at_badges(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
         changed += join_overlapping_fragments(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += join_stacked_lines(page.pdf_paragraph, lambda p: self.update_paragraph_data(p, update_unicode=True),
                                       (vertical_rules(page), horizontal_rules(page)))
         changed += attach_lone_marks(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
+        changed += join_lead_labels(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         if changed:
             self._set_paragraph_render_order(page)
         return result
