@@ -121,8 +121,14 @@ def repeats_source(source, target, run=8):
     pages (2026-11-23)."""
     words = lambda text: re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", re.sub(r'\{v\d+\}', ' ', text).lower())
     a, b = words(source), words(target)
-    # An answer that is the source itself (names, a citation) is judged elsewhere, as unchanged text.
-    if len(a) < run or len(b) < run or ' '.join(source.split()) == ' '.join(target.split()):
+    if len(a) < run or len(b) < run:
+        return False
+    # An answer made only of the source's words (names, a list of product names with its line breaks
+    # changed) is judged elsewhere, as unchanged text: an echo adds words of its own ("Please
+    # translate as follows:"). A Cisco list of English product names was refused (2026-11-23).
+    from collections import Counter
+    every = lambda text: re.findall(r'[^\W\d_]+', re.sub(r'\{v\d+\}|ZXKEEP\w+', ' ', text).lower())
+    if sum((Counter(every(target)) - Counter(every(source))).values()) < 3:
         return False
     longest, previous = 0, [0] * (len(b) + 1)
     for x in a:

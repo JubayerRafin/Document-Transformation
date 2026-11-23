@@ -158,3 +158,11 @@ class ParagraphFailureScopeTests(unittest.TestCase):
                       ValueError('Choose an explicitly configured source and target language.'),
                       TimeoutError('timed out'), ConnectionError('refused')):
             self.assertFalse(validation_failure(error), error)
+
+
+class TruncatedAnswerTests(unittest.TestCase):
+    def test_a_cut_off_answer_keeps_one_paragraph_and_a_refused_connection_still_fails(self):
+        """Cisco manual, 2026-11-23: one long contents paragraph failed the whole document."""
+        from transformation.llm.ollama_native import validation_failure
+        self.assertTrue(validation_failure(ValueError('Model server returned an empty, incomplete, or truncated answer.')))
+        self.assertFalse(validation_failure(ConnectionRefusedError('refused')))

@@ -518,7 +518,11 @@ def validation_failure(error):
                             # Content of one paragraph, not the server or the setup (2026-11-19):
                             'Email addresses do not match', 'Source has an indivisible',
                             'Source exceeds the bounded', 'Invalid field-value', 'Invalid scope',
-                            'Invalid translation audit', 'Invalid structured translation'))
+                            'Invalid translation audit', 'Invalid structured translation',
+                            # A long paragraph whose answer was cut off (a Cisco manual's contents
+                            # page failed a whole document, 2026-11-23); an unreachable server raises
+                            # connection errors instead.
+                            'Model server returned an empty, incomplete, or truncated answer'))
         or message == 'TranslateGemma failed validation.')
 
 def install(endpoint, paragraph_mode=False, protected_values=(), document_context="", external_context=None,terminology=None,glossary=None):

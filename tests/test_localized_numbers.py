@@ -234,6 +234,9 @@ class EchoTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_candidate(source, '다음과 같이 번역해 주세요: ' + source)
         validate_candidate(source, '한 번에 공급됩니다. 여러 페이지가 감지되면 스캔이 중지됩니다. Automatically retry가')
+        # A list of product names returned with its line breaks changed is unchanged text, not an echo.
+        products = ' '.join(f'• Cisco MDS Fibre Channel SW SFP+ module number {n}' for n in ('one', 'two', 'three'))
+        self.assertFalse(repeats_source(products, products.replace(' • ', chr(10) + '• ')))
         # A translation keeping a short English name, or a same-script language, is not an echo.
         self.assertFalse(repeats_source('Open the Embedded Web Server and select General Settings to continue.',
                                         'Öffnen Sie den Embedded Web Server und wählen Sie General Settings, um fortzufahren.'))
