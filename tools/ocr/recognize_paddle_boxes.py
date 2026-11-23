@@ -372,6 +372,11 @@ def dropped_digits(crop, best, recognizer):
     import cv2
     import difflib
     import unicodedata
+    # Digits are dropped only inside the language's own words: a date or code line ("2025-07-16")
+    # has nothing for the language model to drop, and Tesseract misreading it flagged 8 of 9 dates of
+    # an Arabic invoice (2026-11-23).
+    if not re.search(r'[^\W\d_]', best.get('text', '')) or all(c.isascii() for c in best.get('text', '') if c.isalpha()):
+        return None, False
     first = recognizer.predict(crop)[0]
     wanted = digits(first['rec_text'])
     if not wanted or wanted == digits(best['text']):
@@ -384,6 +389,32 @@ def dropped_digits(crop, best, recognizer):
     text = re.sub(r'[\u200e\u200f\u202a-\u202e\u2066-\u2069]', '', first['rec_text']).strip()   # direction marks
     return {'text': text, 'score': min(first['rec_score'], second['rec_score']),
             'variant': 'tesseract_digits', 'model': 'tesseract_' + recognizer.code}, True
+
+
+def latin_line_reread(crop, reads, english, general):
+    """(reading, True) for a line without letters of the page's own script, read alike by the English
+    and the general model, else (None, False).
+
+    A Bengali or Arabic page's codes, amounts, dates and addresses ("APC-2019-37861", "88") were read
+    by the page's own model (Tesseract for Bengali) with confidence just under the bar and kept their
+    source pixels: 16 of 111 lines of a Bengali invoice (2026-11-23). Two Latin models are better
+    readers of Latin letters and digits, and independent: the line is accepted when their four
+    readings (the crop and twice its size) give the same text, each with confidence 0.90 or more."""
+    import cv2
+    texts = [r['text'] for r in reads if r.get('text', '').strip()]
+    if not texts or any(c.isalpha() and not c.isascii() for t in texts for c in t):
+        return None, False
+    found = []
+    for name, model in (('en_PP-OCRv5_mobile_rec', english()), (GENERAL_RECOGNIZER, general())):
+        for variant, view in (('latin_reread', crop), ('latin_reread_2x', cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))):
+            output = list(model.predict(view))
+            if len(output) != 1:
+                return None, False
+            found.append({'text': str(output[0]['rec_text']), 'score': float(output[0]['rec_score']), 'variant': variant, 'model': name})
+    reads.extend(found)
+    if all(f['text'].strip() and f['score'] >= .90 for f in found) and len({consensus_key(f['text']) for f in found}) == 1:
+        return max(found, key=lambda f: f['score']), True
+    return None, False
 
 
 def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digit_checker=None):
@@ -487,7 +518,15 @@ def single_model_consensus(reads,crop,digit_checker,sensitive,primary=None,check
     """(reading, decision) when the views of a one-model language agree well enough, else None.
     Values other than digits (emails, currency, underscores) always stay for review."""
     import cv2
-    strong=[r for r in reads if r['text'].strip() and r['score']>=SINGLE_MODEL_SCORE]
+    # Tesseract's confidences run lower than PaddleOCR's for the same certainty: six identical
+    # readings of "চালান INV-2020-26701" scored 0.86-0.90 and the line kept its pixels (Bengali
+    # invoice, 2026-11-23). When every Tesseract view reads the same text, 0.85 is the bar.
+    threshold=SINGLE_MODEL_SCORE
+    texts=[r['text'] for r in reads if r['text'].strip()]
+    if (reads and all(str(r.get('model','')).startswith('tesseract') for r in reads)
+            and len(texts)==len(reads) and len(set(texts))==1):
+        threshold=.85
+    strong=[r for r in reads if r['text'].strip() and r['score']>=threshold]
     if not strong: return None
     best=max(strong,key=lambda r:r['score'])
     # Spacing is ignored entirely here: the Korean model often drops a space, which joins a number to
@@ -776,6 +815,23 @@ def main(argv=None, model_factory=None):
                     return cv2.cvtColor(cv2.resize(gray,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC),cv2.COLOR_GRAY2BGR)
                 double=lambda c:cv2.resize(c,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC)
                 model.prefetch([v for c,p in zip(unpadded_crops,crops) for v in (c,double(c),contrast(c),p,double(p))])
+            english = general_extra = None
+            def english_model():
+                nonlocal english
+                if english is None:
+                    english = (model_factory or TextRecognition)(model_name='en_PP-OCRv5_mobile_rec', device=args.device, enable_mkldnn=False, cpu_threads=10)
+                return english
+            def general_reader():
+                # The general model itself: the page's model when it is the general one (Chinese,
+                # Japanese), else the digit checker when that is the general model, else loaded here.
+                if model_name == GENERAL_RECOGNIZER:
+                    return model
+                if DIGIT_CHECKERS.get(model_name) == GENERAL_RECOGNIZER:
+                    return digit_model()
+                nonlocal general_extra
+                if general_extra is None:
+                    general_extra = (model_factory or TextRecognition)(model_name=GENERAL_RECOGNIZER, device=args.device, enable_mkldnn=False, cpu_threads=10)
+                return general_extra
             digit_reader = None
             if args.profile == 'bounded' and args.source_language in DIGIT_RESCUE:
                 # Checks every confidently read line for dropped digits (dropped_digits); all crops
@@ -798,6 +854,10 @@ def main(argv=None, model_factory=None):
                             if rescued:
                                 candidates.append(rescued)
                                 best,review,decision=rescued,False,'second_engine_digits_verified'
+                        if review and args.source_language in OWN_SCRIPT and args.source_language != 'en':
+                            reread,accepted=latin_line_reread(unpadded_crops[i],candidates,english_model,general_reader)
+                            if accepted:
+                                best,review,decision=reread,False,'latin_models_agree'
                         if not review and digit_reader is not None:
                             rescued,dropped=dropped_digits(unpadded_crops[i],best,digit_reader)
                             if rescued:

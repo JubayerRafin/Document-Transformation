@@ -64,3 +64,49 @@ class DroppedDigitTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class DateLineTests(unittest.TestCase):
+    def test_a_line_without_the_languages_letters_is_not_checked(self):
+        crop = np.zeros((10, 40, 3), np.uint8)
+        for text in ('2025-07-16', 'USD 591,597.21', 'HID-2024-48150'):
+            self.assertEqual(dropped_digits(crop, {'text': text, 'score': 1.0}, Reader('2025-07-18')), (None, False))
+
+
+class LatinRereadTests(unittest.TestCase):
+    """Bengali invoice, 2026-11-23: codes read by Tesseract just under the confidence bar."""
+
+    class Model:
+        def __init__(self, text, score):
+            self.text, self.score = text, score
+
+        def predict(self, image):
+            return [{'rec_text': self.text, 'rec_score': self.score}]
+
+    def test_a_code_line_two_latin_models_read_alike_is_accepted(self):
+        from tools.ocr.recognize_paddle_boxes import latin_line_reread
+        crop = np.zeros((10, 40, 3), np.uint8)
+        reads = [{'text': '5৬1-2027-14498', 'score': .88}, {'text': 'SVI-2027-14498', 'score': .8}]
+        best, ok = latin_line_reread(crop, reads, lambda: self.Model('SVI-2027-14498', .99), lambda: self.Model('SVI-2027-14498', .97))
+        self.assertTrue(ok)
+        self.assertEqual(best['text'], 'SVI-2027-14498')
+
+    def test_own_script_letters_or_disagreeing_models_are_left_alone(self):
+        from tools.ocr.recognize_paddle_boxes import latin_line_reread
+        crop = np.zeros((10, 40, 3), np.uint8)
+        self.assertEqual(latin_line_reread(crop, [{'text': 'পণ্য 88', 'score': .5}], lambda: self.Model('88', .99),
+                                           lambda: self.Model('88', .99)), (None, False))
+        self.assertEqual(latin_line_reread(crop, [{'text': 'APC-2019-37861', 'score': .87}], lambda: self.Model('APC-2019-37861', .99),
+                                           lambda: self.Model('APC-2019-37881', .99))[1], False)
+
+
+class TesseractConsensusTests(unittest.TestCase):
+    def test_unanimous_tesseract_views_count_from_0_85_and_paddle_views_from_0_90(self):
+        from tools.ocr.recognize_paddle_boxes import single_model_consensus
+        crop = np.zeros((10, 40, 3), np.uint8)
+        views = lambda model, score: [{'text': 'চালান হিসাব', 'score': score, 'variant': v, 'model': model}
+                                      for v in ('detector_bounds', 'detector_bounds_2x', 'contrast_source')]
+        self.assertIsNotNone(single_model_consensus(views('tesseract_ben', .86), crop, None, False))
+        self.assertIsNone(single_model_consensus(views('bengali_rec', .86), crop, None, False))
+        mixed = views('tesseract_ben', .86); mixed[0] = dict(mixed[0], text='চালান হিসেব')
+        self.assertIsNone(single_model_consensus(mixed, crop, None, False))
