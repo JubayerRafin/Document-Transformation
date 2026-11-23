@@ -141,6 +141,20 @@ def repeats_source(source, target, run=8):
     return longest >= run and longest * 2 >= len(a)
 
 
+_TERM_PAIR = re.compile(r'([^\s:：，。,.;；()（）]{1,30})\s*[:：]\s*([^\s:：，。,.;；()（）]{1,30})')
+
+
+def appended_glossary(source, target):
+    """True when the answer carries a word list the source does not have: "... 上涨。能源成本：能源成本
+    上涨：上涨 计划中的：计划中的 savings: 节省的费用 higher: 较高" (an English newsletter paragraph into
+    Chinese, 2026-11-23). Two or more term pairs beyond the source's own, one of them a term paired with
+    itself, or four or more; times and numbers ("09:41") are not pairs."""
+    pairs = lambda text: [(a, b) for a, b in _TERM_PAIR.findall(text) if not (a.isdigit() and b.isdigit())]
+    extra = pairs(target)
+    surplus = len(extra) - len(pairs(source))
+    return surplus >= 4 or (surplus >= 2 and any(a == b for a, b in extra))
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
@@ -160,6 +174,8 @@ def validate_candidate(source, target, values=()):
         raise ValueError('Translation is far longer than its source.')
     if repeats_source(source, target):
         raise ValueError('Translation repeats the source text.')
+    if appended_glossary(source, target):
+        raise ValueError('Translation appended a word list to the paragraph.')
     # A source with no letters or digits ("." after an inline icon) has nothing to translate: words in
     # the answer are the model talking ("no text was given, please provide text"), not a translation.
     if (not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', source))

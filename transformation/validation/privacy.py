@@ -19,6 +19,8 @@ CATEGORY_DEFINITIONS={
     'Addresses':'postal or street addresses',
     'Identifiers':('identifiers linked to a person, account or record: national/personal ID numbers; employee, staff, '
                    'member, customer, patient, account, policy, case, tenant, document, record and invoice numbers; '
+                   'ticket, incident, request, order, booking, reservation, claim, application, reference and '
+                   'transaction numbers that point to one person or their record; '
                    'user names, device names, IP addresses; passwords, API keys, access tokens and secrets. '
                    'Not product codes, SKUs, model numbers, prices, amounts, quantities or dates'),
     'Bank accounts':'bank account, IBAN, card and routing/sort-code numbers',

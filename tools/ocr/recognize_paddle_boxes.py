@@ -96,12 +96,14 @@ def gap_spacing(crop, best, model):
     PaddleOCR's Korean model drops most word spaces, in every view: "장치는5도에서30도사이의" and
     "지역 사무소세 곳으로" ("office tax" for "office, three places") were translated as "between
     figures 5 and 30" and "several offices" (Korean scan, 2026-11-23). Korean separates words with a
-    visible gap, wider than the gap between syllables. A line with a word of six or more characters,
-    four of them syllables, is cut at those gaps (split_word_crops) and the pieces are read; when the pieces
+    visible gap, wider than the gap between syllables. A line with a word of four or more syllables
+    (or a word glued after a colon) is cut at those gaps (split_word_crops) and the pieces are read; when the pieces
     give exactly the line's characters, a space is added at each cut. Characters never change and no
     space is removed; a number is never split."""
     text = best.get('text') or ''
-    long_words = [w for w in text.split() if len(w) >= 6 and len(re.findall(r'[가-힣]', w)) >= 4]
+    # Four syllables or more (Korean words are mostly two or three: "컨설팅시간", "감열라벨" in table
+    # cells kept no space at six), or a word glued to what follows its colon ("소계:KRW").
+    long_words = [w for w in text.split() if len(re.findall(r'[가-힣]', w)) >= 4 or re.search(r'[가-힣][:：]\S', w)]
     if not long_words or '@' in text:
         return best
     pieces = split_word_crops(crop)
@@ -333,6 +335,31 @@ def digits(text):
 # letters match the Arabic model's (spaces and marks aside, at least 60% alike: the same line, where
 # the Arabic model's own letters were also misread, "المبلاق" for "المبلغ المستحق").
 DIGIT_RESCUE = {'ar'}
+
+
+def second_model_agreement(crops, candidates, language, reader):
+    """A reading from a second, separately trained model (tesseract_line.SECOND_MODELS) that gives
+    exactly the characters of a confident reading of the first, spaces and letter case aside: that
+    reading, recorded as the second model's, else None. reader() returns the second model."""
+    from transformation.ocr.read_alike import characters
+    confident = [c for c in candidates if isinstance(c.get('text'), str) and c['text'].strip()
+                 and isinstance(c.get('score'), (int, float)) and c['score'] >= .85]
+    if not confident:
+        return None
+    try:
+        model = reader()
+        readings = [model.predict(crop)[0] for crop in crops]
+    except Exception:
+        return None
+    for other in readings:
+        if other['rec_score'] < .85:
+            continue
+        match = [c for c in confident if characters(c['text']) == characters(other['rec_text'])]
+        if match:
+            best = max(match, key=lambda c: c['score'])
+            return {'text': best['text'], 'score': min(best['score'], other['rec_score']), 'variant': 'second_model',
+                    'model': 'tesseract_' + model.code.split('+')[0].lower()}
+    return None
 DIGITS_DROPPED = 'digits_dropped_by_language_model'   # never rebuilt from this reading
 
 
@@ -832,6 +859,16 @@ def main(argv=None, model_factory=None):
                 if general_extra is None:
                     general_extra = (model_factory or TextRecognition)(model_name=GENERAL_RECOGNIZER, device=args.device, enable_mkldnn=False, cpu_threads=10)
                 return general_extra
+            from tools.ocr.tesseract_line import SECOND_MODELS   # imported here, as the other OCR helpers are
+            second = None
+            def second_reader():
+                nonlocal second
+                if second is None:
+                    from tools.ocr.tesseract_line import TesseractRecognizer, available
+                    if not available(args.source_language, SECOND_MODELS[args.source_language]):
+                        raise RuntimeError('Second recognition model not installed.')
+                    second = TesseractRecognizer(args.source_language, SECOND_MODELS[args.source_language])
+                return second
             digit_reader = None
             if args.profile == 'bounded' and args.source_language in DIGIT_RESCUE:
                 # Checks every confidently read line for dropped digits (dropped_digits); all crops
@@ -854,6 +891,11 @@ def main(argv=None, model_factory=None):
                             if rescued:
                                 candidates.append(rescued)
                                 best,review,decision=rescued,False,'second_engine_digits_verified'
+                        if review and args.source_language in SECOND_MODELS:
+                            agreed=second_model_agreement((unpadded_crops[i],crops[i]),candidates,args.source_language,second_reader)
+                            if agreed:
+                                candidates.append(agreed)
+                                best,review,decision=agreed,False,'second_model_agrees'
                         if review and args.source_language in OWN_SCRIPT and args.source_language != 'en':
                             reread,accepted=latin_line_reread(unpadded_crops[i],candidates,english_model,general_reader)
                             if accepted:

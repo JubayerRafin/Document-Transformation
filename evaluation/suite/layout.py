@@ -15,7 +15,8 @@ holds the source PDFs. Per page, the source and the output are rendered at 50 dp
   text_extent_iou    the box around all text of the page, source against output
   font_ratio         median output line size / median source line size (below 1 = shrunk text)
   new_collisions     text lines overlapping each other that do not overlap in the source (page_audit)
-  text_over_pictures pictures with clearly more text on them than in the source (page_audit)
+  text_over_pictures pictures with text drawn across them that the source did not have (page_audit)
+  picture_text_placements  pictures whose own text was translated and set inside them (intended)
   untranslated_lines lines still in the source language (page_audit)
   off_page           text spans outside the page
 """
@@ -107,6 +108,7 @@ def page_metrics(src, out, source, target):
         'font_ratio': None if ratio is None else round(ratio, 3),
         'new_collisions': issues.get('collisions', 0),
         'text_over_pictures': issues.get('over_pictures', 0),
+        'picture_text_placements': len(audit.get('picture_text_placements', [])),
         'untranslated_lines': issues.get('untranslated', 0),
         'off_page': off,
     }
@@ -119,7 +121,7 @@ def document(source_pdf, output_pdf, source, target):
     for key in pages[0] if pages else []:
         values = [p[key] for p in pages if p[key] is not None]
         row[key] = (round(sum(values) / len(values), 4) if values else None) if key not in (
-            'new_collisions', 'text_over_pictures', 'untranslated_lines', 'off_page') else sum(values)
+            'new_collisions', 'text_over_pictures', 'picture_text_placements', 'untranslated_lines', 'off_page') else sum(values)
     return row
 
 

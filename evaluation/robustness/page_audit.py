@@ -9,8 +9,10 @@ For every page it reports:
     lines of at least four lowercase words; for other sources, lines mostly in the source's script);
   - collisions: output text lines that overlap each other where the source's lines did not (text drawn
     over text, the usual sign of a translation that did not fit);
-  - over_pictures: output text lines over a picture, more than the source had over that picture
-    (labels in a translated diagram drawn across it).
+  - over_pictures: output text lines over a picture, more than the source had over that picture,
+    where some line crosses the picture's edge or lines overlap (a paragraph drawn across a picture).
+    Text wholly inside the picture with clear lines is the picture's own text translated in place;
+    it is listed as picture_text_placements, not as an issue.
 Checks compare the output with its own source page, so a busy source page is not counted against the
 translation. With --render, each flagged page is saved as source|output side by side for review.
 Nothing here is specific to one document.
@@ -110,14 +112,22 @@ def audit_page(src, out, source, target):
     if len(pairs) > source_pairs:
         result['issues'].append({'kind': 'collisions', 'count': len(pairs) - source_pairs,
                                  'examples': [[a['text'][:50], b['text'][:50]] for a, b in pairs[:3]]})
-    over = []
+    over, placed = [], []
     for picture in pictures(src):
         before, after = picture_share(s_lines, picture), picture_share(o_lines, picture)
         if after > before * 1.3 + 0.02 * picture.get_area():
-            over.append({'picture': [round(v) for v in picture], 'source_text_area': round(before),
-                         'output_text_area': round(after)})
+            row = {'picture': [round(v) for v in picture], 'source_text_area': round(before),
+                   'output_text_area': round(after)}
+            # Text that lies wholly inside the picture, its lines clear of each other, is the picture's
+            # own text translated and set where it stood (a warning label in a manual figure): an
+            # intended placement. Text crossing the picture's edge is a paragraph drawn across it.
+            touching = [l for l in o_lines if not (l['bbox'] & picture).is_empty]
+            inside = all((picture + (-1, -1, 1, 1)).contains(l['bbox']) for l in touching)
+            (placed if inside and not collisions(touching) else over).append(row)
     if over:
         result['issues'].append({'kind': 'over_pictures', 'count': len(over), 'examples': over[:3]})
+    if placed:
+        result['picture_text_placements'] = placed
     return result
 
 

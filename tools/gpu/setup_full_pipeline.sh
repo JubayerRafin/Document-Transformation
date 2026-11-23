@@ -8,12 +8,20 @@ if ! command -v soffice >/dev/null; then
   apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress fonts-noto-cjk fonts-dejavu-core
 fi
+# Word and PowerPoint previews (and their PII check) are drawn by LibreOffice with the system fonts:
+# without Noto's Bengali, Devanagari and Arabic faces those scripts render as empty boxes.
+if [ -z "$(fc-list :lang=bn family)" ] || [ -z "$(fc-list :lang=hi family)" ]; then
+  apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends fonts-noto-core
+fi
 # Bengali scans: PaddleOCR has no Bengali recognizer, Tesseract's LSTM model reads the line crops the
 # Paddle detector finds (tools/ocr/tesseract_line.py; 50% -> 99% of characters, 2026-11-23).
 # Arabic scans: Tesseract reads the digits PaddleOCR's Arabic model drops (dropped_digits).
-if ! tesseract --list-langs 2>/dev/null | grep -qx ben || ! tesseract --list-langs 2>/dev/null | grep -qx ara; then
+# A second model per script (Bengali "script" model, Hindi) confirms lines the first reads unsteadily
+# (tools/ocr/tesseract_line.SECOND_MODELS).
+if ! tesseract --list-langs 2>/dev/null | grep -qx ben || ! tesseract --list-langs 2>/dev/null | grep -qx ara    || ! tesseract --list-langs 2>/dev/null | grep -qx Bengali || ! tesseract --list-langs 2>/dev/null | grep -qx hin; then
   apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben tesseract-ocr-ara
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben tesseract-ocr-ara     tesseract-ocr-script-beng tesseract-ocr-hin
 fi
 uv python install 3.11
 test -x /workspace/transformx-engine/bin/python || uv venv --python 3.11 /workspace/transformx-engine

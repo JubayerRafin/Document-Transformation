@@ -11,10 +11,14 @@ import shutil
 import subprocess
 
 TESSERACT_MODELS = {'bn': 'ben', 'ar': 'ara'}
+# A second, separately trained model of the same script (Tesseract's "script" models, apt packages
+# tesseract-ocr-script-beng and -deva; Hindi's language model for Paddle's Devanagari reader): a line
+# that the first model reads unsteadily is translated when the two models agree on it.
+SECOND_MODELS = {'bn': 'Bengali', 'hi': 'hin'}
 
 
-def available(language):
-    code = TESSERACT_MODELS.get(language)
+def available(language, model=None):
+    code = model or TESSERACT_MODELS.get(language)
     if not code or not shutil.which('tesseract'):
         return False
     try:
@@ -27,9 +31,9 @@ def available(language):
 class TesseractRecognizer:
     """predict(image) -> [{'rec_text', 'rec_score'}] for one text line (BGR numpy image)."""
 
-    def __init__(self, language):
+    def __init__(self, language, model=None):
         # Bengali alone read 88% of a page's characters, with English 99% (codes, amounts, names).
-        self.code = TESSERACT_MODELS[language] + '+eng'
+        self.code = (model or TESSERACT_MODELS[language]) + '+eng'
         self.cache = {}
 
     def _run(self, png):

@@ -64,6 +64,7 @@ def layout_summary(rows, key):
                      'text_extent_iou': mean('text_extent_iou'), 'font_ratio': mean('font_ratio'),
                      'page_count_match': round(sum(r['page_count_match'] for r in items) / len(items), 4),
                      'new_collisions': total('new_collisions'), 'text_over_pictures': total('text_over_pictures'),
+                     'picture_text_placements': total('picture_text_placements'),
                      'untranslated_lines': total('untranslated_lines'), 'off_page': total('off_page')}
     return out
 

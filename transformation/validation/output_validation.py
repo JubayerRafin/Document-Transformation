@@ -60,7 +60,11 @@ def source_floor(span_box,sources):
     if area<=0:return None
     best=max(sources,key=lambda s:(s[0]&span_box).get_area(),default=None)
     if best is None or (best[0]&span_box).get_area()<area*.3:return None
-    return max(4.0,.7*best[1])
+    # Squeezed further, text is still legible down to 6 pt (common fine print) if it keeps 60% of its
+    # source size: German and Spanish table headers of 9.5 pt scans set at 6.1-6.6 pt ("Menge",
+    # "Einheitspreis") were reported as layout problems (12 of 19 flagged dev jobs, 2026-11-23).
+    size=best[1]
+    return max(4.0,min(.7*size,max(6.0,.6*size)))
 
 
 def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intended_overlays=(),source_text=None):
@@ -84,7 +88,8 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                 for block in page.get_text('dict')['blocks']:
                     for line in block.get('lines',[]):
                         for span in line['spans']:
-                            text_spans.append(span)
+                            # Blank spans (spaces LibreOffice draws over Korean text) overlap nothing real.
+                            if span['text'].strip(): text_spans.append(span)
                             minimum=min_font_size
                             matching=[r['minimum'] for r in font_regions if r['page']==number and
                                       (pymupdf.Rect(r['bbox'])+(-.25,-.25,.25,.25)).contains(pymupdf.Rect(span['bbox']))]
