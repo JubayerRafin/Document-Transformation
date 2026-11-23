@@ -31,7 +31,7 @@ type View = "new" | "history" | "progress" | "result" | "glossary";
 const titles: Record<View, [string, string]> = {
   new: [
     "Make your document work for you",
-    "Translate, redact and reconstruct your PDF in one focused workflow.",
+    "Translate, redact and reconstruct your PDF, Word or PowerPoint document in one focused workflow.",
   ],
   history: ["Your documents", "Find your recent jobs and review the results."],
   progress: [

@@ -18,7 +18,9 @@ import {
   ApiClient,
   PII_CATEGORIES,
   type PiiStyle,
-  validatePdf,
+  validateDocument,
+  documentKind,
+  DOCUMENT_LABEL,
   MAX_PAGES,
   MAX_MB,
   type Operation,
@@ -82,7 +84,7 @@ export function UploadPanel({
     if (!f) return;
     const version = ++selection.current;
     setFileError("");
-    const problem = await validatePdf(f, undefined, worker?.capabilities?.limits);
+    const problem = await validateDocument(f, undefined, worker?.capabilities?.limits);
     if (version !== selection.current) return;
     if (problem) {
       setFile(null);
@@ -99,7 +101,7 @@ export function UploadPanel({
       if (e.dataTransfer.files.length !== 1) {
         selection.current++;
         setFile(null);
-        setFileError("Choose one PDF at a time.");
+        setFileError("Choose one document at a time.");
         return;
       }
       void select(e.dataTransfer.files[0]);
@@ -110,7 +112,7 @@ export function UploadPanel({
     if (busy) return;
     setError("");
     if (!file) {
-      setFileError("Choose a PDF document to continue.");
+      setFileError("Choose a document to continue.");
       return;
     }
     if (!worker) {
@@ -130,7 +132,7 @@ export function UploadPanel({
       source_language: source,
       target_language: target,
       worker_id: worker.id,
-      output_format: "pdf",
+      output_format: documentKind(file.name) || "pdf",
       protected_values: protectedValues
         .split("\n")
         .map((v) => v.trim())
@@ -220,12 +222,12 @@ export function UploadPanel({
               type="file"
               id="document-upload"
               className="sr-only"
-              accept=".pdf,application/pdf"
+              accept=".pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
               onChange={(e) => {
                 void select(e.target.files?.[0]);
                 e.target.value = "";
               }}
-              aria-label="Choose a PDF"
+              aria-label="Choose a PDF, Word or PowerPoint file"
               aria-describedby="upload-hint"
             />
             <div
@@ -247,7 +249,7 @@ export function UploadPanel({
                       {file.name}
                     </p>
                     <p className="mb-0 text-xs text-muted-foreground">
-                      {(file.size / 1_000_000).toFixed(2)} MB · PDF document
+                      {(file.size / 1_000_000).toFixed(2)} MB · {DOCUMENT_LABEL[documentKind(file.name) || "pdf"]}
                     </p>
                   </div>
                   <Button
@@ -268,7 +270,7 @@ export function UploadPanel({
                   <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl border border-border bg-background text-primary">
                     <UploadCloud className="size-6" strokeWidth={1.6} />
                   </div>
-                  <p className="mb-1 text-sm font-medium">Drop your PDF here</p>
+                  <p className="mb-1 text-sm font-medium">Drop your document here</p>
                   <p className="mb-4 text-xs text-muted-foreground">
                     or choose a file from your device
                   </p>
@@ -286,8 +288,9 @@ export function UploadPanel({
               id="upload-hint"
               className="mb-0 mt-3 text-xs leading-5 text-muted-foreground"
             >
-              One PDF per job. Maximum {limits.max_mb} MB and {limits.max_pages} pages. Encrypted PDFs are
-              not supported.
+              One PDF, Word (.docx) or PowerPoint (.pptx) file per job. Maximum {limits.max_mb} MB and{" "}
+              {limits.max_pages} pages. Word and PowerPoint files come back in their own format.
+              Password-protected files are not supported.
             </p>
             {fileError && (
               <p className="mb-0 mt-3 text-sm text-destructive" role="alert">
@@ -325,7 +328,7 @@ export function UploadPanel({
               {(["translation", "pii", "combined"] as const).map((value) => (
                 <TabsContent key={value} value={value} className="sr-only">
                   {value === "translation"
-                    ? "Translate your PDF into your selected language."
+                    ? "Translate your document into your selected language."
                     : value === "pii"
                       ? "Select the information you want to redact."
                       : "Translate your document and redact selected information."}

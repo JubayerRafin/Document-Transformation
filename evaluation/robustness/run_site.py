@@ -28,13 +28,20 @@ def call(url, data=None, headers=None, method=None):
         return response.read()
 
 
+MEDIA = {'.pdf': 'application/pdf',
+         '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+         '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
+
+
 def submit(base, pdf, source, target, operation='translation'):
-    options = {'operation': operation, 'source_language': source, 'target_language': target, 'output_format': 'pdf',
+    """pdf: a PDF, Word or PowerPoint file (the result comes back in the same format)."""
+    options = {'operation': operation, 'source_language': source, 'target_language': target,
+               'output_format': pdf.suffix.lower().lstrip('.'),
                'protected_values': [], 'document_context': '', 'worker_id': 'local',
                'pii_categories': [] if operation == 'translation' else ['Names', 'Email addresses', 'Phone numbers', 'Addresses', 'Identifiers', 'Bank accounts', 'Dates of birth']}
     boundary = '----tx' + uuid.uuid4().hex
     body = (f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="{pdf.name}"\r\n'
-            f'Content-Type: application/pdf\r\n\r\n').encode() + pdf.read_bytes() + \
+            f'Content-Type: {MEDIA[pdf.suffix.lower()]}\r\n\r\n').encode() + pdf.read_bytes() + \
         (f'\r\n--{boundary}\r\nContent-Disposition: form-data; name="options"\r\n\r\n{json.dumps(options)}\r\n'
          f'--{boundary}--\r\n').encode()
     answer = call(base + '/v1/jobs', body, {'Content-Type': f'multipart/form-data; boundary={boundary}',
@@ -87,21 +94,28 @@ def main():
         metrics = job.get('metrics') or {}
         summary = {'doc': stem, 'job': job_id, 'source': source, 'target': target, 'kind': doc['kind'],
                    'status': 'generated' if job['status'] == 'succeeded' else job['status'],
-                   'failure_code': job.get('error_code'), 'pages': doc['pages'],
+                   'failure_code': job.get('error_code'), 'pages': job.get('pages') or doc.get('pages') or 1,
                    'wall_seconds': metrics.get('total_seconds'), 'server_seconds': metrics.get('server_seconds'),
                    'checks': metrics.get('checks'), 'stages': [(e['stage'], e['elapsed_seconds']) for e in events]}
         if job['status'] == 'succeeded':
             result = next(a for a in job['artifacts'] if a['kind'] == 'result')
-            (folder / 'output.pdf').write_bytes(call(f"{args.url}/v1/jobs/{job_id}/artifacts/{result['id']}"))
+            suffix = Path(result['filename']).suffix.lower() or '.pdf'
+            (folder / ('output' + suffix)).write_bytes(call(f"{args.url}/v1/jobs/{job_id}/artifacts/{result['id']}"))
+            if suffix != '.pdf':
+                # What the website shows: the engine's PDF drawing of the Word or PowerPoint result.
+                (folder / 'output.pdf').write_bytes(call(f"{args.url}/v1/jobs/{job_id}/artifacts/{result['id']}/content"))
+                source_file = next(a for a in job['artifacts'] if a['kind'] == 'source')
+                (folder / 'source-preview.pdf').write_bytes(
+                    call(f"{args.url}/v1/jobs/{job_id}/artifacts/{source_file['id']}/content"))
         (folder / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=1), encoding='utf-8')
         seconds = summary['wall_seconds'] or 0
         t = timing.setdefault(target, {'documents': 0, 'pages': 0, 'seconds': 0.0, 'failed': 0})
         t['documents'] += 1
-        t['pages'] += doc['pages']
+        t['pages'] += summary['pages']
         t['seconds'] += seconds
         t['failed'] += summary['status'] != 'generated'
         print(f"{target} {stem}: {summary['status']} {summary['failure_code'] or ''} {seconds:.0f} s "
-              f"({seconds / max(1, doc['pages']):.1f} s/page)", flush=True)
+              f"({seconds / max(1, summary['pages']):.1f} s/page)", flush=True)
     for t in timing.values():
         t['seconds_per_page'] = round(t['seconds'] / max(1, t['pages']), 1)
     (root / 'timing.json').write_text(json.dumps(timing, indent=1), encoding='utf-8')

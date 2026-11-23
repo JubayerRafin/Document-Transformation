@@ -187,7 +187,7 @@ export type TransformOptions = {
   operation: Operation;
   source_language: string;
   target_language: string;
-  output_format: "pdf";
+  output_format: "pdf" | "docx" | "pptx";
   protected_values: string[];
   document_context: string;
   pii_categories: string[];
@@ -227,8 +227,12 @@ const MESSAGES: Record<string, string> = {
     "The service needs administrator configuration. Please try again later.",
   DATABASE_OR_STORAGE_REQUEST_FAILED:
     "The document service is unavailable. Try again without changing your document.",
-  REQUEST_TOO_LARGE: "The file is larger than this server accepts. Choose a smaller PDF.",
+  REQUEST_TOO_LARGE: "The file is larger than this server accepts. Choose a smaller document.",
   INVALID_PDF: "Choose a valid PDF document.",
+  INVALID_DOCUMENT:
+    "This file could not be opened. Choose a PDF, Word (.docx) or PowerPoint (.pptx) file that is not password-protected.",
+  MANUAL_REDACTION_PDF_ONLY:
+    "Areas can be drawn on PDF results only. Open this Word or PowerPoint result in Office to change it.",
   CSRF_INVALID:
     "Your session needs refreshing. Reload this page and sign in again.",
   ONLY_QUEUED_CANCELLATION_SUPPORTED:
@@ -384,6 +388,37 @@ export async function validatePdf(
     return "This PDF is password-protected. Remove the password, then upload it again.";
   if (pages !== undefined && pages > limits.max_pages)
     return `This PDF has ${pages} pages; the limit is ${limits.max_pages}. Split it into parts of up to ${limits.max_pages} pages.`;
+  return null;
+}
+/** "pdf", "docx" or "pptx" from a file name, or "" for any other file. */
+export function documentKind(name: string): "pdf" | "docx" | "pptx" | "" {
+  const match = /\.(pdf|docx|pptx)$/i.exec(name);
+  return match ? (match[1].toLowerCase() as "pdf" | "docx" | "pptx") : "";
+}
+export const DOCUMENT_LABEL = { pdf: "PDF document", docx: "Word document", pptx: "PowerPoint presentation" };
+/**
+ * A PDF is checked as before (validatePdf); a Word or PowerPoint file by size and its package
+ * signature. Its pages are counted by the server, which draws it once at upload.
+ */
+export async function validateDocument(
+  file: File,
+  facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts,
+  limits: { max_pages: number; max_mb: number } = { max_pages: MAX_PAGES, max_mb: MAX_MB },
+) {
+  const kind = documentKind(file.name);
+  if (!kind) return "Choose a PDF, Word (.docx) or PowerPoint (.pptx) file.";
+  if (kind === "pdf") return validatePdf(file, facts, limits);
+  if (file.size < 4) return "This file is empty. Choose it again.";
+  if (file.size > limits.max_mb * 1_000_000) return `Choose a file smaller than ${limits.max_mb} MB.`;
+  try {
+    const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
+    if (head[0] !== 0x50 || head[1] !== 0x4b)
+      return kind === "docx"
+        ? "This file doesn’t appear to be a Word document. Password-protected files are not supported."
+        : "This file doesn’t appear to be a PowerPoint presentation. Password-protected files are not supported.";
+  } catch {
+    return "We couldn’t read that file. Please choose it again.";
+  }
   return null;
 }
 export const MAX_PAGES = 250;

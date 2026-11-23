@@ -26,7 +26,10 @@ def main(set_dir, label, url, ssh, operation='pii'):
     key = json.loads((set_dir / 'answer_key.json').read_text(encoding='utf-8'))
     runs = set_dir / 'runs' / label
     jobs = {}
-    for pdf in sorted((set_dir / 'pdfs').glob('*.pdf')):
+    # The PDF set keeps its files in pdfs/; the Word and PowerPoint set (evaluation/office) names them in the key.
+    files = ([set_dir / spec['file'] for name, spec in sorted(key.items()) if not name.startswith('_')]
+             if not (set_dir / 'pdfs').is_dir() else sorted((set_dir / 'pdfs').glob('*.pdf')))
+    for pdf in files:
         language = key.get(pdf.stem, {}).get('language', 'en')
         target = language if operation == 'pii' else ('ko' if language == 'en' else 'en')
         jobs[pdf.stem] = (submit(url, pdf, language, target, operation), time.monotonic(), language, target)
@@ -43,8 +46,10 @@ def main(set_dir, label, url, ssh, operation='pii'):
         output = None
         if job['status'] == 'succeeded':
             result = next(a for a in job['artifacts'] if a['kind'] == 'result')
-            output = folder / 'output.pdf'
+            output = folder / ('output' + (Path(result['filename']).suffix.lower() or '.pdf'))
             output.write_bytes(call(f"{url}/v1/jobs/{job_id}/artifacts/{result['id']}"))
+            if output.suffix != '.pdf':
+                (folder / 'output-preview.pdf').write_bytes(call(f"{url}/v1/jobs/{job_id}/artifacts/{result['id']}/content"))
         finished[name] = (job_id, job, output, language, target)
         print(label, name, job['status'], job.get('error_code') or '', flush=True)
     # The findings files, from the server's job folders.

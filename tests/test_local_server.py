@@ -22,6 +22,25 @@ def pdf_bytes(pages=1, text='Hello Alex Morgan'):
         return doc.tobytes()
 
 
+def minimal_docx(text):
+    """The smallest Word package LibreOffice opens: content types, relationships, one paragraph."""
+    import io
+    import zipfile
+    w = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, 'w') as z:
+        z.writestr('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                   '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                   '<Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" '
+                   'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
+        z.writestr('_rels/.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                   '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+                   'Target="word/document.xml"/></Relationships>')
+        z.writestr('word/document.xml', f'<?xml version="1.0"?><w:document xmlns:w="{w}"><w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p>'
+                   '</w:body></w:document>')
+    return out.getvalue()
+
+
 @unittest.skipIf(TestClient is None, 'fastapi is not installed')
 class LocalServerTests(unittest.TestCase):
     def setUp(self):
@@ -82,6 +101,34 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(self.client.get(url).headers['content-type'], 'application/pdf')
         self.assertEqual(self.client.get('/v1/jobs').json()[0]['id'], job_id)
 
+    def test_word_and_powerpoint_jobs_keep_their_format(self):
+        import io
+        import shutil
+        if not shutil.which('soffice'):
+            self.skipTest('LibreOffice draws the preview of Word and PowerPoint uploads')
+        r = self.submit(name='letter.docx', data=minimal_docx('Hello Alex Morgan'))
+        self.assertEqual(r.status_code, 202, r.text)
+        job_id = r.json()['job_id']
+        self.assertEqual(self.store.get(job_id)['options']['output_format'], 'docx')
+        self.assertGreaterEqual(self.store.get(job_id)['pages'], 1)
+        self.run_queue()
+        job = self.client.get(f'/v1/jobs/{job_id}').json()
+        self.assertEqual(job['status'], 'succeeded')
+        source, result = job['artifacts']
+        self.assertEqual(result['filename'], 'letter-translated.docx')
+        download = self.client.get(f"/v1/jobs/{job_id}/artifacts/{result['id']}")
+        self.assertTrue(download.content.startswith(b'PK'))
+        self.assertIn('wordprocessingml', download.headers['content-type'])
+        for artifact in (source, result):   # the website shows a PDF preview of each
+            url = self.client.get(f"/v1/jobs/{job_id}/artifacts/{artifact['id']}/url").json()['url']
+            view = self.client.get(url)
+            self.assertEqual(view.headers['content-type'], 'application/pdf')
+            self.assertTrue(view.content.startswith(b'%PDF-'))
+        # Boxes are drawn on PDF pages only.
+        draft = self.client.post(f'/v1/jobs/{job_id}/redactions', json={'artifact_id': result['id'], 'source_sha256': result['sha256']},
+                                 headers={'Idempotency-Key': uuid.uuid4().hex})
+        self.assertEqual(draft.json()['error'], 'MANUAL_REDACTION_PDF_ONLY')
+
     def test_pii_model_choice_is_offered_and_kept_only_for_pii_jobs(self):
         self.engine.status['pii_models'].append({'id': 'openai', 'label': 'GPT', 'external': True})
         workers = self.client.get('/v1/workers').json()
@@ -123,7 +170,8 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(self.submit({'operation': 'pii'}).json()['error'], 'INVALID_PII_CATEGORIES')
         self.assertEqual(self.submit({'pii_style': 'blur'}).json()['error'], 'INVALID_PII_STYLE')
         self.assertEqual(self.submit({'translation_model': 'missing'}).json()['error'], 'TRANSLATION_MODEL_NOT_OFFERED')
-        self.assertEqual(self.submit(name='doc.txt').json()['error'], 'INVALID_PDF')
+        self.assertEqual(self.submit(name='doc.txt').json()['error'], 'INVALID_DOCUMENT')
+        self.assertEqual(self.submit(name='doc.docx', data=b'not a package').json()['error'], 'INVALID_DOCUMENT')
         pii = {'operation': 'pii', 'pii_categories': ['Names']}
         self.assertEqual(self.submit({**pii, 'pii_model': 'missing'}).json()['error'], 'PII_MODEL_NOT_OFFERED')
         self.assertEqual(self.submit({**pii, 'pii_model': 'Bad Name'}).json()['error'], 'INVALID_PII_MODEL')

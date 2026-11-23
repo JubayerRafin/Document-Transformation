@@ -35,6 +35,24 @@ def match(expected, value):
 def similar(a, b): return difflib.SequenceMatcher(None, compact(a), compact(b)).ratio() >= .85
 
 
+def document_text(path):
+    """All text of a PDF (its text layer), or of a Word or PowerPoint file: every XML part, so
+    speaker notes, comments, headers and properties count too."""
+    path = Path(path)
+    if path.suffix.lower() in ('.docx', '.pptx'):
+        import zipfile
+        import xml.etree.ElementTree as ET
+        parts = []
+        with zipfile.ZipFile(path) as archive:
+            for name in archive.namelist():
+                if name.endswith('.xml'):
+                    root = ET.fromstring(archive.read(name))
+                    parts.append(' '.join(t for t in root.itertext()))
+        return ' '.join(parts)
+    with pymupdf.open(path) as pdf:
+        return ' '.join(p.get_text() for p in pdf)
+
+
 def score_doc(spec, summary, source, run_dir=None):
     row = {'status': summary.get('status'), 'failure_code': summary.get('failure_code'), 'error': (summary.get('error') or '')[:200],
            'server_seconds': summary.get('server_seconds'), 'pages': spec['pages'], 'variant': spec['variant'], 'language': spec['language'],
@@ -48,8 +66,8 @@ def score_doc(spec, summary, source, run_dir=None):
     output = Path(summary['output_file']) if generated and summary.get('output_file') else None
     out_text = ''
     if output and output.is_file():
-        with pymupdf.open(output) as pdf: out_text = ' '.join(p.get_text() for p in pdf)
-    with pymupdf.open(source) as pdf: src_text = ' '.join(p.get_text() for p in pdf)
+        out_text = document_text(output)
+    src_text = document_text(source)
     verification = load(run / 'privacy-verification.json') if run else None
     row['privacy_verification'] = ('passed' if verification.get('passed') else 'flagged') if verification else 'not_run'
     # Image values: judged against a fresh OCR of the output when ocr_leaks.py has produced one.
@@ -92,7 +110,8 @@ def main():
     for name, spec in key.items():
         if name.startswith('_'): continue
         summary = load(set_dir / 'runs' / label / name / 'summary.json')
-        if summary: docs[name] = score_doc(spec, summary, set_dir / 'pdfs' / f'{name}.pdf', set_dir / 'runs' / label / name)
+        source = set_dir / spec['file'] if spec.get('file') else set_dir / 'pdfs' / f'{name}.pdf'
+        if summary: docs[name] = score_doc(spec, summary, source, set_dir / 'runs' / label / name)
     groups = defaultdict(lambda: defaultdict(lambda: [0, 0]))  # group -> key -> [found, total]
     totals = {'docs': len(docs), 'generated': 0, 'expected': 0, 'found_any': 0, 'found_full': 0, 'text_values': 0, 'text_leaks': 0, 'image_values': 0, 'image_leaks': 0,
               'negatives': 0, 'negatives_found': 0, 'negatives_removed': 0, 'unexpected': 0, 'seconds': 0.0, 'pages': 0}

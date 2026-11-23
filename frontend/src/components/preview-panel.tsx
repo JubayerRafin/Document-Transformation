@@ -101,7 +101,7 @@ export function PreviewPanel({
               </a>
             </Button>
           )}
-          {result && !readOnly && (
+          {result && !readOnly && /\.pdf$/i.test(result.filename) && (
             <Button asChild size="sm" variant="outline">
               <a href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&new=1`}>
                 Review &amp; add redactions

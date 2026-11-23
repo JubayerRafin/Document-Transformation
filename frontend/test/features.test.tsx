@@ -28,7 +28,7 @@ it("submits a selected PDF using the exact selected server and mode", async () =
     submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
   const { submitted } = upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
@@ -64,7 +64,7 @@ it("offers the server's translation models and sends the chosen one", async () =
   // This server offers two models, so the choice is shown at once.
   expect(screen.getByLabelText("Translation model")).toBeInTheDocument();
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
@@ -84,7 +84,7 @@ it("sends no model choice for the default model or for PII only", async () => {
     submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
@@ -115,7 +115,7 @@ it("blocks invalid PDF content and never submits", async () => {
     submit = vi.spyOn(api, "submit");
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["invalid"], "fake.pdf", { type: "application/pdf" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent("valid PDF");
@@ -130,7 +130,7 @@ it("reuses the idempotency key after a failed unchanged submission", async () =>
     .mockResolvedValueOnce({ job_id: job.id });
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "retry.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("retry.pdf");
@@ -154,7 +154,7 @@ it("does not open an uploaded job after its account session changed", async () =
   );
   const { submitted } = upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "private.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("private.pdf");
@@ -178,7 +178,7 @@ it("requires a selected PII category before sending a redaction job", async () =
     submit = vi.spyOn(api, "submit");
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "pii.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("pii.pdf");
@@ -272,7 +272,7 @@ it("sends the chosen masking style and keep-visible values with a PII job", asyn
   upload(api);
   await u.click(screen.getByRole("tab", { name: "PII redaction" }));
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
@@ -293,7 +293,7 @@ it("translation jobs do not send PII masking options", async () => {
     submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
@@ -376,7 +376,7 @@ it("offers the server's PII models for redaction and warns before an outside ser
   expect(screen.queryByLabelText("PII model")).not.toBeInTheDocument();
   await u.click(screen.getByRole("tab", { name: "PII redaction" }));
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");

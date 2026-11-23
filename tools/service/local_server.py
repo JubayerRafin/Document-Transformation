@@ -46,6 +46,18 @@ LANGUAGE = re.compile(r'^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$')
 MODEL_ID = re.compile(r'^[a-z0-9][a-z0-9_-]{0,31}$')
 KEY = re.compile(r'^[A-Za-z0-9_-]{8,120}$')
 JOB_ID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
+# Accepted uploads. A Word or PowerPoint file comes back in its own format; the website shows a PDF
+# preview of it (LibreOffice), made at upload for the source and by the engine for the result.
+FORMATS = ('pdf', 'docx', 'pptx')
+MEDIA = {'pdf': 'application/pdf',
+         'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+         'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
+
+
+def file_kind(filename):
+    """'pdf', 'docx' or 'pptx' from a file name, else ''."""
+    suffix = Path(filename or '').suffix.lower().lstrip('.')
+    return suffix if suffix in FORMATS else ''
 
 
 class Fault(Exception):
@@ -76,7 +88,7 @@ def check_options(raw):
     o = {'operation': 'translation', 'source_language': 'en', 'target_language': 'ko', 'output_format': 'pdf',
          'protected_values': [], 'document_context': '', 'pii_categories': [], **raw}
     o.pop('worker_id', None)
-    if o['operation'] not in ('translation', 'pii', 'combined') or o['output_format'] != 'pdf':
+    if o['operation'] not in ('translation', 'pii', 'combined') or o['output_format'] not in FORMATS:
         raise Fault('INVALID_OPERATION')
     if not all(isinstance(v, str) and LANGUAGE.match(v) for v in (o['source_language'], o['target_language'])):
         raise Fault('INVALID_LANGUAGE')
@@ -129,9 +141,10 @@ def glossary_entries(raw):
 
 def result_name(filename, operation):
     stem = Path(filename).stem
+    kind = file_kind(filename) or 'pdf'
     suffix = {'translation': 'translated', 'pii': 'redacted', 'combined': 'translated-redacted',
               'manual_redaction': 'redacted'}[operation]
-    return f'{stem}-{suffix}.pdf'
+    return f'{stem}-{suffix}.{kind}'
 
 
 def redaction_regions(value, allow_empty=True):
@@ -282,7 +295,8 @@ class Engine:
                 'capabilities': {'gpu': s.get('gpu', ''), 'operations': s.get('operations', []),
                                  'note': s.get('note', ''), 'translation_models': s.get('translation_models', []),
                                  'pii_models': s.get('pii_models', []),
-                                 'limits': {'max_pages': MAX_PAGES, 'max_mb': MAX_BYTES // 1_000_000}}}
+                                 'limits': {'max_pages': MAX_PAGES, 'max_mb': MAX_BYTES // 1_000_000},
+                                 'formats': list(FORMATS)}}
 
     def maintain(self):
         """Every STATUS_SECONDS: keep the OCR and layout services loaded, delete old job folders and
@@ -321,7 +335,7 @@ class Engine:
             else:
                 output, metrics = (self.fake_job if self.fake else self.engine_job)(job)
             data = output.read_bytes()
-            result = self.store.root / job['id'] / 'result.pdf'
+            result = self.store.root / job['id'] / ('result.' + (file_kind(job['filename']) or 'pdf'))
             if output.resolve() != result.resolve():
                 shutil.copyfile(output, result)
             job['artifacts'].append({'id': str(uuid.uuid4()), 'kind': 'result',
@@ -341,7 +355,8 @@ class Engine:
     def engine_job(self, job):
         """cloud_worker.execute() without the hosted transfer: the source is already in the job folder."""
         folder = self.store.root / job['id']
-        source = folder / 'source.pdf'
+        kind = file_kind(job['filename']) or 'pdf'
+        source = folder / ('source.' + kind)
         request, events, terminal = folder / 'request.json', folder / 'engine-events.jsonl', folder / 'terminal.json'
         if self.ocr_session:
             self.ocr_session.ensure()
@@ -372,13 +387,23 @@ class Engine:
         if result.get('source_sha256') != job['source_sha256']:
             raise runner.JobFailure('OUTPUT_INVALID', 'Engine source hash mismatch.')
         import pymupdf
+        # A Word or PowerPoint result is checked as a package and shown through the engine's PDF
+        # preview of it (office-preview.pdf next to the result).
+        preview = output if kind == 'pdf' else output.parent / 'office-preview.pdf'
         try:
-            with pymupdf.open(output) as pdf:
+            if kind != 'pdf':
+                from transformation.office.package_ir import open_package
+                if output.suffix.lower() != '.' + kind:
+                    raise ValueError('Result is not in the uploaded format.')
+                open_package(output.read_bytes(), kind).close()
+            with pymupdf.open(preview) as pdf:
                 if pdf.needs_pass or not len(pdf):
                     raise ValueError('Invalid generated PDF.')
                 pages = len(pdf)
+            if kind != 'pdf':
+                shutil.copyfile(preview, folder / 'result-preview.pdf')
         except Exception as exc:
-            raise runner.JobFailure('OUTPUT_INVALID', 'Invalid generated PDF.') from exc
+            raise runner.JobFailure('OUTPUT_INVALID', 'Invalid generated output.') from exc
         checks = runner.summarize_checks(result)
         metrics = {'source_sha256': job['source_sha256'], 'total_seconds': time.monotonic() - started, 'pages': pages,
                    'gpu_verified': result.get('gpu_verified') is True, 'checks': checks,
@@ -423,7 +448,9 @@ class Engine:
             time.sleep(float(os.environ.get('TRANSFORMX_FAKE_STAGE_SECONDS', '1')))
         if job['filename'].lower().startswith('fail'):
             raise runner.JobFailure('ENGINE_FAILED', 'Test failure requested by the file name.')
-        source = self.store.root / job['id'] / 'source.pdf'
+        source = self.store.root / job['id'] / ('source.' + (file_kind(job['filename']) or 'pdf'))
+        if source.suffix != '.pdf':
+            shutil.copyfile(self.store.root / job['id'] / 'source-preview.pdf', self.store.root / job['id'] / 'result-preview.pdf')
         checks = {'acceptable': True, 'privacy_verification': 'not_run', 'known_sensitive_residuals': 0,
                   'geometry_blockers': 0, 'layout_review_candidates': 0, 'uninspected_content': 0,
                   'scan_acceptance_blockers': 0, 'translation_errors': 0}
@@ -501,35 +528,52 @@ def create_app(store, engine, site_dir, password=''):
         if upload is None or isinstance(upload, str):
             raise Fault('INVALID_PDF')
         name = upload.filename or ''
-        if len(name) > 180 or re.search(r'[\\/\x00-\x1f]', name) or not name.lower().endswith('.pdf'):
-            raise Fault('INVALID_PDF')
+        kind = file_kind(name)
+        if len(name) > 180 or re.search(r'[\\/\x00-\x1f]', name) or not kind:
+            raise Fault('INVALID_DOCUMENT' if name and not name.lower().endswith('.pdf') else 'INVALID_PDF')
         data = await upload.read(MAX_BYTES + 1)
         await upload.close()
         if len(data) > MAX_BYTES:
             raise Fault('REQUEST_TOO_LARGE', 413)
-        if len(data) < 5 or data[:5] != b'%PDF-':
-            raise Fault('INVALID_PDF')
+        bad = 'INVALID_PDF' if kind == 'pdf' else 'INVALID_DOCUMENT'
+        if kind == 'pdf' and (len(data) < 5 or data[:5] != b'%PDF-'):
+            raise Fault(bad)
+        if kind != 'pdf' and data[:2] != b'PK':
+            raise Fault(bad)
         try:
             options = check_options(json.loads(form.get('options') or '{}'))
         except ValueError:
             raise Fault('INVALID_OPTIONS')
+        options['output_format'] = kind  # a document comes back in its own format
         offered = {m['id'] for m in engine.status.get('translation_models', [])}
         if options.get('translation_model') and options['translation_model'] not in offered:
             raise Fault('TRANSLATION_MODEL_NOT_OFFERED')
         if options.get('pii_model') and options['pii_model'] not in {m['id'] for m in engine.status.get('pii_models', [])}:
             raise Fault('PII_MODEL_NOT_OFFERED')
+        preview = None
         try:
             import pymupdf
-            with pymupdf.open(stream=data, filetype='pdf') as pdf:
-                if pdf.needs_pass:
-                    raise Fault('INVALID_PDF')
-                pages = len(pdf)
+            if kind == 'pdf':
+                with pymupdf.open(stream=data, filetype='pdf') as pdf:
+                    if pdf.needs_pass:
+                        raise Fault(bad)
+                    pages = len(pdf)
+            else:
+                # The package is checked and drawn once here: the website shows this preview, and
+                # its page count is the job's (a file LibreOffice cannot open is rejected now).
+                import asyncio
+                from transformation.office.package_ir import open_package
+                from transformation.office.office import render
+                open_package(data, kind).close()
+                preview = (await asyncio.to_thread(render, data, 'source.' + kind))[0]
+                with pymupdf.open(stream=preview, filetype='pdf') as pdf:
+                    pages = len(pdf)
         except Fault:
             raise
         except Exception:
-            raise Fault('INVALID_PDF')
+            raise Fault(bad)
         if not 1 <= pages <= MAX_PAGES:
-            raise Fault('INVALID_PDF')
+            raise Fault(bad)
         if options['operation'] != 'pii':
             entry = store.glossaries().get(f"{options['source_language']}>{options['target_language']}")
             if entry and entry['entries']:
@@ -537,7 +581,9 @@ def create_app(store, engine, site_dir, password=''):
         job_id = str(uuid.uuid4())
         folder = store.root / job_id
         folder.mkdir()
-        (folder / 'source.pdf').write_bytes(data)
+        (folder / ('source.' + kind)).write_bytes(data)
+        if preview is not None:
+            (folder / 'source-preview.pdf').write_bytes(preview)
         digest = hashlib.sha256(data).hexdigest()
         now = time.time()
         job = {'id': job_id, 'filename': name, 'status': 'queued', 'stage': 'queued', 'quality': 'requires_review',
@@ -573,12 +619,16 @@ def create_app(store, engine, site_dir, password=''):
         return JSONResponse(store.public(store.get(job_id)),
                             headers={'Content-Disposition': 'attachment; filename="run-report.json"'})
 
-    def artifact_file(job_id, artifact_id):
+    def artifact_file(job_id, artifact_id, view=False):
+        """(artifact, path). view=True gives what the website shows: the PDF itself, or the PDF
+        preview of a Word or PowerPoint file."""
         j = store.get(job_id)
         a = next((a for a in j['artifacts'] if a['id'] == artifact_id), None)
         if not a:
             raise Fault('NOT_FOUND', 404)
-        path = store.root / j['id'] / ('source.pdf' if a['kind'] == 'source' else 'result.pdf')
+        role = 'source' if a['kind'] == 'source' else 'result'
+        kind = file_kind(a['filename']) or 'pdf'
+        path = store.root / j['id'] / (f'{role}-preview.pdf' if view and kind != 'pdf' else f'{role}.{kind}')
         if not path.is_file():
             raise Fault('NOT_FOUND', 404)
         return a, path
@@ -586,16 +636,16 @@ def create_app(store, engine, site_dir, password=''):
     @app.get('/v1/jobs/{job_id}/artifacts/{artifact_id}')
     def download(job_id: str, artifact_id: str):
         a, path = artifact_file(job_id, artifact_id)
-        return FileResponse(path, media_type='application/pdf', filename=a['filename'])
+        return FileResponse(path, media_type=MEDIA[file_kind(a['filename']) or 'pdf'], filename=a['filename'])
 
     @app.get('/v1/jobs/{job_id}/artifacts/{artifact_id}/content')
     def content(job_id: str, artifact_id: str):
-        _, path = artifact_file(job_id, artifact_id)
+        _, path = artifact_file(job_id, artifact_id, view=True)
         return FileResponse(path, media_type='application/pdf', content_disposition_type='inline')
 
     @app.get('/v1/jobs/{job_id}/artifacts/{artifact_id}/url')
     def url(job_id: str, artifact_id: str):
-        artifact_file(job_id, artifact_id)
+        artifact_file(job_id, artifact_id, view=True)
         return {'url': f'/v1/jobs/{job_id}/artifacts/{artifact_id}/content'}
 
     # The review editor (redaction-review.html): a draft of boxes over a finished result, saved as it
@@ -633,6 +683,9 @@ def create_app(store, engine, site_dir, password=''):
             if j['status'] != 'succeeded':
                 raise Fault('RESULT_NOT_READY', 409)
             a = next((a for a in j['artifacts'] if a['kind'] == 'result'), None)
+            if a and file_kind(a['filename']) != 'pdf':
+                # Boxes are drawn on PDF pages; Word and PowerPoint results are edited in Office.
+                raise Fault('MANUAL_REDACTION_PDF_ONLY', 409)
             if not a or b.get('artifact_id') != a['id'] or b.get('source_sha256') != a['sha256']:
                 raise Fault('PDF_VERSION_CHANGED', 409)
             d = store.by_key(key)

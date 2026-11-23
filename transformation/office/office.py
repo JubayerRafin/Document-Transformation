@@ -8,7 +8,9 @@ import json
 import pymupdf
 
 
-def render(data,filename,executable=None):
+def render(data,filename,executable=None,convert='pdf'):
+    """(PDF bytes, report). convert is LibreOffice's --convert-to argument (a PDF export filter with
+    options, e.g. speaker notes pages; see transformation/office/native.NOTES_FILTER)."""
     suffix=Path(filename).suffix.lower()
     if suffix=='.pdf':
         return data,{'renderer':'input PDF','overflow':[]}
@@ -29,12 +31,12 @@ def render(data,filename,executable=None):
         output=root/'source.pdf'
         report={'renderer':'LibreOffice','overflow':[]}
         if executable and Path(executable).is_file():
-            command=[str(executable),'-env:UserInstallation='+(root/'profile').as_uri(),'--headless','--convert-to','pdf','--outdir',str(root),str(source)]
+            command=[str(executable),'-env:UserInstallation='+(root/'profile').as_uri(),'--headless','--convert-to',convert,'--outdir',str(root),str(source)]
         elif os.name=='nt':
             command=['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(Path(__file__).with_name('render_office.ps1')),'-Source',str(source),'-Destination',str(output),'-Report',str(root/'render.json')]
         else:
             raise ValueError('Office rendering requires Microsoft Office on Windows or LibreOffice.')
-        result=subprocess.run(command,capture_output=True,text=True,timeout=120,check=False)
+        result=subprocess.run(command,capture_output=True,text=True,timeout=300,check=False)
         if result.returncode or not output.exists():
             raise RuntimeError('Office rendering failed: '+result.stderr[-1000:])
         if (root/'render.json').exists(): report=json.loads((root/'render.json').read_text(encoding='utf-8-sig'))

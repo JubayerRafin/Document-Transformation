@@ -346,7 +346,28 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 save_json(run/'pii-detection-evidence.json',evidence)
                 save_json(run/'source-ir.json',ir)
             else:
-                findings=detect(text_regions(ir),pii_categories,pii_endpoint,pii_model,pii_assist)
+                # Word and PowerPoint: tracked changes accepted and author fields cleared first, then the
+                # PDF detector reads the document as LibreOffice draws it, notes and comments included.
+                from transformation.office import native as office_native
+                safe_data,revisions=office_native.accept_revisions(safe_data,kind)
+                if revisions:
+                    info['warnings'].append(f'{revisions} tracked change(s) were accepted before masking, so deleted text cannot keep a removed value.')
+                safe_data=office_native.scrub_properties(safe_data,kind)
+                detection=office_native.detection_pdf(safe_data,kind)
+                detection_path=run/'office-detection.pdf'; detection_path.write_bytes(detection)
+                from transformation.validation.pii_document import detect_document
+                (run/'office-detection').mkdir(exist_ok=True)
+                detection_ir=content_ir(extract_pdf(detection_path,run/'office-detection','native',
+                                                   analyze_pdf(detection,pii_endpoint,pii_model,False),defer_figures=True))
+                findings,_,evidence=detect_document(detection,detection_ir,pii_categories,pii_endpoint,pii_model,pii_assist,
+                                                    workers=pii_workers,known_values=known_values)
+                analyzed_texts=evidence.pop('analyzed_texts',[])
+                if pii_keep:
+                    from transformation.validation.pii_document import split_kept
+                    findings,kept=split_kept(findings,pii_keep)
+                    if kept:
+                        info['warnings'].append(f"{len(kept)} detected value(s) were left visible because they match the job's keep-visible list.")
+                save_json(run/'pii-detection-evidence.json',evidence)
             save_json(run/'pii-findings.json',findings)
             if stop_after_pii:
                 info.update(status='pii_detected'); yield emit('pii_detection'); return
@@ -377,8 +398,14 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                     info['redaction_whole_line_fallbacks']=fallbacks
                     info['warnings'].append(f'{fallbacks} scanned/image text line(s) were masked as a whole because the sensitive value could not be separated from its label.')
             else:
-                updates={r['id']:mask(r['text'],values) for r in text_regions(ir)}
-                safe_data,notes=write_package(safe_data,kind,updates,values); info['warnings'].extend(notes)
+                from transformation.validation.value_redaction import replacement_labels
+                label=office_native.mask_label(pii_style,replacement_labels(findings,pii_style))
+                office_regions=text_regions(extract_package(safe_data,filename))
+                office_masks=office_native.office_values(values,[r['text'] for r in office_regions])
+                updates=office_native.mask_updates(office_regions,office_masks,label)
+                safe_data,notes=write_package(safe_data,kind,updates,office_masks); info['warnings'].extend(notes)
+                info['office_masked_paragraphs']=len(updates)
+                values=list(dict.fromkeys(values+office_masks))
             info['warnings'].append('PII detection is provisional. Image text, OCR errors, embedded objects and detector omissions require review.')
         safe_source=run/('processing-source.'+kind); safe_source.write_bytes(safe_data)
         purposes=[p['purpose'] for p in analysis.get('visual_pages',[])]
@@ -502,46 +529,47 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
         else:
             final_ir=extract_package(safe_data,filename); updates={}; errors=[]
             yield emit('translation' if translate else 'reconstruction')
-            from transformation.llm.ollama_native import translate_paragraph
-            from transformation.llm.translation_guard import validate_candidate,audit_candidate
-            language=next((name for name,code in LANGUAGES.items() if code==options.get('target','ko')),options.get('target','ko'))
-            terms=options.get('terminology',{})
-            for region in text_regions(final_ir):
-                transformed=region['text']; styled=None
-                if translate:
-                    try:
-                        context=safe_context+('\nPreferred terminology: '+json.dumps(terms,ensure_ascii=False) if terms else '')
-                        run_texts=region.get('metadata',{}).get('run_texts',[])
-                        styled=None
-                        for attempt in range(2):
-                            if len(run_texts)>1:
-                                from transformation.office.styled_translation import translate_runs
-                                styled=translate_runs(endpoint,model,run_texts,language,list(options.get('protected_values',[]))+['[REDACTED]'],context,source_language=options.get('source','en'),terminology=terms)
-                                transformed=''.join(styled); stats={}
-                            else:
-                                transformed,stats=translate_paragraph(endpoint,model,region['text'],language,
-                                    list(options.get('protected_values',[]))+['[REDACTED]'],context,structured=len(region['text'])<=200,source_language=options.get('source','en'),terminology=terms)
-                            validate_candidate(region['text'],transformed,list(options.get('protected_values',[]))+['[REDACTED]'])
-                            if stats.get('skipped_model'): break
-                            if __import__('transformation.llm.endpoints',fromlist=['is_translategemma']).is_translategemma(model): break
-                            audit=audit_candidate(pii_endpoint,pii_model,region['text'],transformed,language,safe_context,list(options.get('protected_values',[]))+['[REDACTED]'])
-                            if audit['faithful']: break
-                            context+='\nPrior translation failed review: '+'; '.join(audit['issues'])
-                        else: raise ValueError('Semantic review rejected this paragraph.')
-                    except (ValueError,OSError,TimeoutError) as exc:
-                        transformed=region['text']; styled=None; errors.append({'region_id':region['id'],'reason':str(exc)})
-                updates[region['id']]=styled if styled is not None else transformed
-                region['transformed_text']=transformed
-                save_json(run/'transformed-ir.json',final_ir)
-                info['translation_progress']={'requests_completed':len(updates)}; yield emit('translation')
-            save_json(run/'region-errors.json',errors)
-            if errors:
-                info['warnings'].append(f'{len(errors)} paragraphs failed translation validation and retain their processing-source text.')
-                if len(errors)==len(updates): raise RuntimeError('Every paragraph failed translation. See region-errors.json; no translated output was accepted.')
-            from transformation.office.package_ir import refresh_tables
-            refresh_tables(final_ir)
-            yield emit('reconstruction')
-            native,notes=write_package(safe_data,kind,updates,[f['value'] for f in findings]); info['warnings'].extend(notes)
+            native=safe_data
+            if translate:
+                # Paragraph pieces translated concurrently through the same checked path as PDF text
+                # (translate_paragraph), formatting carried as **...** markers; see office/native.py.
+                from transformation.office import native as office_native
+                from transformation.llm.ollama_native import translate_paragraph
+                language=next((name for name,code in LANGUAGES.items() if code==options.get('target','ko')),options.get('target','ko'))
+                terms=options.get('terminology',{})
+                protected=list(options.get('protected_values',[]))+['[REDACTED]',office_native.BOX_MASK]
+                if redact:
+                    from transformation.validation.value_redaction import replacement_labels
+                    protected+=[v for v in replacement_labels(findings,pii_style).values() if v not in protected]
+                def translate_one(text):
+                    result,stats=translate_paragraph(endpoint,model,text,language,protected,safe_context,
+                        structured=len(text)<=200,source_language=options.get('source','en'),terminology=terms)
+                    if stats.get('kept_source_requires_review'):
+                        raise ValueError('Every translation attempt failed its checks; the source text is kept.')
+                    return result
+                outcome=None
+                for event in office_native.translate_regions(text_regions(final_ir),translate_one,
+                                                             workers=int(options.get('office_workers',16))):
+                    if 'updates' in event: outcome=event
+                    else: info['translation_progress']=event; yield emit('translation')
+                updates,errors=outcome['updates'],outcome['errors']
+                info['office_translation']=outcome['notes']
+                save_json(run/'office-translation.json',{'notes':outcome['notes'],
+                    'pairs':[{'src':a,'mt':b} for a,b in outcome['pairs']]})
+                for region in text_regions(final_ir):
+                    if region['id'] in updates: region['transformed_text']=''.join(updates[region['id']])
+                save_json(run/'region-errors.json',errors)
+                if errors:
+                    info['warnings'].append(f'{len(errors)} paragraph(s) failed translation validation and keep their source text.')
+                    if not updates: raise RuntimeError('Every paragraph failed translation. See region-errors.json; no translated output was accepted.')
+                from transformation.office.package_ir import refresh_tables
+                refresh_tables(final_ir)
+                yield emit('reconstruction')
+                native,notes=write_package(safe_data,kind,updates,[]); info['warnings'].extend(notes)
+                source_rtl=options.get('source','en') in office_native.RTL_LANGUAGES
+                target_rtl=options.get('target','ko') in office_native.RTL_LANGUAGES
+                if source_rtl!=target_rtl:
+                    native=office_native.set_direction(native,kind,list(updates),target_rtl)
             (run/'output'/('transformed.'+kind)).write_bytes(native)
             if output_kind==kind: artifact=native
             else:
@@ -557,13 +585,16 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 info['warnings'].append('Office cross-format conversion uses the rendered pagination. Artwork becomes a raster background; native same-format output retains original package objects.')
             info['translation_errors']=len(errors)
         yield emit('validation')
-        if output_kind=='pptx':
+        if output_kind=='pptx' and translate:
+            # Translated text measured in LibreOffice's drawing; boxes it outgrew get a smaller font.
             try:
-                from transformation.office.office import fit_pptx
-                artifact,fitted_preview,fit_report=fit_pptx(artifact)
-                (run/'output'/'office-preview.pdf').write_bytes(fitted_preview)
+                from transformation.office.native import fit_slides
+                artifact,fit_report=fit_slides(artifact,baseline=safe_data)
                 save_json(run/'office-fitting.json',fit_report)
-            except (ValueError,RuntimeError,TimeoutError) as exc:
+                info['office_fitting']={'boxes_shrunk':len({(c['slide'],c['shape_id']) for c in fit_report['changes']}),
+                                        'still_overflowing':len(fit_report['still_overflowing'])}
+            except (ValueError,RuntimeError,TimeoutError,OSError) as exc:
+                fit_report={'still_overflowing':[],'error':str(exc)}
                 info['warnings'].append('PowerPoint text fitting could not be measured: '+str(exc))
         destination=run/'output'/('result.'+output_kind); destination.write_bytes(artifact)
         if output_kind=='pdf':
@@ -627,7 +658,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 preview,layout=render(artifact,'result.'+output_kind)
                 (run/'output'/'office-preview.pdf').write_bytes(preview)
                 save_json(run/'office-layout.json',layout)
-                independent['office_overflow']=layout['overflow']
+                independent['office_overflow']=(fit_report['still_overflowing'] if output_kind=='pptx' and translate else [])+list(layout['overflow'])
                 independent['rendered_layout']=inspect_output(preview,'pdf')
             except (ValueError,RuntimeError,TimeoutError) as exc:
                 independent['office_render_error']=str(exc)

@@ -46,6 +46,54 @@ def paragraph_text_nodes(paragraph,tag):
     return result
 
 
+# Run attributes that do not change how text looks: revision ids, proofing marks, language tags.
+_NEUTRAL=re.compile(r'\s(?:w:)?rsid\w*="[^"]*"|\s(?:lang|altLang|dirty|err|smtClean|smtId|bmk|noProof)="[^"]*"')
+_NEUTRAL_ELEMENTS={'{'+W+'}lang','{'+W+'}noProof','{'+W+'}proofErr','{'+W+'}rtl','{'+W+'}cs'}
+
+
+def run_key(node,parents,paragraph):
+    """What a text node looks like: its run's character properties (without revision ids, proofing
+    and language marks) and the hyperlink it sits in. Neighbouring nodes with the same key are one
+    piece of formatting; a paragraph is often split into many such runs by editing history alone."""
+    run=parents.get(node)
+    key=''
+    if run is not None:
+        props=run.find('{'+W+'}rPr')
+        if props is None: props=run.find('{'+A+'}rPr')
+        if props is not None:
+            clean=ET.Element(props.tag,{k:v for k,v in props.attrib.items() if k.split('}')[-1] not in
+                                        {'lang','altLang','dirty','err','smtClean','smtId','bmk','noProof'}})
+            for child in props:
+                if child.tag not in _NEUTRAL_ELEMENTS: clean.append(child)
+            key=_NEUTRAL.sub('',ET.tostring(clean,encoding='unicode'))
+    ancestor=run
+    while ancestor is not None and ancestor is not paragraph:
+        if ancestor.tag=='{'+W+'}hyperlink':
+            key+='|link:'+(ancestor.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id') or ancestor.get('{'+W+'}anchor') or '')
+            break
+        ancestor=parents.get(ancestor)
+    return key
+
+
+def node_breaks(paragraph,tag):
+    """For each text node of paragraph_text_nodes(), 'tab' or 'br' when a tab or line break element
+    stands between it and the text before it, else None. The text nodes join without them, so a
+    form line "Name<tab>Value" would otherwise reach the translator as "NameValue"."""
+    breaks=[]; pending=[None]
+    def walk(node):
+        for child in node:
+            if child.tag=='{'+tag+'}p': continue
+            local=child.tag.split('}')[-1]
+            if local in {'pPr','rPr','tabs','instrText','delText'}: continue
+            if child.tag=='{'+tag+'}t':
+                breaks.append(pending[0]); pending[0]=None
+            elif local in {'tab','ptab'}: pending[0]=pending[0] or 'tab'
+            elif local in {'br','cr'}: pending[0]='br'
+            else: walk(child)
+    walk(paragraph)
+    return breaks
+
+
 def open_package(data,kind):
     archive=zipfile.ZipFile(BytesIO(data))
     entries=archive.infolist()
@@ -99,6 +147,11 @@ def extract_package(data,filename):
                         shape=ancestor
                     if ancestor.tag in {'{'+W+'}tc','{'+A+'}tc'} and cell is None:
                         cell=ancestor
+                # Placeholder prompts of slide masters and layouts ("Click to edit Master title
+                # style") never show on a slide; real master text (a footer, a logo caption) does.
+                if (shape is not None and re.match(r'ppt/(slideMasters|slideLayouts|notesMasters|handoutMasters)/',name)
+                        and shape.find('.//{'+P+'}nvPr/{'+P+'}ph') is not None):
+                    continue
                 bbox=None
                 if shape is not None:
                     transform=shape.find('.//{'+A+'}xfrm')
@@ -112,6 +165,8 @@ def extract_package(data,filename):
                     'source_ref':{'part':name,'paragraph_index':index,'text_nodes':len(nodes)},
                     'metadata':{'inside_table':cell is not None,'runs':len(nodes),
                         'run_texts':[n.text or '' for n in nodes],
+                        'run_keys':[run_key(n,parents,paragraph) for n in nodes],
+                        'run_breaks':node_breaks(paragraph,tag),
                         'run_styles':[ET.tostring(parents[n],encoding='unicode') for n in nodes]},'warnings':[]})
             paragraph_ids={id(p):name+':p'+str(i) for i,p in enumerate(paragraphs)}
             for index,table in enumerate(root.iter('{'+tag+'}tbl')):
@@ -170,37 +225,48 @@ def write_package(data,kind,updates,redacted_values=()):
                         if len(update)!=len(nodes) or not all(isinstance(t,str) for t in update):
                             raise ValueError('Styled paragraph update does not match its run count: '+key)
                         for node,text in zip(nodes,update):
-                            node.text=text; node.set('{'+XML+'}space','preserve')
+                            node.text=text
+                            if kind=='docx': node.set('{'+XML+'}space','preserve')  # Word only: DrawingML a:t has no xml:space
                     elif len(nodes)==1 or update==''.join(n.text or '' for n in nodes):
-                        if len(nodes)==1: nodes[0].text=update; nodes[0].set('{'+XML+'}space','preserve')
+                        if len(nodes)==1:
+                            nodes[0].text=update
+                            if kind=='docx': nodes[0].set('{'+XML+'}space','preserve')
                     else:
                         # Preserve emphasis boundaries for callers that have not
                         # supplied a validated styled translation. Never silently
                         # flatten a mixed-run paragraph.
                         raise ValueError('A changed mixed-run paragraph requires run-aligned text: '+key)
                     changed=True
-                # Remove selected literals from auxiliary textual XML too.
+                # Remove selected literals from auxiliary textual XML too (chart labels, alt text,
+                # custom XML), word-bounded like the output check: "Mat" is not in "Format".
                 if redacted_values:
+                    from transformation.validation.output_validation import residual_in
+                    from transformation.validation.privacy import mask
                     for node in root.iter():
-                        for value in redacted_values:
-                            if node.text and value in node.text:
-                                node.text=node.text.replace(value,'[REDACTED]'); changed=True
-                            if node.tail and value in node.tail:
-                                node.tail=node.tail.replace(value,'[REDACTED]'); changed=True
-                            for key,val in list(node.attrib.items()):
-                                if value in val:
-                                    if item.filename.endswith('.rels') and key=='Target' and node.get('TargetMode')=='External':
-                                        node.set(key,val.replace(value,'REDACTED')); changed=True
-                                        warnings.append('A sensitive external relationship target was sanitized: '+item.filename)
-                                    else: raise ValueError('Sensitive value appears in package attributes; manual review is required before export.')
+                        for field in ('text','tail'):
+                            value_text=getattr(node,field)
+                            if value_text and any(residual_in(v,value_text) for v in redacted_values):
+                                setattr(node,field,mask(value_text,redacted_values)); changed=True
+                        for key,val in list(node.attrib.items()):
+                            if not any(residual_in(v,val) for v in redacted_values): continue
+                            if item.filename.endswith('.rels') and key=='Target' and node.get('TargetMode')=='External':
+                                masked=val
+                                for value in redacted_values: masked=masked.replace(value,'REDACTED')
+                                node.set(key,masked); changed=True
+                                warnings.append('A sensitive external link target was replaced: '+item.filename)
+                            else:
+                                node.set(key,mask(val,redacted_values)); changed=True
+                                warnings.append('A removed value was also masked in an object description: '+item.filename)
                 if changed: payload=serialize(root,payload)
             target.writestr(item,payload)
     result=out.getvalue()
-    with open_package(result,kind) as verified:
-        for part in verified.namelist():
-            if part.endswith(('.xml','.rels')):
-                root=ET.fromstring(verified.read(part))
-                joined=''.join(root.itertext())+' '.join(v for n in root.iter() for v in n.attrib.values())
-                if any(v in joined for v in redacted_values):
-                    raise ValueError('A selected sensitive value remains in the Office package.')
+    if redacted_values:
+        from transformation.validation.output_validation import residual_in
+        with open_package(result,kind) as verified:
+            for part in verified.namelist():
+                if part.endswith(('.xml','.rels')):
+                    root=ET.fromstring(verified.read(part))
+                    joined=''.join(root.itertext())+' '+' '.join(v for n in root.iter() for v in n.attrib.values())
+                    if any(residual_in(v,joined) for v in redacted_values):
+                        raise ValueError('A selected sensitive value remains in the Office package.')
     return result,list(dict.fromkeys(warnings))
