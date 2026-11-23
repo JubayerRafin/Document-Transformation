@@ -77,7 +77,12 @@ def voted_spacing(best, candidates):
     for value in views.values():
         for gap in gaps(value): votes[gap] = votes.get(gap, 0) + 1
     number = lambda ch: ch.isdigit() or ch in '.,:/-'
-    wanted = gaps(text) | {gap for gap, count in votes.items() if 2 * count >= len(views)
+    # Between two Hangul syllables a tie is not enough: half of four views put spaces inside words
+    # ("정 기 점검은", "있습니 다", Korean scan, 2026-11-23); Korean word gaps come from the image
+    # (gap_spacing).
+    hangul = lambda ch: '가' <= ch <= '힣'
+    wanted = gaps(text) | {gap for gap, count in votes.items()
+                           if (2 * count > len(views) or (2 * count == len(views) and not (hangul(key[gap - 1]) and hangul(key[gap]))))
                            and 0 < gap < len(key) and not (number(key[gap - 1]) and number(key[gap]))}
     spaced = ''.join((' ' if i in wanted else '') + ch for i, ch in enumerate(key))
     if squeeze(spaced) != key or spaced == ' '.join(text.split()):
@@ -103,13 +108,23 @@ def gap_spacing(crop, best, model):
     if len(pieces) < 2:
         return best
     reads = [str(r['rec_text']).strip() for r in model.predict(pieces)]
+    import unicodedata
     squeeze = lambda value: re.sub(r'\s+', '', value)
+    punct = lambda ch: unicodedata.category(ch).startswith('P')
     key = squeeze(text)
-    if len(reads) != len(pieces) or not all(reads) or squeeze(''.join(reads)) != key:
+    # Letters and digits must match; a piece read can drop a period ("차단하십시오" for "차단하십시오."),
+    # and a space goes after the punctuation at a cut.
+    letters = [i for i, ch in enumerate(key) if not punct(ch)]
+    pieces_letters = [''.join(ch for ch in squeeze(read) if not punct(ch)) for read in reads]
+    if (len(reads) != len(pieces) or not all(pieces_letters)
+            or ''.join(pieces_letters) != ''.join(key[i] for i in letters)):
         return best
-    cuts, position = set(), 0
-    for read in reads[:-1]:
-        position += len(squeeze(read))
+    cuts, count = set(), 0
+    for piece in pieces_letters[:-1]:
+        count += len(piece)
+        position = letters[count - 1] + 1
+        while position < len(key) and punct(key[position]):
+            position += 1
         cuts.add(position)
     own, position = set(), 0                   # the reading's own spaces, kept
     for ch in text.strip():
@@ -792,7 +807,7 @@ def main(argv=None, model_factory=None):
                                 review,decision=True,DIGITS_DROPPED
                         best=voted_spacing(best,candidates)
                         if args.source_language=='ko' and model_name!=TESSERACT_RECOGNIZER:
-                            best=gap_spacing(unpadded_crops[i],best,model)
+                            best=gap_spacing(crops[i],best,model)   # padded: the tight crop has no background rows
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
                         # Localization evidence supplements the transcription. It

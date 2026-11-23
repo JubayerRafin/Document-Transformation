@@ -51,6 +51,16 @@ class DroppedDigitTests(unittest.TestCase):
         region['metadata']['recognition_decision'] = 'unresolved_source_disagreement'
         self.assertTrue(reads_consistently(region))
 
+    def test_a_line_read_whole_by_tesseract_is_rebuilt_but_stays_in_the_pii_review_queue(self):
+        from transformation.ocr.read_alike import read_alike
+        model = 'arabic_PP-OCRv5_mobile_rec'
+        region = {'text': LINE, 'metadata': {'requires_review': True,
+                  'recognition_decision': 'sensitive_literal_independent_evidence_not_established',
+                  'candidates': [{'model': model, 'text': PADDLE, 'score': .95}] * 4
+                  + [{'model': 'tesseract_ara+eng', 'variant': 'tesseract_digits', 'text': LINE, 'score': .9}]}}
+        self.assertTrue(reads_consistently(region))
+        self.assertFalse(read_alike(region))
+
 
 if __name__ == '__main__':
     unittest.main()

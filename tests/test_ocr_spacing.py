@@ -37,7 +37,9 @@ class VotedSpacingTests(unittest.TestCase):
     def test_korean_line_gets_its_word_spaces_back(self):
         reads = views('주생산 라인의 정기 점검은매월첫째 주말로', '주생산 라인의정기 점검은매월 첫째 주말로',
                       '주생산 라인의정기 점검은매월 첫째 주말로', '주생산라인의정기점검은매월첫째주말로')
-        self.assertEqual(voted_spacing(reads[3], reads)['text'], '주생산 라인의정기 점검은매월 첫째 주말로')
+        # Spaces most views have are added; "매월 첫째" has two of four views, a tie, which does not add
+        # a space between two syllables ("정 기" was such a tie): gap_spacing adds it from the image.
+        self.assertEqual(voted_spacing(reads[3], reads)['text'], '주생산 라인의정기 점검은매월첫째 주말로')
 
 
 if __name__ == '__main__':
@@ -75,6 +77,12 @@ class GapSpacingTests(unittest.TestCase):
         spaced = gap_spacing(self.line([3, 4, 5]), best, self.Model(['장치는', '5도에서', '30도사이의']))
         self.assertEqual(spaced['text'], '장치는 5도에서 30도사이의')
         self.assertEqual(spaced['spacing'], 'image_gaps')
+
+    def test_a_period_a_piece_drops_is_kept_and_the_space_goes_after_it(self):
+        from tools.ocr.recognize_paddle_boxes import gap_spacing
+        best = {'text': '차단하십시오.장치는5도에서', 'score': .95}
+        spaced = gap_spacing(self.line([6, 3, 4]), best, self.Model(['차단하십시오', '장치는', '5도에서']))
+        self.assertEqual(spaced['text'], '차단하십시오. 장치는 5도에서')
 
     def test_pieces_that_read_other_characters_or_short_lines_change_nothing(self):
         from tools.ocr.recognize_paddle_boxes import gap_spacing

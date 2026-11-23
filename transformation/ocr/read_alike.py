@@ -71,6 +71,11 @@ def reads_consistently(region):
     if region.get('metadata', {}).get('recognition_decision') == 'digits_dropped_by_language_model':
         return False      # the readings agree, but all lack the line's numbers (recognize_paddle_boxes.dropped_digits)
     key, confident = _readings(region)
+    # A line whose digits the language model dropped and Tesseract read in two views, its letters
+    # matching (recognize_paddle_boxes.dropped_digits, digit_rescue): "تتراوح بين 5 و30 درجة". The
+    # numbers have no second recognizer, so the PII review queue (read_alike) still lists the line.
+    if any(c.get('variant') in ('tesseract_digits', 'digit_rescue') and characters(c['text']) == key for c in confident):
+        return True
     agree = [c for c in confident if characters(c['text']) == key]
     if agree and len(agree) > len(confident) - len(agree) and _models(agree) >= 2:
         return True
