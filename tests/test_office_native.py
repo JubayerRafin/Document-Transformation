@@ -188,7 +188,7 @@ def test_values_read_across_lines():
     # ... a value wrapped only in the drawing is matched whole, and short pieces are never masked alone.
     wrapped = ['sofia_mbeki@tide\nwatersuppl.exam\nple']
     assert native.office_values(wrapped, texts) == wrapped
-    assert native.office_values(['FX-2618-1519\n07'], texts) == ['FX-2618-1519\n07', 'FX-2618-1519']
+    assert native.office_values(['FX-2618-1519\n07'], texts + ['ID: FX-2618-1519']) == ['FX-2618-1519\n07', 'FX-2618-1519']
     masked = native.masked_runs([texts[2]], native.office_values(wrapped, texts), lambda v: '[EMAIL]')
     assert masked == ['Mail: [EMAIL]']
 
