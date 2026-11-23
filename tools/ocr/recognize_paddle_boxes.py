@@ -48,6 +48,43 @@ def select_candidate(candidates):
     return best, best['score'] < .95 or len(groups) > 1, 'confidence_or_disagreement'
 
 
+def voted_spacing(best, candidates):
+    """The chosen reading with the word spaces most views of the same characters agree on.
+
+    Views of one line often read the same characters and differ only in spaces, and the view that
+    drops spaces tends to score highest: a Korean line became "주생산라인의정기점검은매월첫째주말로",
+    which the translator then misread (2026-11-23). Characters never change and no space is removed.
+    A space is added where at least half of the agreeing views have one, but not inside a number
+    ("5, 657") or an address or identifier ("a@b", "sk_")."""
+    text = best.get('text') or ''
+    if not text.strip() or '@' in text or re.search(r'\bsk_', text):
+        return best
+    squeeze = lambda value: re.sub(r'\s+', '', value or '')
+    key = squeeze(text)
+    views = {}
+    for c in candidates:
+        if isinstance(c, dict) and squeeze(c.get('text')) == key:
+            views.setdefault(c.get('variant'), c.get('text'))
+    if len(views) < 2:
+        return best
+    def gaps(value):
+        found, position = set(), 0
+        for ch in value.strip():
+            if ch.isspace(): found.add(position)
+            else: position += 1
+        return found
+    votes = {}
+    for value in views.values():
+        for gap in gaps(value): votes[gap] = votes.get(gap, 0) + 1
+    number = lambda ch: ch.isdigit() or ch in '.,:/-'
+    wanted = gaps(text) | {gap for gap, count in votes.items() if 2 * count >= len(views)
+                           and 0 < gap < len(key) and not (number(key[gap - 1]) and number(key[gap]))}
+    spaced = ''.join((' ' if i in wanted else '') + ch for i, ch in enumerate(key))
+    if squeeze(spaced) != key or spaced == ' '.join(text.split()):
+        return best
+    return dict(best, text=spaced, spacing='voted')
+
+
 def consensus_key(text):
     """Ignore prose spacing and dash typography; keep structured literals exact."""
     literals=re.findall(r'[\w.+-]+@[\w.-]+|\b\w*_[\w._-]+|(?<!\w)[\w.+:/%–—−-]*\d[\w.,:/%–—−-]*',text)
@@ -670,6 +707,7 @@ def main(argv=None, model_factory=None):
                             if rescued:
                                 candidates.append(rescued)
                                 best,review,decision=rescued,False,'second_engine_digits_verified'
+                        best=voted_spacing(best,candidates)
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
                         # Localization evidence supplements the transcription. It
