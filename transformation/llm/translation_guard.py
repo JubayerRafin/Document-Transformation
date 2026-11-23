@@ -155,6 +155,27 @@ def appended_glossary(source, target):
     return surplus >= 4 or (surplus >= 2 and any(a == b for a, b in extra))
 
 
+# Full-width digits (Japanese, Chinese and Korean text) are the same numbers as ASCII digits: "（１）"
+# translated "(1)" was refused as an added number, every attempt, and 27 paragraphs of a Japanese
+# government deck stayed untranslated (Word and PowerPoint mass test, 2026-11-24).
+FULLWIDTH_DIGITS = str.maketrans('０１２３４５６７８９', '0123456789')
+# Japanese era years: the year before each era's first year.
+ERAS = {'明治': 1867, '大正': 1911, '昭和': 1925, '平成': 1988, '令和': 2018}
+_ERA_YEAR = re.compile(r'(明治|大正|昭和|平成|令和)\s*(\d{1,2}|元)\s*年')
+
+
+def era_years(source):
+    """The source with its Japanese era years as Western years, and with both, for the literal check.
+
+    "平成28年12月14日" is December 14, 2016: a translation may write 2016, or "2016 (Heisei 28)"; the
+    number 28 is not omitted and 2016 is not added. 元年 is an era's first year."""
+    if not _ERA_YEAR.search(source):
+        return []
+    year = lambda m: ERAS[m.group(1)] + (1 if m.group(2) == '元' else int(m.group(2)))
+    return [_ERA_YEAR.sub(lambda m: f'{year(m)}年', source),
+            _ERA_YEAR.sub(lambda m: f'{year(m)}年（{m.group(1)}{m.group(2)}年）', source)]
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
@@ -181,6 +202,8 @@ def validate_candidate(source, target, values=()):
     if (not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', source))
             and any(c.isalpha() for c in re.sub(r'\{v\d+\}', '', target))):
         raise ValueError('Translation added words to a source without text.')
+    source, target = source.translate(FULLWIDTH_DIGITS), target.translate(FULLWIDTH_DIGITS)
+    values = [v.translate(FULLWIDTH_DIGITS) for v in values]
     for piece, count in Counter(glued_placeholders(source)).items():
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')
@@ -193,7 +216,8 @@ def validate_candidate(source, target, values=()):
     joined=joined_separator_spacing(source,values)
     spaced=glued_units(source,values)
     if (not preserved(source) and (joined==source or not preserved(joined))
-            and (spaced==source or not preserved(spaced))):
+            and (spaced==source or not preserved(spaced))
+            and not any(preserved(variant) for variant in era_years(source))):
         raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.role_bindings import validate_bindings
     validate_bindings(source,target,values)
