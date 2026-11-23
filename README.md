@@ -1,8 +1,17 @@
 # TransformX
 
-TransformX translates PDF documents and redacts personal information (PII) while keeping the
-original page layout. Users upload a PDF on the website; a private GPU server processes it and
-returns a translated or redacted PDF for review.
+TransformX translates PDF, Word (.docx) and PowerPoint (.pptx) documents and redacts personal
+information (PII) while keeping the original layout. Users upload a document on the website; a
+private GPU server processes it and returns it translated or redacted, in the format it was
+uploaded in, for review.
+
+Word and PowerPoint files are changed in place (`transformation/office/native.py`): every paragraph
+keeps its runs, so styles, numbering, tables, pictures, notes and slide layouts stay as they were.
+Bold, italic and link text keep their formatting through translation; Arabic targets turn
+paragraphs and tables right to left; PowerPoint boxes the translation outgrows get a smaller font,
+measured against the source deck. For PII, tracked changes are accepted and author fields cleared
+before masking, and speaker notes, comments, headers and footers are checked too. The website shows
+a LibreOffice PDF preview of the source and the result; manual box redaction is for PDF results.
 
 Three job types are supported:
 
@@ -22,7 +31,8 @@ and Portuguese. Arabic is written right to left with proper letter shaping; Hind
 shaped Indic text. Mass tests on generated documents (reports, invoices, forms, contracts, slides,
 timetables, manuals, scans) cover English into each of the other ten, and Korean, Japanese,
 Chinese, Arabic, Hindi and Bengali into English, plus a real 50-page printer manual and a 200-page
-document. OCR of scanned pages reads English, Korean, Chinese and Japanese.
+document. OCR of scanned pages reads all eleven languages (Bengali and Hindi lines are confirmed
+by a second recognition model).
 
 Highlights, notes, form fields and links in a source PDF are kept in its translation. If the GPU
 server offers more than one translation model, users choose one per job on the upload form.
