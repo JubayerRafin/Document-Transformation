@@ -638,7 +638,12 @@ def join_broken_line(page, update):
             continue
         groups, current = [], [line[0]]
         for a, b, gap, mid, short in pairs:
-            if (mid or (short and gap <= 0.6 * a['size'])) and gap > -0.1 * a['size'] and not ruled(a, b):
+            # A rule between two glyphs set one after the other in one run (touching advances) is
+            # not a cell border between them: a table wider than its newsletter column drew its
+            # border through the next column's text, and "por escrito" became "po" | "r escrito",
+            # each translated alone (2026-11-23).
+            if ((mid or (short and gap <= 0.6 * a['size'])) and gap > -0.1 * a['size']
+                    and (not ruled(a, b) or (a['text'][-1:].isalpha() and b['text'][:1].isalpha() and advances_touch(a, b)))):
                 current.append(b)
             else:
                 groups.append(current)
