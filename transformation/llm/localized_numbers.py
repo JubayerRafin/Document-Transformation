@@ -206,9 +206,12 @@ def spelled_counts(source,target,omissions,values=()):
     "three consecutive quarters", "2営業日" -> "two business days"). Japanese contract clauses stayed
     untranslated because every such answer was refused (mass test, 2026-11-19). Only counts up to
     twenty, each matched by one number word of the same value that the source does not already have;
-    "3" written as "four" is still refused."""
+    "3" written as "four" is still refused. Ordinal words count too: "毎月第1週末" is "the first weekend of
+    each month", and a Japanese scan kept a whole paragraph in Japanese because "1" became "first"
+    (2026-11-23)."""
     if not omissions:return omissions
-    spelled=word_quantities(target,values)-word_quantities(source,values)
+    spelled=((word_quantities(target,values)+ordinal_word_quantities(target,values))
+             -(word_quantities(source,values)+ordinal_word_quantities(source,values)))
     left=Counter(omissions)
     for value,count in omissions.items():
         if not re.fullmatch(r'[1-9]\d?',value) or int(value)>20:continue

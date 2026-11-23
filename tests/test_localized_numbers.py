@@ -159,6 +159,19 @@ class SpelledCountTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_candidate('Ref INV-2025-3', 'Ref INV-2025-three')
 
+    def test_a_count_written_as_the_same_ordinal_word_is_accepted(self):
+        """Japanese scan, 2026-11-23: the right answer was refused three times and the paragraph kept in Japanese."""
+        from transformation.llm.translation_guard import validate_candidate
+        source = '主要生産ラインの保守点検は、毎月第1週末に予定されています。委員会は、試験プログラムをさらに3つの地域事務所に拡大することを推奨します。'
+        validate_candidate(source, 'The maintenance and inspection of the main production line are scheduled for the first weekend '
+                                   'of each month. The committee recommends expanding the testing program to 3 additional regional offices.')
+        for target in ('The maintenance of the main production line is scheduled for the second weekend of each month. '
+                       'The committee recommends expanding the testing program to 3 additional regional offices.',
+                       'The maintenance of the main production line is scheduled for the weekend of each month. '
+                       'The committee recommends expanding the testing program to 3 additional regional offices.'):
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)
+
 
 class LengthTests(unittest.TestCase):
     def test_an_answer_far_longer_than_its_source_is_refused(self):
