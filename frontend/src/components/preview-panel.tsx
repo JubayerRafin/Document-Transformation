@@ -20,16 +20,20 @@ import {
 } from "@/lib/api";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { RedactedValuesPanel } from "./redacted-values";
 export function PreviewPanel({
   job,
   api,
   onError,
   readOnly = false,
+  onCreated,
 }: {
   job: Job;
   api: ApiClient;
   onError: (e: unknown) => void;
   readOnly?: boolean;
+  /** A new version of this job was made (values kept visible): open it. */
+  onCreated?: (id: string) => void;
 }) {
   const [urls, setUrls] = useState<{ source?: string; result?: string }>({}),
     [error, setError] = useState(""),
@@ -167,6 +171,15 @@ export function PreviewPanel({
             </p>
           )}
         </div>
+      )}
+      {job.parent_job_id && (job.options.pii_keep?.length || 0) > 0 && (
+        <p className="mb-0 text-xs text-muted-foreground" data-testid="kept-version">
+          New version made from the original, with {job.options.pii_keep!.length} value
+          {job.options.pii_keep!.length === 1 ? "" : "s"} kept visible.
+        </p>
+      )}
+      {result && onCreated && (job.options.operation === "pii" || job.options.operation === "combined") && (
+        <RedactedValuesPanel job={job} api={api} onError={onError} onCreated={onCreated} readOnly={readOnly} />
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="mb-0 text-xs text-muted-foreground">

@@ -390,3 +390,42 @@ it("offers the server's PII models for redaction and warns before an outside ser
   expect(submit.mock.calls[0][1]).toMatchObject({ operation: "pii", pii_model: "openai" });
   expect(submit.mock.calls[0][1]).not.toHaveProperty("translation_model");
 });
+it("lists the removed values and makes a new version with the ticked ones kept visible", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    created = vi.fn();
+  vi.spyOn(api, "preview").mockResolvedValue({ url: "https://test.supabase.co/x" });
+  vi.spyOn(api, "redactedValues").mockResolvedValue({
+    values: [
+      { value: "Northwind Ltd", category: "Names", occurrences: 3, pages: [1, 2, 3, 5], parts: [] },
+      { value: "alex.m@north\nwind.example", category: "Email addresses", occurrences: 2, pages: [2], parts: ["alex.m@north"] },
+    ],
+    kept: ["Contoso"],
+    truncated: false,
+  });
+  const keep = vi.spyOn(api, "keepVisible").mockResolvedValue({ job_id: "new-job" });
+  const redacted = { ...job, options: { ...job.options, operation: "pii" as const, pii_keep: ["Contoso"] } };
+  render(<PreviewPanel job={redacted} api={api} onError={vi.fn()} onCreated={created} />);
+  expect(await screen.findByText("2 values removed · 1 kept visible")).toBeInTheDocument();
+  await u.click(screen.getByRole("button", { name: "Show what was removed" }));
+  const list = screen.getByTestId("removed-values");
+  expect(list).toHaveTextContent("alex.m@north ↵ wind.example");
+  expect(list).toHaveTextContent("Names · p. 1–3, 5 · 3 times");
+  expect(list).toHaveTextContent("also as “alex.m@north”");
+  const make = screen.getByRole("button", { name: "Make a new version" });
+  expect(make).toBeDisabled();
+  await u.click(screen.getByRole("checkbox", { name: "Keep visible: Northwind Ltd" }));
+  await u.click(screen.getByRole("checkbox", { name: "Keep visible: Contoso" }));
+  await u.click(make);
+  expect(keep).toHaveBeenCalledWith(redacted.id, ["Northwind Ltd"], expect.any(String));
+  expect(created).toHaveBeenCalledWith("new-job");
+});
+it("shows no removed-values list for translation results", async () => {
+  const api = new ApiClient();
+  vi.spyOn(api, "preview").mockResolvedValue({ url: "https://test.supabase.co/x" });
+  const list = vi.spyOn(api, "redactedValues");
+  render(<PreviewPanel job={job} api={api} onError={vi.fn()} onCreated={vi.fn()} />);
+  await screen.findByTitle("Original document");
+  expect(list).not.toHaveBeenCalled();
+  expect(screen.queryByRole("region", { name: "Removed values" })).toBeNull();
+});

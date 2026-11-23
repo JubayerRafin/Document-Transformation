@@ -255,6 +255,72 @@ class LocalServerTests(unittest.TestCase):
         self.assertEqual(job['status'], 'succeeded', job.get('error_code'))
         self.assertTrue(job['metrics']['manual_redaction_verified'])
 
+    def finished_redaction(self, keep=None):
+        options = {'operation': 'pii', 'pii_categories': ['Names', 'Email addresses']}
+        if keep:
+            options['pii_keep'] = keep
+        job_id = self.submit(options).json()['job_id']
+        self.run_queue()
+        run = self.store.root / job_id / 'engine' / 'run-1'
+        run.mkdir(parents=True)
+        (run / 'pii-findings.json').write_text(json.dumps([
+            {'region_id': 'pii-native-1-1', 'value': 'Alex Morgan', 'category': 'Names'},
+            {'region_id': 'p2_r2:cell-1-1', 'value': 'alex.m@north\nwind.example', 'category': 'Email addresses'},
+            {'region_id': 'pii-native-2-4', 'value': 'alex.m@north', 'category': 'Identifiers'},
+            {'region_id': 'pii-native-3-1', 'value': 'Alex  Morgan', 'category': 'Names'}]), encoding='utf-8')
+        picture = run / 'image-1'
+        picture.mkdir()
+        (picture / 'pii-findings.json').write_text(json.dumps([
+            {'region_id': 'ocr-1', 'value': 'Northwind Ltd', 'category': 'Names'}]), encoding='utf-8')
+        return job_id
+
+    def test_removed_values_are_listed_and_a_new_version_keeps_the_chosen_ones(self):
+        job_id = self.finished_redaction()
+        listed = self.client.get(f'/v1/jobs/{job_id}/redacted-values').json()
+        rows = {r['value']: r for r in listed['values']}
+        # Spacing and case are ignored as the engine does; a piece of a wrapped value is listed with it.
+        self.assertEqual(rows['Alex Morgan']['occurrences'], 2)
+        self.assertEqual(rows['Alex Morgan']['pages'], [1, 3])
+        self.assertEqual(rows['alex.m@north\nwind.example']['parts'], ['alex.m@north'])
+        self.assertEqual(rows['alex.m@north\nwind.example']['pages'], [2])
+        self.assertIn('Northwind Ltd', rows)   # found in a picture inside the document
+        self.assertEqual(listed['kept'], [])
+        # The values never enter the job record the website lists.
+        self.assertNotIn('Alex Morgan', json.dumps(self.client.get(f'/v1/jobs/{job_id}').json()))
+        r = self.client.post(f'/v1/jobs/{job_id}/keep-visible', json={'keep': ['Northwind Ltd', ' Alex Morgan ']},
+                             headers={'Idempotency-Key': 'keep-key-1'})
+        self.assertEqual(r.status_code, 202)
+        new = self.client.get(f"/v1/jobs/{r.json()['job_id']}").json()
+        self.assertEqual(new['parent_job_id'], job_id)
+        self.assertEqual(new['options']['pii_keep'], ['Northwind Ltd', 'Alex Morgan'])
+        self.assertEqual(new['options']['pii_categories'], ['Names', 'Email addresses'])
+        self.assertEqual(new['source_sha256'], self.client.get(f'/v1/jobs/{job_id}').json()['source_sha256'])
+        self.assertEqual((self.store.root / new['id'] / 'source.pdf').read_bytes(),
+                         (self.store.root / job_id / 'source.pdf').read_bytes())
+        again = self.client.post(f'/v1/jobs/{job_id}/keep-visible', json={'keep': ['Northwind Ltd']},
+                                 headers={'Idempotency-Key': 'keep-key-1'})
+        self.assertEqual(again.json()['job_id'], new['id'])
+        self.run_queue()
+        self.assertEqual(self.client.get(f"/v1/jobs/{new['id']}").json()['status'], 'succeeded')
+
+    def test_a_kept_value_can_be_hidden_again_and_bad_requests_are_refused(self):
+        job_id = self.finished_redaction(keep=['Northwind Ltd'])
+        self.assertEqual(self.client.get(f'/v1/jobs/{job_id}/redacted-values').json()['kept'], ['Northwind Ltd'])
+        same = self.client.post(f'/v1/jobs/{job_id}/keep-visible', json={'keep': ['Northwind Ltd']},
+                                headers={'Idempotency-Key': uuid.uuid4().hex})
+        self.assertEqual(same.json()['error'], 'KEEP_LIST_UNCHANGED')
+        hidden = self.client.post(f'/v1/jobs/{job_id}/keep-visible', json={'keep': []},
+                                  headers={'Idempotency-Key': uuid.uuid4().hex})
+        self.assertNotIn('pii_keep', self.client.get(f"/v1/jobs/{hidden.json()['job_id']}").json()['options'])
+        for body in ({'keep': ['x' * 201]}, {'keep': [''] }, {'keep': 'Alex'}, {'keep': ['a'] * 101}):
+            r = self.client.post(f'/v1/jobs/{job_id}/keep-visible', json=body, headers={'Idempotency-Key': uuid.uuid4().hex})
+            self.assertEqual(r.json()['error'], 'INVALID_PII_KEEP', body)
+        self.assertEqual(self.client.post(f'/v1/jobs/{job_id}/keep-visible', json={'keep': []}).json()['error'],
+                         'IDEMPOTENCY_KEY_REQUIRED')
+        translation = self.submit().json()['job_id']
+        self.run_queue()
+        self.assertEqual(self.client.get(f'/v1/jobs/{translation}/redacted-values').json()['error'], 'NOT_A_REDACTION_JOB')
+
     def test_website_pages_and_password(self):
         self.assertIn(b'product', self.client.get('/').content)
         self.assertIn(b'workspace', self.client.get('/workspace').content)

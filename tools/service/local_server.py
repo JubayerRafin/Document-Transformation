@@ -170,11 +170,68 @@ def redaction_regions(value, allow_empty=True):
     return out
 
 
+MAX_LISTED_VALUES = 400
+
+
+def _page_of(region_id):
+    """The page a finding's region is on, from its id ("pii-native-2-3", "p2_r2:cell-1-0"), or None."""
+    m = re.match(r'pii-native-(\d+)-|p(\d+)(?:[_:]|$)', str(region_id or ''))
+    return int(m.group(1) or m.group(2)) if m else None
+
+
+def redacted_values(folder, keep=()):
+    """What a PII job removed, for the website's list where a value can be kept visible.
+
+    Read from the engine's pii-findings.json files in the job's folder (the document's own pages and
+    the pictures read inside it), never stored in the job's metrics. Values are grouped as the engine
+    matches a keep-visible entry (spaces and case ignored); a value that is part of a longer one, as
+    a value cut by a line break is ("morel.m@stoneb" of the whole address), is listed with it, since
+    keeping the longer value keeps its parts visible too."""
+    from transformation.validation.value_redaction import compact
+    found = []
+    for path in sorted((Path(folder) / 'engine').rglob('pii-findings.json')):
+        try:
+            rows = json.loads(path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        for f in rows if isinstance(rows, list) else []:
+            if isinstance(f, dict) and isinstance(f.get('value'), str) and compact(f['value']):
+                found.append(f)
+    groups = []
+    for f in sorted(found, key=lambda f: len(compact(f['value'])), reverse=True):
+        key = compact(f['value']).casefold()
+        group = next((g for g in groups if key in g['key']), None)
+        if group is None:
+            group = {'key': key, 'value': f['value'].strip(), 'category': f.get('category') or 'Identifiers',
+                     'occurrences': 0, 'pages': set(), 'parts': set()}
+            groups.append(group)
+        elif key != group['key']:
+            group['parts'].add(' '.join(f['value'].split()))
+        group['occurrences'] += 1
+        page = _page_of(f.get('region_id'))
+        if page:
+            group['pages'].add(page)
+    groups.sort(key=lambda g: (min(g['pages']) if g['pages'] else 10**6, g['category'], g['key']))
+    values = [{'value': g['value'], 'category': g['category'], 'occurrences': g['occurrences'],
+               'pages': sorted(g['pages']), 'parts': sorted(g['parts'])[:5]} for g in groups[:MAX_LISTED_VALUES]]
+    return {'values': values, 'kept': [k for k in keep if isinstance(k, str)],
+            'truncated': len(groups) > MAX_LISTED_VALUES}
+
+
+def keep_list(value):
+    """A keep-visible list sent by the website: the same limits as the pii_keep job option."""
+    if (not isinstance(value, list) or len(value) > 100
+            or any(not isinstance(v, str) or not v.strip() or len(v) > 200 for v in value)):
+        raise Fault('INVALID_PII_KEEP')
+    return list(dict.fromkeys(v.strip() for v in value))
+
+
 class Store:
     """Jobs on disk: <root>/<job id>/job.json beside the job's files. One lock for all changes."""
 
     PUBLIC = ('id', 'filename', 'status', 'stage', 'quality', 'pages', 'created', 'updated', 'baseline',
-              'options', 'metrics', 'source_sha256', 'assigned_worker_id', 'artifacts', 'error_code')
+              'options', 'metrics', 'source_sha256', 'assigned_worker_id', 'artifacts', 'error_code',
+              'parent_job_id')
 
     def __init__(self, root):
         self.root = Path(root)
@@ -752,6 +809,60 @@ def create_app(store, engine, site_dir, password=''):
             store.save(d)
         engine.wake.set()
         return JSONResponse({'job_id': d['id'], 'status': 'queued'}, status_code=202)
+
+    # Values removed by mistake: the job's list of removed values, and a new version of the job, from
+    # the same original, with the chosen values kept visible (the pii_keep option). The original
+    # job and its result stay as they are; the new job records the list and the job it came from.
+    def redaction_job(job_id):
+        j = store.get(job_id)
+        if j['options'].get('operation') not in ('pii', 'combined'):
+            raise Fault('NOT_A_REDACTION_JOB', 409)
+        if j['status'] != 'succeeded':
+            raise Fault('RESULT_NOT_READY', 409)
+        return j
+
+    @app.get('/v1/jobs/{job_id}/redacted-values')
+    def removed_values(job_id: str):
+        j = redaction_job(job_id)
+        return redacted_values(store.root / j['id'], j['options'].get('pii_keep') or [])
+
+    @app.post('/v1/jobs/{job_id}/keep-visible', status_code=202)
+    async def keep_visible(job_id: str, request: Request):
+        key = request.headers.get('idempotency-key', '')
+        if not KEY.match(key):
+            raise Fault('IDEMPOTENCY_KEY_REQUIRED')
+        b = await json_body(request)
+        keep = keep_list(b.get('keep'))
+        with store.lock:
+            prior = store.by_key(key)
+            if prior:
+                return JSONResponse({'job_id': prior['id'], 'status_url': '/v1/jobs/' + prior['id']}, status_code=202)
+            parent = redaction_job(job_id)
+            if keep == list(parent['options'].get('pii_keep') or []):
+                raise Fault('KEEP_LIST_UNCHANGED', 409)
+            kind = file_kind(parent['filename']) or 'pdf'
+            source = store.root / parent['id'] / ('source.' + kind)
+            original = next((a for a in parent['artifacts'] if a['kind'] == 'source'), None)
+            if not source.is_file() or original is None:
+                raise Fault('ORIGINAL_UNAVAILABLE', 409)
+            new_id = str(uuid.uuid4())
+            folder = store.root / new_id
+            folder.mkdir()
+            shutil.copyfile(source, folder / source.name)
+            if (store.root / parent['id'] / 'source-preview.pdf').is_file():
+                shutil.copyfile(store.root / parent['id'] / 'source-preview.pdf', folder / 'source-preview.pdf')
+            options = {k: v for k, v in parent['options'].items() if k != 'pii_keep'}
+            if keep:
+                options['pii_keep'] = keep
+            now = time.time()
+            job = {'id': new_id, 'filename': parent['filename'], 'status': 'queued', 'stage': 'queued',
+                   'quality': 'requires_review', 'pages': parent['pages'], 'created': now, 'updated': now,
+                   'baseline': False, 'options': options, 'metrics': {}, 'source_sha256': parent['source_sha256'],
+                   'assigned_worker_id': SERVER_ID, 'error_code': None, 'idempotency_key': key, 'events': [],
+                   'parent_job_id': parent['id'], 'artifacts': [dict(original, id=str(uuid.uuid4()))]}
+            store.save(job)
+        engine.wake.set()
+        return JSONResponse({'job_id': new_id, 'status_url': '/v1/jobs/' + new_id}, status_code=202)
 
     @app.get('/v1/glossaries')
     def glossaries():

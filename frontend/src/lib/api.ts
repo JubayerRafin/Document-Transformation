@@ -42,7 +42,19 @@ export type Job = {
   assigned_worker_id?: string;
   artifacts: Artifact[];
   error_code?: string;
+  /** Set on a new version made from another job's original (e.g. with values kept visible). */
+  parent_job_id?: string | null;
 };
+/** A value a PII job removed, read on the server from the job's own files. */
+export type RedactedValue = {
+  value: string;
+  category: string;
+  occurrences: number;
+  pages: number[];
+  /** Pieces of this value found separately, e.g. where a line break cut it. */
+  parts: string[];
+};
+export type RedactedValues = { values: RedactedValue[]; kept: string[]; truncated: boolean };
 /** A place in the redacted PDF a person should look at; a box only, never text. */
 export type ReviewItem = {
   page: number;
@@ -244,6 +256,11 @@ const MESSAGES: Record<string, string> = {
   DUPLICATE_GLOSSARY_TERM: "A term appears twice in this glossary.",
   INVALID_LANGUAGE: "Choose two different languages.",
   TRANSLATION_MODEL_NOT_OFFERED: "That translation model is not available on this server right now. Reload the page.",
+  KEEP_LIST_UNCHANGED: "Choose at least one value to keep visible or to hide again.",
+  NOT_A_REDACTION_JOB: "Only redaction results have a list of removed values.",
+  ORIGINAL_UNAVAILABLE:
+    "The original document of this result is no longer on the server. Upload it again with the values under “Keep visible”.",
+  RESULT_NOT_READY: "This result is not ready yet. Try again when the job has finished.",
   PII_MODEL_NOT_OFFERED: "That PII model is not available on this server right now. Reload the page.",
 };
 export class ApiError extends Error {
@@ -323,6 +340,23 @@ export class ApiClient {
       headers: { "Idempotency-Key": key },
       body: data,
     });
+  }
+  redactedValues(id: string, signal?: AbortSignal) {
+    return this.request<RedactedValues>(
+      `/v1/jobs/${encodeURIComponent(id)}/redacted-values`,
+      { signal },
+    );
+  }
+  /** A new version of a PII job from the same original, with these values left visible. */
+  keepVisible(id: string, keep: string[], key: string) {
+    return this.request<{ job_id: string }>(
+      `/v1/jobs/${encodeURIComponent(id)}/keep-visible`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+        body: JSON.stringify({ keep }),
+      },
+    );
   }
   cancel(id: string) {
     return this.request(`/v1/jobs/${encodeURIComponent(id)}/cancel`, {

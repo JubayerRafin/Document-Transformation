@@ -308,6 +308,7 @@ export function Workspace() {
                             api={s.api}
                             onError={s.handleError}
                             readOnly={readOnly}
+                            onCreated={submitted}
                           />
                         ) : (
                           <ProgressPanel
