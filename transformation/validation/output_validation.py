@@ -11,6 +11,24 @@ def normalized(value):
     return re.sub(r'\s+','',unquote(value)).casefold()
 
 
+def residual_in(value,text):
+    """True when value is still in text, spaces and letter case aside (a name split by a line break
+    counts). A value that starts and ends with a letter or digit of a script written with spaces
+    must stand as a word: the name "Mat" was found in "Format" and blocked a Samsung guide
+    (2026-11-23). Other scripts (Arabic words take prefixes; CJK has no word spaces) are found anywhere."""
+    from urllib.parse import unquote
+    key=normalized(value)
+    if not key:return False
+    bounded=lambda ch:ch.isalnum() and ord(ch)<0x0590      # Latin, Greek, Cyrillic letters and digits
+    if not (bounded(key[0]) and bounded(key[-1])):
+        return key in normalized(text)
+    # Only a neighbouring letter or digit of the same kind of script ends the word: "EMP-2026-14033은"
+    # (a Korean particle attached) still holds the value.
+    near=r'[0-9a-zÀ-ɏͰ-ϿЀ-ӿ]'
+    pattern=r'(?<!'+near+r')'+r'\s*'.join(re.escape(c) for c in key)+r'(?!'+near+r')'
+    return re.search(pattern,unquote(text).casefold()) is not None
+
+
 def partial_name_residuals(source,output,names):
     """Words of a selected multi-word name left behind while other words were removed.
 
@@ -55,7 +73,7 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
             raise ValueError('Invalid source-relative font validation region.')
     def check(text,location):
         for value in values:
-            if normalized(value) and normalized(value) in normalized(text):
+            if residual_in(value,text):
                 residual.append({'location':location,'value':value})
     if kind=='pdf':
         with pymupdf.open(stream=data,filetype='pdf') as pdf:
@@ -105,7 +123,9 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                     if overlap>min(areas[index],areas[other_index])*.35:
                         candidates.append({'page':number,'kind':'text_text_overlap',
                                            'text':[text_spans[index]['text'],text_spans[other_index]['text']]})
-                for link in page.get_links(): check(str(link),'page '+str(number)+' link')
+                # A link's address and file, not its record: "105088" matched a link's object number
+                # and blocked a Cisco manual (2026-11-23).
+                for link in page.get_links(): check(' '.join(str(link.get(k) or '') for k in ('uri','file')),'page '+str(number)+' link')
                 for annot in page.annots() or []: check(str(annot.info),'page '+str(number)+' annotation')
                 # annots() excludes form fields; their values are not page text.
                 for widget in page.widgets() or []: check(str(widget.field_value or '')+' '+str(widget.field_name or ''),'page '+str(number)+' form field')

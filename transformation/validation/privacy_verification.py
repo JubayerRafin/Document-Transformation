@@ -97,7 +97,15 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options,languag
             progress=None
             for progress in _read(folder/'source.pdf',folder,'paddle',options,language): yield {'page':index+1,'progress':progress}
             regions=_regions(folder/'source.pdf',folder,progress); text=' '.join(r['text'] for r in regions)
-            residual=[v for v in values if normalized(v) in normalized(text)]
+            # A selected value read again inside one line is a finding with a place, masked and
+            # checked again by the final-check rounds; only one that cannot be placed (read across
+            # lines) blocks the result at once. A Cisco part number the model had selected, printed
+            # in a picture, blocked a whole manual (2026-11-23). Values are matched as words.
+            from transformation.validation.output_validation import residual_in
+            residual=[v for v in values if residual_in(v,text)]
+            located=[{'region_id':r['id'],'value':v,'category':'Identifiers','method':'selected_value_reread'}
+                     for v in residual for r in regions if residual_in(v,r.get('text',''))]
+            residual=[v for v in residual if v not in {d['value'] for d in located}]
             def analysed(region):
                 key=_compact(region.get('text','')).casefold()
                 return len(key)>=3 and any(key in text for text in seen_texts)
@@ -112,6 +120,7 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options,languag
             # is not an identifier and must not trigger masking or a second check.
             from transformation.validation.privacy import plausible
             detected=[d for d in detected if plausible(d.get('value',''),d.get('category',''))]
+            detected+=located
             flagged=[r for r in regions if r.get('metadata',{}).get('requires_review')]
             with pymupdf.open(folder/'source.pdf') as rendered:
                 uncertain=[r for r in flagged if _could_hide_selected_value(r,values,rendered[0])]
@@ -147,7 +156,8 @@ def verify(data,kind,run,values,categories,endpoint,model,assist,options,languag
             boxes={r['id']:r.get('bbox') for r in regions}
             detected=[dict(d,bbox=boxes.get(d.get('region_id'))) for d in detected]
             reports.append({'page':index+1,'page_size':[page.rect.width,page.rect.height],
-                            'known_residual_values':residual,'detected_pii':detected,'uncertain_regions':uncertain,
+                            'known_residual_values':residual,'located_residual_values':sorted({d['value'] for d in located}),
+                            'detected_pii':detected,'uncertain_regions':uncertain,
                             'uncertain_regions_ignored':len(flagged)-len(uncertain)})
     yield {'reports':reports,'passed':not any(p['known_residual_values'] or p['detected_pii'] or p['uncertain_regions'] for p in reports),
            'limitations':'Fresh OCR can still miss content. This is an acceptance check, not a privacy guarantee.'}

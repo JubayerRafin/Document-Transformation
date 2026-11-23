@@ -40,7 +40,12 @@ class UnreadableVerificationTests(unittest.TestCase):
                 result=list(verify(data,'pdf',root,['demo@example.invalid'],['Email addresses'],'','',False,{'ocr_python':'fixture'}))[-1]
             self.assertFalse(result['passed'])
             self.assertEqual(result['reports'][0]['uncertain_regions'],['unknown'])
-            self.assertEqual(result['reports'][0]['known_residual_values'],['demo@example.invalid'])
+            # A selected value read again in one line is a placed finding: masked and checked again.
+            report=result['reports'][0]
+            self.assertEqual(report['known_residual_values'],[])
+            self.assertEqual(report['located_residual_values'],['demo@example.invalid'])
+            self.assertIn(('readable','demo@example.invalid','selected_value_reread'),
+                          [(d['region_id'],d['value'],d['method']) for d in report['detected_pii']])
 
     def _translated(self, source_text, source_review=False):
         """An English output keeping one line of source pixels the English reader leaves empty."""

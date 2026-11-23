@@ -604,6 +604,19 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             independent['partial_name_residuals']=partial_name_residuals(data,artifact,names)
             if independent['partial_name_residuals']:
                 info['warnings'].append('Part of a selected name remains in the output; review the highlighted names.')
+        if independent['known_sensitive_residuals'] and redact and kind=='pdf' and output_kind=='pdf':
+            # Values masked where they were detected but still standing elsewhere: masked here and
+            # checked again; only what is still readable then blocks the result.
+            from transformation.validation.value_redaction import redact_remaining
+            save_json(run/'independent-validation-before-repair.json',independent)
+            artifact,repaired=redact_remaining(artifact,independent['known_sensitive_residuals'])
+            if repaired:
+                destination.write_bytes(artifact)
+                info['residual_masks']=repaired
+                info['warnings'].append(f'{repaired} further occurrence(s) of removed values were masked by the final check; review them.')
+                residual_check=inspect_output(artifact,output_kind,all_values)
+                independent['known_sensitive_residuals']=residual_check['known_sensitive_residuals']
+                independent['residual_repair']=repaired
         save_json(run/'independent-validation.json',independent)
         if independent['known_sensitive_residuals']:
             info['failure_code']='PRIVACY_CHECK_BLOCKED'

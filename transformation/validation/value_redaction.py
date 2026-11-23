@@ -527,3 +527,52 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
                               'removed_unselected_characters':sum(missing.values()),'review_required':True})
     return result,audit
 
+
+
+def redact_remaining(data, residuals):
+    """Mask selected values the output check still found (inspect_output's known_sensitive_residuals).
+
+    A value masked where it was detected can stand elsewhere in other words' company ("Adobe" and
+    "apache" in a Canon manual's licence pages), and the whole 235-page result was blocked
+    (2026-11-23). Each remaining occurrence on a reported page is matched as whole words in the
+    page's word list (never inside a longer word) and masked; values in the PDF metadata clear it and
+    links holding them are removed. Returns (pdf bytes, occurrences masked)."""
+    import pymupdf
+    from transformation.validation.output_validation import residual_in
+    masked = 0
+    word = lambda w: re.sub(r'^\W+|\W+$', '', w).casefold()
+    with pymupdf.open(stream=data, filetype='pdf') as pdf:
+        for item in residuals:
+            location, value = item.get('location', ''), item.get('value', '')
+            if location == 'PDF metadata':
+                pdf.set_metadata({}); pdf.del_xml_metadata(); continue
+            match = re.fullmatch(r'page (\d+)( link)?', location)
+            if not match or not 1 <= int(match[1]) <= len(pdf):
+                continue
+            page = pdf[int(match[1]) - 1]
+            if match[2]:
+                for link in page.get_links():
+                    if residual_in(value, ' '.join(str(link.get(k) or '') for k in ('uri', 'file'))):
+                        page.delete_link(link); masked += 1
+                continue
+            tokens = [word(t) for t in value.split() if word(t)]
+            if not tokens:
+                continue
+            words = page.get_text('words')
+            found = []
+            if len(tokens) == 1 and not re.search(r'[A-Za-z0-9]', value):
+                found = list(page.search_for(value))          # scripts without word spaces
+            else:
+                keys = [word(w[4]) for w in words]
+                for i in range(len(words) - len(tokens) + 1):
+                    if keys[i:i + len(tokens)] == tokens:
+                        rect = pymupdf.Rect(words[i][:4])
+                        for w in words[i + 1:i + len(tokens)]:
+                            rect |= pymupdf.Rect(w[:4])
+                        found.append(rect)
+            for rect in found:
+                page.add_redact_annot(rect, fill=(0, 0, 0)); masked += 1
+            if found:
+                page.apply_redactions(images=2, graphics=0, text=0)
+        result = pdf.tobytes(garbage=4, deflate=True, clean=True)
+    return result, masked
