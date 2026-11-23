@@ -3,10 +3,18 @@ import math
 import pymupdf
 
 
+def _kept_as_source(region):
+    """An uncertain line the scan rebuild keeps as source pixels: its size does not matter. A line
+    flagged by the OCR but read consistently is rebuilt and needs its size: "해야 합니다" was drawn at
+    13.7 pt beside 8.4 pt lines, as tall as its box (Korean scan, 2026-11-23)."""
+    from transformation.ocr.read_alike import reads_consistently
+    return bool(region.get('metadata',{}).get('requires_review')) and not reads_consistently(region)
+
+
 def source_fit_policy(region,page):
     box=pymupdf.Rect(region['bbox'])
     fallback={'minimum':8.0,'maximum':max(8.0,box.height*.95),'basis':'default_readability_floor'}
-    if region.get('metadata',{}).get('requires_review') or box.is_empty:return fallback
+    if _kept_as_source(region) or box.is_empty:return fallback
     density=1.0
     for image in page.get_image_info():
         rect=pymupdf.Rect(image['bbox'])
@@ -69,7 +77,7 @@ def neighbour_policy(region,policy,measured):
     fell back to the floor and were drawn at 8 pt, twice their neighbours (2026-11-23). measured:
     (region, policy) for every line of the picture. A line with no comparable neighbour keeps its
     policy."""
-    if policy.get('basis')!='default_readability_floor' or region.get('metadata',{}).get('requires_review'):
+    if policy.get('basis')!='default_readability_floor' or _kept_as_source(region):
         return policy
     box=pymupdf.Rect(region['bbox'])
     if box.is_empty:return policy

@@ -136,6 +136,15 @@ class NeighbourPolicyTests(unittest.TestCase):
         self.assertEqual(policy['basis'], 'neighbouring_lines_estimate')
         self.assertAlmostEqual(policy['maximum'], 5.9)
         self.assertLess(policy['minimum'], 8.0)
+        # A line the OCR flagged but read consistently is rebuilt and takes its neighbours' size;
+        # one kept as source pixels keeps the floor (Korean scan, 2026-11-23).
+        ko = 'korean_PP-OCRv5_mobile_rec'
+        flagged = dict(line, text='해야 합니다', metadata={'requires_review': True, 'candidates': [
+            {'model': ko, 'text': '해야 합니다.', 'score': .9}, {'model': ko, 'text': '해야 합니다', 'score': .94},
+            {'model': ko, 'text': '해야 합니다.', 'score': .89}]})
+        self.assertEqual(neighbour_policy(flagged, floor, [(flagged, floor)] + near)['basis'], 'neighbouring_lines_estimate')
+        flagged['metadata']['candidates'] = flagged['metadata']['candidates'][:1]
+        self.assertIs(neighbour_policy(flagged, floor, [(flagged, floor)] + near), floor)
 
     def test_measured_lines_and_lines_without_neighbours_keep_their_policy(self):
         from transformation.layout.ocr_fitting import neighbour_policy
