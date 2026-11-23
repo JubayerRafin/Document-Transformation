@@ -4,7 +4,7 @@ usage: python -m evaluation.pii.score <set_dir> <label>
 Writes <set_dir>/runs/<label>/scores.json and prints an aggregate table.
 
 Per expected value: detected 'full' (a finding contains it), 'partial' (a finding covers >=60%),
-'ocr_variant' (>=85% similar, OCR misread), 'by_words' (every word found separately) or 'missed'.
+'ocr_variant' (>=85% similar, OCR misread), 'by_words' (every word found separately) or 'missed'; a value held only as deleted tracked-change text and absent from the output is 'removed_with_revision'.
 Leaks: a value still in the output text layer, or a word of a multi-word value left behind.
 Over-masking: a must-stay-visible value found as PII, or removed from the output text.
 Image values are judged against a fresh OCR of the output when ocr_leaks.py has run; otherwise by detection only.
@@ -53,6 +53,22 @@ def document_text(path):
         return ' '.join(p.get_text() for p in pdf)
 
 
+def deleted_only(source, value):
+    """Whether a Word source holds value only as deleted tracked-change text (w:delText). The engine
+    accepts tracked changes before masking, so such a value is removed with the revision; it is
+    handled when the output does not contain it, without being flagged."""
+    import re
+    import zipfile
+    if Path(source).suffix.lower() != '.docx':
+        return False
+    with zipfile.ZipFile(source) as z:
+        xml = ''.join(z.read(n).decode('utf-8', 'replace') for n in z.namelist()
+                      if n.startswith('word/') and n.endswith('.xml'))
+    deleted = ''.join(re.findall(r'<w:delText[^>]*>([^<]*)</w:delText>', xml))
+    kept = ''.join(re.findall(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', xml))
+    return compact(value) in compact(deleted) and compact(value) not in compact(kept)
+
+
 def score_doc(spec, summary, source, run_dir=None):
     row = {'status': summary.get('status'), 'failure_code': summary.get('failure_code'), 'error': (summary.get('error') or '')[:200],
            'server_seconds': summary.get('server_seconds'), 'pages': spec['pages'], 'variant': spec['variant'], 'language': spec['language'],
@@ -89,6 +105,8 @@ def score_doc(spec, summary, source, run_dir=None):
         if generated and where == 'text':
             leak = compact(value) in compact(out_text) or any(
                 len(w) >= 4 and src_text.count(w) and src_text.count(w) == out_text.count(w) for w in words if len(words) > 1)
+        if detected == 'missed' and generated and where == 'text' and not leak and deleted_only(source, value):
+            detected = 'removed_with_revision'
         rows.append({'category': category, 'value': value, 'where': where, 'detected': detected, 'leak': leak})
     row['expected'] = rows
     known = [v for _, v, _ in spec['expected']] + spec.get('optional', [])
