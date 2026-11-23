@@ -243,6 +243,79 @@ def katakana_lookalikes(text):
     return ''.join(out)
 
 
+def punctuation_from_reader(crop, best, reader):
+    """Arabic sentence punctuation and spaces from a second reading that has exactly the same letters
+    and digits. PaddleOCR's Arabic model drops the full stop and the space after it ("أخرىيجب" for
+    "أخرى. يجب", Arabic development scans, 2026-11-24); Tesseract's Arabic model reads the same
+    letters with them. Letters and digits never change; diacritics follow the second reading."""
+    import unicodedata
+    try:
+        other = reader.predict(crop)[0]
+    except Exception:
+        return best
+    text, found = best.get('text') or '', (other.get('rec_text') or '').strip()
+    if not found or found == text.strip() or other.get('rec_score', 0) < .75:
+        return best
+    core = lambda t: ''.join(c for c in t if unicodedata.category(c)[0] in 'LN')
+    if core(text) != core(found):
+        return best
+    return dict(best, text=found, spacing='second_model_punctuation')
+
+
+SCRIPT_LETTERS = {'bn': ('ঀ', '৿'), 'hi': ('ऀ', 'ॿ'), 'ar': ('؀', 'ۿ'),
+                  'ko': ('가', '힣')}
+
+
+def script_islands(best, candidates, language):
+    """A word of the line's own script read as Latin letters between words of that script: Tesseract's
+    Bengali model read "সেবা ডেস্কে যোগাযোগ" as "সেবা COCS যোগাযোগ" in four of seven views, and
+    the second Bengali model agreed (Bengali development scan, 2026-11-24). Such a word is replaced
+    only when other views of the line read every other word the same and give one word of the
+    script in its place, scoring within 0.05 of the chosen view. A Latin word no view reads in the
+    script (a currency, a code, a product name) stays."""
+    letters = SCRIPT_LETTERS.get(language)
+    text = best.get('text') or ''
+    if not letters or not re.search(r'[A-Za-z]', text):
+        return best
+    native = lambda word: any(letters[0] <= ch <= letters[1] for ch in word)
+    latin = lambda word: bool(re.fullmatch(r'[A-Za-z]+', word))
+    words = text.split()
+    islands = [i for i, w in enumerate(words) if latin(w)
+               and (i == 0 or native(words[i - 1])) and (i == len(words) - 1 or native(words[i + 1]))
+               and any(native(words[j]) for j in (i - 1, i + 1) if 0 <= j < len(words))]
+    if not islands:
+        return best
+    for i in islands:
+        found = {}
+        for c in candidates:
+            other = (c.get('text') or '').split() if isinstance(c, dict) else []
+            if (len(other) == len(words) and c.get('score', 0) >= best.get('score', 0) - .05
+                    and all(a == b for j, (a, b) in enumerate(zip(words, other)) if j != i)
+                    and native(other[i]) and not re.search(r'[A-Za-z]', other[i])):
+                found[other[i]] = found.get(other[i], 0) + 1
+        if len(found) == 1:
+            words[i] = next(iter(found))
+    replaced = ' '.join(words)
+    return best if replaced == ' '.join(text.split()) else dict(best, text=replaced, script_island='replaced')
+
+
+INDIC_DIGITS = {'hi': '०१२३४५६७८९', 'bn': '০১২৩৪৫৬৭৮৯'}
+
+
+def western_digits(text, language):
+    """Devanagari or Bengali digits read in a number written with Western digits: "३0" for 30,
+    "५ से ३0" for "5 से 30" (Hindi development scan, 2026-11-24). A number never mixes digit scripts,
+    so a mixed number is Western, and a line holding Western digits has its other digits Western too.
+    A line written entirely in the script's own digits is left as it is."""
+    native = INDIC_DIGITS.get(language)
+    if not native or not any(c in native for c in text):
+        return text
+    to_western = str.maketrans(native, '0123456789')
+    if re.search(r'[0-9]', text):
+        return text.translate(to_western)
+    return text
+
+
 def consensus_key(text):
     """Ignore prose spacing and dash typography; keep structured literals exact."""
     literals=re.findall(r'[\w.+-]+@[\w.-]+|\b\w*_[\w._-]+|(?<!\w)[\w.+:/%–—−-]*\d[\w.,:/%–—−-]*',text)
@@ -1020,6 +1093,12 @@ def main(argv=None, model_factory=None):
                             elif dropped:
                                 review,decision=True,DIGITS_DROPPED
                         best=voted_spacing(best,candidates)
+                        if args.source_language=='ar' and digit_reader is not None:
+                            best=punctuation_from_reader(unpadded_crops[i],best,digit_reader)
+                        if args.source_language in INDIC_DIGITS:
+                            best=dict(best,text=western_digits(best['text'],args.source_language))
+                        if args.source_language in SCRIPT_LETTERS:
+                            best=script_islands(best,candidates,args.source_language)
                         if args.source_language in ('ko','ja','zh') and model_name!=TESSERACT_RECOGNIZER:
                             best=gap_spacing(crops[i],best,model,args.source_language)   # padded: the tight crop has no background rows
                         if args.source_language=='ja':
