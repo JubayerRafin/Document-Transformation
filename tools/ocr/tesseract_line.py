@@ -14,7 +14,7 @@ TESSERACT_MODELS = {'bn': 'ben', 'ar': 'ara'}
 # A second, separately trained model of the same script (Tesseract's "script" models, apt packages
 # tesseract-ocr-script-beng and -deva; Hindi's language model for Paddle's Devanagari reader): a line
 # that the first model reads unsteadily is translated when the two models agree on it.
-SECOND_MODELS = {'bn': 'Bengali', 'hi': 'hin'}
+SECOND_MODELS = {'bn': 'Bengali', 'hi': 'hin', 'ja': 'jpn', 'zh': 'chi_sim'}
 
 
 def available(language, model=None):

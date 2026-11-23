@@ -76,6 +76,11 @@ def reads_consistently(region):
     # numbers have no second recognizer, so the PII review queue (read_alike) still lists the line.
     if any(c.get('variant') in ('tesseract_digits', 'digit_rescue') and characters(c['text']) == key for c in confident):
         return True
+    # Two separately trained models gave the line's characters (recognize_paddle_boxes.second_model_agreement).
+    readings = region.get('metadata', {}).get('candidates', [])
+    if any(isinstance(c, dict) and c.get('variant') == 'second_model' and isinstance(c.get('text'), str)
+           and characters(c['text']) == key for c in readings):
+        return True
     agree = [c for c in confident if characters(c['text']) == key]
     if agree and len(agree) > len(confident) - len(agree) and _models(agree) >= 2:
         return True

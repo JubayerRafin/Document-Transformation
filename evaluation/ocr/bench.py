@@ -12,7 +12,8 @@ same OCR the engine uses (transformation.ocr.paddle_pipeline.run_ocr) and compar
   cer / cer_nospace              character error rate: each line of the truth (cut at table-cell gaps;
                                  right-to-left lines in runs of one direction) against its closest
                                  match anywhere in the OCR text (edit distance to the best substring
-                                 of an OCR line, so reading order and the scan's tilt do not matter),
+                                 of an OCR line, or of boxes on one row joined left to right, so
+                                 reading order and the scan's tilt do not matter),
                                  summed over all truth characters; with and without word spaces
   review_share                   OCR lines flagged by the recognizer
   kept_share                     OCR lines a translation keeps as source pixels (flagged, not read
@@ -133,6 +134,32 @@ def substring_distance(needle, haystack):
     return min(previous)
 
 
+def row_joins(lines):
+    """OCR boxes on one row, left to right, joined: the detector can read one line as several boxes
+    ("Advertencia: Desconecte" | "la" | "alimentación ..."), which the translation joins again
+    (transformation/ocr/source_lines.py) but a per-box match counted as missing text. Each run of
+    boxes that share at least half their height and stand less than three line heights apart."""
+    boxes = [l for l in lines if l.get('text', '').strip() and l.get('bbox')]
+    boxes.sort(key=lambda l: (l['bbox'][1], l['bbox'][0]))
+    used, out = set(), []
+    for i, first in enumerate(boxes):
+        if i in used:
+            continue
+        row, end = [first], first['bbox'][2]
+        for j in range(i + 1, len(boxes)):
+            other = boxes[j]
+            if j in used:
+                continue
+            a, b = row[-1]['bbox'], other['bbox']
+            height = min(a[3] - a[1], b[3] - b[1])
+            overlap = min(a[3], b[3]) - max(a[1], b[1])
+            if overlap >= .5 * height and 0 <= b[0] - end < 3 * height:
+                row.append(other); used.add(j); end = b[2]
+        if len(row) > 1:
+            out.append(' '.join(l['text'] for l in row))
+    return out
+
+
 def line_cer(truth_lines, ocr_lines_text):
     """(cer, cer without spaces): every truth line against its best-matching OCR line."""
     def best(line, candidates):
@@ -198,8 +225,9 @@ def main():
                     done = event
             found = ocr_text(done['recognition_dir'])
             row = score(truth_text(truth), found)
+            lines = ocr_lines(done['recognition_dir'])
             row['cer'], row['cer_nospace'] = line_cer(truth_cells(truth),
-                                                      [l.get('text', '') for l in ocr_lines(done['recognition_dir'])])
+                                                      [l.get('text', '') for l in lines] + row_joins(lines))
             row['review_share'] = review_share(done['recognition_dir'])
             row['kept_share'] = kept_share(done['recognition_dir'])
         except Exception as exc:  # one language failing must not hide the others

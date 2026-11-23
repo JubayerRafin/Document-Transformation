@@ -465,14 +465,14 @@ def scanned(src_path, out_path, rng):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('out')
-    parser.add_argument('--set', choices=['dev', 'heldout', 'competition'], default='dev')
+    parser.add_argument('--set', choices=['dev', 'dev2', 'heldout', 'competition'], default='dev')
     parser.add_argument('--langs', default=','.join(LANGS))
     parser.add_argument('--edge', default=r'C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe')
     args = parser.parse_args()
     # Absolute: the browser resolves a relative --print-to-pdf path against its own folder.
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
-    seed = {'dev': 20261121, 'heldout': 99117, 'competition': 20261204}[args.set]
+    seed = {'dev': 20261121, 'dev2': 20261124, 'heldout': 99117, 'competition': 20261204}[args.set]  # dev2: more development scans
     manifest = []
     with tempfile.TemporaryDirectory() as tmp:
         tmp = Path(tmp)

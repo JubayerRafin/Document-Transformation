@@ -22,6 +22,65 @@ def detector_polygons(value):
     return polygons
 
 
+def recover_missed_text(image, polygons):
+    """Boxes for text the detector left out of a line it found: (polygons, number added).
+
+    The detector stopped short of words on a light box background ("Advertencia: Desconecte" |
+    "alimentación ...", missing "la"; "seco, a una temperatura" missing "de entre 5 y 30 grados.",
+    Spanish scan, 2026-11-24). Beside each detected box, on its own rows, columns with text ink are
+    followed outward until a gap wider than the line is tall (a column gutter) or another box; ink
+    that runs the whole height (a border) or along one row (a rule) is not text. A stretch at least
+    0.4 line heights wide becomes a new box, read like the others; one that reads as nothing is
+    dropped."""
+    import cv2
+    import numpy as np
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
+    height, width = gray.shape
+    boxes = [cv2.boundingRect(np.asarray(p, dtype=np.float32).astype(np.int32)) for p in polygons]
+    covered = np.zeros((height, width), dtype=bool)
+    for x, y, w, h in boxes:
+        covered[y:y + h, x:x + w] = True
+    added = []
+    for x, y, w, h in boxes:
+        if h < 10 or w < h or y < 0 or y + h > height:
+            continue
+        top, bottom = y + int(h * .15), y + h - int(h * .15)
+        band = gray[top:bottom].astype(np.int16)
+        if band.size == 0:
+            continue
+        background = np.percentile(gray[y:y + h], 90)
+        ink = band < background - 60
+        rows = bottom - top
+        counts = ink.sum(axis=0)
+        text_columns = (counts > 0) & (counts < .9 * rows)
+        middle = y + h // 2
+        for direction in (1, -1):
+            start = x + w if direction == 1 else x - 1
+            position, last, gap = start, None, 0
+            while 0 <= position < width and not covered[middle, position]:
+                if text_columns[position]:
+                    last, gap = position, 0
+                else:
+                    gap += 1
+                    if gap > 1.2 * h:
+                        break
+                position += direction
+            if last is None or abs(last - start) < .4 * h:
+                continue
+            left, right = sorted((start, last))
+            left, right = max(0, left - 2), min(width - 1, right + 2)
+            span = ink[:, left:right + 1]
+            if text_columns[left:right + 1].sum() < .25 * (right - left + 1):
+                continue
+            if span.sum() and span.sum(axis=1).max() > .8 * (right - left + 1):
+                continue   # one row inked across the stretch: a rule, not text
+            added.append(np.array([[left, y], [right, y], [right, y + h], [left, y + h]], dtype=np.float32))
+            covered[y:y + h, left:right + 1] = True
+    if not added:
+        return polygons, 0
+    return np.concatenate([np.asarray(polygons, dtype=np.float32), np.stack(added)]), len(added)
+
+
 def select_candidate(candidates):
     """Whitespace-insensitive consensus; never normalize identifier characters."""
     if not candidates:
@@ -90,7 +149,10 @@ def voted_spacing(best, candidates):
     return dict(best, text=spaced, spacing='voted')
 
 
-def gap_spacing(crop, best, model):
+CJK_LATIN_GLUE = re.compile(r'[A-Za-z][0-9]|[A-Za-z0-9][^\x00-\x7f]|[^\x00-\x7f][A-Za-z0-9]|[:：][A-Za-z0-9]')
+
+
+def gap_spacing(crop, best, model, language='ko'):
     """The chosen Korean reading with a space at each word gap the line image shows.
 
     PaddleOCR's Korean model drops most word spaces, in every view: "장치는5도에서30도사이의" and
@@ -104,6 +166,11 @@ def gap_spacing(crop, best, model):
     # Four syllables or more (Korean words are mostly two or three: "컨설팅시간", "감열라벨" in table
     # cells kept no space at six), or a word glued to what follows its colon ("소계:KRW").
     long_words = [w for w in text.split() if len(re.findall(r'[가-힣]', w)) >= 4 or re.search(r'[가-힣][:：]\S', w)]
+    if language != 'ko':
+        # Japanese and Chinese have no word spaces, but a currency code, amount or Latin word set
+        # beside them does: "KRW 676,188,000" and "小計: USD 879,754.63" were read "KRW676,188,000"
+        # and "小計:USD879,754.63" (Japanese scans, 2026-11-24). Only such boundaries get a space.
+        long_words = [w for w in text.split() if CJK_LATIN_GLUE.search(w)]
     if not long_words or '@' in text:
         return best
     pieces = split_word_crops(crop)
@@ -133,13 +200,47 @@ def gap_spacing(crop, best, model):
         if ch.isspace(): own.add(position)
         else: position += 1
     number = lambda ch: ch.isdigit() or ch in '.,:/-'
+    latin = lambda ch: ch.isascii() and ch.isalnum()
+    allowed = (lambda a, b: True) if language == 'ko' else (lambda a, b: latin(a) or latin(b))
     out = []
     for position, ch in enumerate(key):
-        if position and (position in own or (position in cuts and not (number(key[position - 1]) and number(ch)))):
+        if position and (position in own or (position in cuts and not (number(key[position - 1]) and number(ch))
+                                             and allowed(key[position - 1], ch))):
             out.append(' ')
         out.append(ch)
     result = ''.join(out)
     return best if result == text.strip() else dict(best, text=result, spacing='image_gaps')
+
+
+KATAKANA_LOOKALIKES = {'一': 'ー', '口': 'ロ', '力': 'カ', '工': 'エ', '二': 'ニ', '八': 'ハ', '夕': 'タ', '卜': 'ト'}
+
+
+def _katakana(ch):
+    return '\u30a1' <= ch <= '\u30ff'
+
+
+def katakana_lookalikes(text):
+    """Kanji that look like katakana, read inside a katakana word, as the katakana they are.
+
+    The recognizer reads the long-vowel mark and some katakana as kanji of the same shape:
+    "ネットワ一ク" (一 for ー), "力バ一" (力 for カ), "プ口グラム" (口 for ロ) in Japanese scans
+    (2026-11-24). A look-alike before a katakana is that katakana unless a kanji precedes it; 一 right
+    after a katakana and not followed by a kanji is the long-vowel mark. Kanji next to kanji are never
+    changed ("第一", "統一")."""
+    if not any(c in KATAKANA_LOOKALIKES for c in text):
+        return text
+    out = list(text)
+    for i, ch in enumerate(text):
+        if ch not in KATAKANA_LOOKALIKES:
+            continue
+        before = text[i - 1] if i else ''
+        after = text[i + 1] if i + 1 < len(text) else ''
+        kanji = lambda c: '一' <= c <= '鿿'
+        if (after and _katakana(after) and (_katakana(before) or not kanji(before))) if before else (after and _katakana(after)):
+            out[i] = KATAKANA_LOOKALIKES[ch]
+        elif ch == '一' and before and _katakana(before) and not ('\u4e00' <= after <= '\u9fff'):
+            out[i] = 'ー'
+    return ''.join(out)
 
 
 def consensus_key(text):
@@ -339,11 +440,16 @@ DIGIT_RESCUE = {'ar'}
 
 def second_model_agreement(crops, candidates, language, reader):
     """A reading from a second, separately trained model (tesseract_line.SECOND_MODELS) that gives
-    exactly the characters of a confident reading of the first, spaces and letter case aside: that
-    reading, recorded as the second model's, else None. reader() returns the second model."""
+    exactly the characters of a reading of the first, spaces and letter case aside: that reading,
+    recorded as the second model's, else None. reader() returns the second model.
+
+    Two independently trained models giving the same characters is the evidence; each must still be
+    fairly sure (0.7 and 0.75). Small katakana in Japanese scans are read at 0.7-0.85 by the first
+    model, and those lines stayed untranslated (9.8% of a Japanese development scan, 2026-11-24)."""
     from transformation.ocr.read_alike import characters
+    same = (lambda t: characters(katakana_lookalikes(t))) if language == 'ja' else characters
     confident = [c for c in candidates if isinstance(c.get('text'), str) and c['text'].strip()
-                 and isinstance(c.get('score'), (int, float)) and c['score'] >= .85]
+                 and isinstance(c.get('score'), (int, float)) and c['score'] >= .7]
     if not confident:
         return None
     try:
@@ -352,9 +458,9 @@ def second_model_agreement(crops, candidates, language, reader):
     except Exception:
         return None
     for other in readings:
-        if other['rec_score'] < .85:
+        if other['rec_score'] < .75 or not other['rec_text'].strip():
             continue
-        match = [c for c in confident if characters(c['text']) == characters(other['rec_text'])]
+        match = [c for c in confident if same(c['text']) == same(other['rec_text'])]
         if match:
             best = max(match, key=lambda c: c['score'])
             return {'text': best['text'], 'score': min(best['score'], other['rec_score']), 'variant': 'second_model',
@@ -738,6 +844,12 @@ def main(argv=None, model_factory=None):
         rect = pdf[0].rect
         page_width, page_height = rect.width, rect.height
     polygons = detector_polygons(detection['dt_polys'])
+    recovered = 0
+    if len(polygons) and args.profile == 'bounded':
+        found = len(polygons)
+        polygons, recovered = recover_missed_text(image, polygons)
+        if recovered:
+            print(f'Recovered {recovered} stretch(es) of text the detector left out.', flush=True)
     if len(polygons)==0 and not args.prepare_only:
         from importlib.metadata import version
         out.mkdir()
@@ -772,7 +884,7 @@ def main(argv=None, model_factory=None):
         if not ok:
             raise ValueError(f'Cannot encode crop {i+1}')
         path.write_bytes(encoded.tobytes())
-        records.append({'id': f'p1_line{i+1}', 'detector_index': i,
+        records.append({'id': f'p1_line{i+1}', 'detector_index': i, **({'recovered': True} if recovered and i >= found else {}),
                         'polygon_pixels': poly.tolist(), 'crop': str(path),
                         'crop_polygon_pixels': crop_polygons[i].tolist(),
                         'bbox': [float(poly[:,0].min()*page_width/width), float(poly[:,1].min()*page_height/height),
@@ -908,8 +1020,21 @@ def main(argv=None, model_factory=None):
                             elif dropped:
                                 review,decision=True,DIGITS_DROPPED
                         best=voted_spacing(best,candidates)
-                        if args.source_language=='ko' and model_name!=TESSERACT_RECOGNIZER:
-                            best=gap_spacing(crops[i],best,model)   # padded: the tight crop has no background rows
+                        if args.source_language in ('ko','ja','zh') and model_name!=TESSERACT_RECOGNIZER:
+                            best=gap_spacing(crops[i],best,model,args.source_language)   # padded: the tight crop has no background rows
+                        if args.source_language=='ja':
+                            for c in candidates:
+                                if isinstance(c.get('text'),str): c['text']=katakana_lookalikes(c['text'])
+                            best=dict(best,text=katakana_lookalikes(best['text']))
+                        import unicodedata as _ud
+                        if record.get('recovered') and (review or best['score']<.6
+                                                        or sum(c.isalnum() for c in best['text'])<2
+                                                        or _ud.category(best['text'].strip()[:1] or ' ').startswith('M')):
+                            # A recovered stretch kept only when read clearly: a piece of a rule ("一",
+                            # 0.53) or a cut through a syllable (a line starting with a vowel sign) is not a line.
+                            print(f'Recovered box {i+1} dropped: nothing read clearly.',flush=True)
+                            record['dropped']=True
+                            continue
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
                         # Localization evidence supplements the transcription. It
@@ -1044,6 +1169,7 @@ def main(argv=None, model_factory=None):
                     evidence.write(json.dumps(record, ensure_ascii=False) + '\n')
                     evidence.flush()
                     print(f'Recognized {i+1}/{len(records)}', flush=True)
+            records = [r for r in records if not r.get('dropped')]   # recovered boxes that read as nothing
             (out / 'review.txt').write_text('\n'.join(f"{r['id']} | {r['recognition_score']:.3f} | {r['text']}" for r in records), encoding='utf-8')
             ordered = sorted(records, key=lambda r: (r['bbox'][1], r['bbox'][0]))
             (out / 'review-top-to-bottom.txt').write_text(
