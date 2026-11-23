@@ -19,9 +19,15 @@ fi
 # Arabic scans: Tesseract reads the digits PaddleOCR's Arabic model drops (dropped_digits).
 # A second model per script (Bengali "script" model, Hindi, Japanese, Chinese) confirms lines the first reads unsteadily
 # (tools/ocr/tesseract_line.SECOND_MODELS).
-if ! tesseract --list-langs 2>/dev/null | grep -qx ben || ! tesseract --list-langs 2>/dev/null | grep -qx ara    || ! tesseract --list-langs 2>/dev/null | grep -qx Bengali || ! tesseract --list-langs 2>/dev/null | grep -qx hin \n   || ! tesseract --list-langs 2>/dev/null | grep -qx jpn || ! tesseract --list-langs 2>/dev/null | grep -qx chi_sim; then
+langs=$(tesseract --list-langs 2>/dev/null || true)
+missing=0
+for lang in ben ara Bengali hin jpn chi_sim; do
+  printf '%s\n' "$langs" | grep -qx "$lang" || missing=1
+done
+if [ "$missing" = 1 ]; then
   apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben tesseract-ocr-ara     tesseract-ocr-script-beng tesseract-ocr-hin tesseract-ocr-jpn tesseract-ocr-chi-sim
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben tesseract-ocr-ara \
+    tesseract-ocr-script-beng tesseract-ocr-hin tesseract-ocr-jpn tesseract-ocr-chi-sim
 fi
 uv python install 3.11
 test -x /workspace/transformx-engine/bin/python || uv venv --python 3.11 /workspace/transformx-engine
