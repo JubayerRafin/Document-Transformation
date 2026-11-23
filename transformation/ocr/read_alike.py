@@ -68,6 +68,8 @@ def reads_consistently(region):
     spaces and letter case) and outnumber the confident readings that differ; or, for a line of words
     only that one model reads, when three or more confident readings give its letters and outnumber
     the readings that differ."""
+    if region.get('metadata', {}).get('recognition_decision') == 'digits_dropped_by_language_model':
+        return False      # the readings agree, but all lack the line's numbers (recognize_paddle_boxes.dropped_digits)
     key, confident = _readings(region)
     agree = [c for c in confident if characters(c['text']) == key]
     if agree and len(agree) > len(confident) - len(agree) and _models(agree) >= 2:

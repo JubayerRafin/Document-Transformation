@@ -278,6 +278,7 @@ def digits(text):
 # letters match the Arabic model's (spaces and marks aside, at least 60% alike: the same line, where
 # the Arabic model's own letters were also misread, "المبلاق" for "المبلغ المستحق").
 DIGIT_RESCUE = {'ar'}
+DIGITS_DROPPED = 'digits_dropped_by_language_model'   # never rebuilt from this reading
 
 
 def digit_rescue(crop, best, digit_model, language):
@@ -301,6 +302,33 @@ def digit_rescue(crop, best, digit_model, language):
         return None
     return {'text': other['rec_text'], 'score': max(other['rec_score'], best.get('score', 0)),
             'variant': 'digit_rescue', 'model': 'tesseract_' + language}
+
+
+def dropped_digits(crop, best, recognizer):
+    """(read with the numbers, numbers dropped) for a line the language model read confidently.
+
+    PaddleOCR's Arabic model drops Western digits written inside Arabic text and reads the rest of
+    the line with full confidence: "تتراوح بين 5 و30 درجة" came back as "تتراوح بين و درجة" in every
+    view, and the translation said "between and degrees" (Arabic scan, 2026-11-23). Tesseract's
+    Arabic model reads those lines whole. When it finds digits the line lacks, its read replaces the
+    line if a second view gives the same digits and its letters match the language model's (spaces,
+    marks and punctuation aside, at least 75% alike); otherwise the digits are known to be missing
+    and the line keeps its source pixels."""
+    import cv2
+    import difflib
+    import unicodedata
+    first = recognizer.predict(crop)[0]
+    wanted = digits(first['rec_text'])
+    if not wanted or wanted == digits(best['text']):
+        return None, False
+    second = recognizer.predict(cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))[0]
+    letters = lambda t: ''.join(c for c in t if unicodedata.category(c).startswith('L') and not c.isascii())
+    a, b = letters(best['text']), letters(first['rec_text'])
+    if digits(second['rec_text']) != wanted or not a or difflib.SequenceMatcher(None, a, b).ratio() < .75:
+        return None, True
+    text = re.sub(r'[\u200e\u200f\u202a-\u202e\u2066-\u2069]', '', first['rec_text']).strip()   # direction marks
+    return {'text': text, 'score': min(first['rec_score'], second['rec_score']),
+            'variant': 'tesseract_digits', 'model': 'tesseract_' + recognizer.code}, True
 
 
 def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digit_checker=None):
@@ -693,6 +721,14 @@ def main(argv=None, model_factory=None):
                     return cv2.cvtColor(cv2.resize(gray,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC),cv2.COLOR_GRAY2BGR)
                 double=lambda c:cv2.resize(c,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC)
                 model.prefetch([v for c,p in zip(unpadded_crops,crops) for v in (c,double(c),contrast(c),p,double(p))])
+            digit_reader = None
+            if args.profile == 'bounded' and args.source_language in DIGIT_RESCUE:
+                # Checks every confidently read line for dropped digits (dropped_digits); all crops
+                # are read at once, a few seconds per page.
+                from tools.ocr.tesseract_line import TesseractRecognizer, available
+                if available(args.source_language):
+                    digit_reader = TesseractRecognizer(args.source_language)
+                    digit_reader.prefetch(unpadded_crops)
             with (out / 'lines.jsonl').open('w', encoding='utf-8') as evidence:
                 for i, record in enumerate(records):
                     if args.profile=='bounded':
@@ -707,6 +743,13 @@ def main(argv=None, model_factory=None):
                             if rescued:
                                 candidates.append(rescued)
                                 best,review,decision=rescued,False,'second_engine_digits_verified'
+                        if not review and digit_reader is not None:
+                            rescued,dropped=dropped_digits(unpadded_crops[i],best,digit_reader)
+                            if rescued:
+                                candidates.append(rescued)
+                                best,decision=rescued,'tesseract_digits_verified'
+                            elif dropped:
+                                review,decision=True,DIGITS_DROPPED
                         best=voted_spacing(best,candidates)
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)

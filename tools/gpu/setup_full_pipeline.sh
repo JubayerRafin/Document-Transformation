@@ -10,9 +10,10 @@ if ! command -v soffice >/dev/null; then
 fi
 # Bengali scans: PaddleOCR has no Bengali recognizer, Tesseract's LSTM model reads the line crops the
 # Paddle detector finds (tools/ocr/tesseract_line.py; 50% -> 99% of characters, 2026-11-23).
-if ! tesseract --list-langs 2>/dev/null | grep -qx ben; then
+# Arabic scans: Tesseract reads the digits PaddleOCR's Arabic model drops (dropped_digits).
+if ! tesseract --list-langs 2>/dev/null | grep -qx ben || ! tesseract --list-langs 2>/dev/null | grep -qx ara; then
   apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
-  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben tesseract-ocr-ara
 fi
 uv python install 3.11
 test -x /workspace/transformx-engine/bin/python || uv venv --python 3.11 /workspace/transformx-engine
