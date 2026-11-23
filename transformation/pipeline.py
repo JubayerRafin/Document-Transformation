@@ -366,6 +366,17 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                                                    analyze_pdf(detection,pii_endpoint,pii_model,False),defer_figures=True))
                 findings,_,evidence=detect_document(detection,detection_ir,pii_categories,pii_endpoint,pii_model,pii_assist,
                                                     workers=pii_workers,known_values=known_values)
+                # Addresses, phone numbers and bank accounts have a fixed form: they are also found in
+                # the package's own text, which no rendering changes. In the preview a narrow table
+                # cell drew the underscore of "mathis_benoit@..." on a line of its own, the address
+                # read there did not match the package and it stayed unmasked (Word and PowerPoint
+                # mass test, 2026-11-24).
+                from transformation.validation.privacy import detect as pattern_detect
+                formats=[c for c in pii_categories if c in ('Email addresses','Phone numbers','Bank accounts')]
+                if formats:
+                    package_regions=[r for r in text_regions(extract_package(safe_data,filename)) if r.get('text','').strip()]
+                    findings+=[dict(f,method='package_pattern') for f in
+                               pattern_detect(package_regions,formats,pii_endpoint,pii_model,assist=False)]
                 analyzed_texts=evidence.pop('analyzed_texts',[])
                 if pii_keep:
                     from transformation.validation.pii_document import split_kept
