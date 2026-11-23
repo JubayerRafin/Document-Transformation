@@ -491,7 +491,9 @@ def drop_contained_duplicates(page):
     (2026-11-24). The source draws each letter once: the pieces are the layout reading the joined
     letters' overlapping boxes again. A paragraph of these scripts whose box lies (80% or more) inside
     another's and whose letters appear in that paragraph's letters in order is that repeat, and is
-    removed. Returns how many were removed."""
+    removed. The other box is taken half its font size larger on every side: the pieces can be only
+    the tops of the letters, above the word's box ("كر" from 69.5 to 73.9 pt over a box ending at
+    69.5 pt; the same newsletter on a later run). Returns how many were removed."""
     import unicodedata
     removed = 0
     letters = lambda p: ''.join(c for c in ''.join(getattr(ch, 'char_unicode', '') or '' for ch in _characters(p))
@@ -509,7 +511,9 @@ def drop_contained_duplicates(page):
             b = getattr(whole, 'box', None)
             if b is None:
                 continue
-            inside = max(0.0, min(a.x2, b.x2) - max(a.x, b.x)) * max(0.0, min(a.y2, b.y2) - max(a.y, b.y))
+            m = 0.5 * _char_size(whole)
+            inside = (max(0.0, min(a.x2, b.x2 + m) - max(a.x, b.x - m))
+                      * max(0.0, min(a.y2, b.y2 + m) - max(a.y, b.y - m)))
             container = letters(whole)
             if inside >= 0.8 * area and len(container) > len(text) and text in container:
                 page.pdf_paragraph.remove(piece)

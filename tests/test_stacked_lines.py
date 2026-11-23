@@ -274,6 +274,18 @@ class OverlappingFragmentTests(unittest.TestCase):
         self.assertEqual(drop_contained_duplicates(page), 3)
         self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['w', 'o', 'l'])
 
+    def test_arabic_pieces_at_the_top_of_the_word_are_removed(self):
+        """The same newsletter on a later run: only the letters' tops were read again, above the word's
+        box (boxes as BabelDOC measured them); they were translated "Dedicated", "Resy", "Sure"."""
+        from transformation.layout.stacked_lines import drop_contained_duplicates
+        whole = self.piece('w', 'كرسي مكتب', 260.5, 52.2, 280.0, 69.5)
+        pieces = [self.piece('p1', 'كرس', 272.5, 64.9, 276.3, 67.5), self.piece('p2', 'رسي', 266.3, 69.3, 272.5, 70.6),
+                  self.piece('p3', 'كر', 276.0, 69.5, 280.0, 73.9)]
+        line_above = self.piece('a', 'كرسي', 262.0, 74.0, 280.0, 83.0)     # a line of its own above: kept
+        page = NS(pdf_paragraph=[whole, *pieces, line_above])
+        self.assertEqual(drop_contained_duplicates(page), 3)
+        self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['w', 'a'])
+
     def test_overlapping_pieces_of_one_hindi_line_become_one_paragraph(self):
         from transformation.layout.stacked_lines import join_overlapping_fragments
         # Boxes measured in the Hindi report: "परामर्श", "र्श घंट", "घंटे" on one line of a cell.
