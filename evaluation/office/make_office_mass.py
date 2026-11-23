@@ -16,7 +16,7 @@ Per language (all eleven; text from the corpus statements, so translations have 
 
 Big documents (English, Korean, German and Arabic; --big-pages / --big-slides): a policy document of
 that many pages and a deck of that many slides. 97-2003 copies (form.doc, briefing.ppt) are made from
-the .docx/.pptx by LibreOffice: run `python -m evaluation.office.make_office_mass OUT --legacy` where
+the .docx/.pptx by LibreOffice (form-97.doc, briefing-97.ppt): run `python -m evaluation.office.make_office_mass OUT --legacy` where
 soffice is installed (the GPU server).
 
 PII (English, German, French, Spanish, Korean): letter.docx (comments by a named author, a tracked
@@ -424,10 +424,13 @@ def legacy(out):
         target = {'form.docx': ('doc', 'doc:MS Word 97'), 'briefing.pptx': ('ppt', 'ppt:MS PowerPoint 97')}.get(name.split('-')[-1])
         if not target:
             continue
+        # <name>-97.doc: its own stem, so its results do not share the .docx's folder.
+        new = name.rsplit('.', 1)[0] + '-97.' + target[0]
         with tempfile.TemporaryDirectory() as folder:
+            copy = Path(folder) / new.replace('.' + target[0], '.' + name.rsplit('.', 1)[1])
+            shutil.copyfile(out / name, copy)
             subprocess.run([soffice, '-env:UserInstallation=' + Path(folder, 'p').as_uri(), '--headless', '--convert-to',
-                            target[1], '--outdir', str(out), str(out / name)], capture_output=True, timeout=300, check=True)
-        new = name.rsplit('.', 1)[0] + '.' + target[0]
+                            target[1], '--outdir', str(out), str(copy)], capture_output=True, timeout=300, check=True)
         if (out / new).exists():
             added.append(dict(doc, file=new, kind=doc['kind'] + '-97', format=target[0]))
     manifest['documents'] += [a for a in added if a['file'] not in {d['file'] for d in manifest['documents']}]
