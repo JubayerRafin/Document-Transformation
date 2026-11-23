@@ -152,7 +152,7 @@ def voted_spacing(best, candidates):
 CJK_LATIN_GLUE = re.compile(r'[A-Za-z][0-9]|[A-Za-z0-9][^\x00-\x7f]|[^\x00-\x7f][A-Za-z0-9]|[:：][A-Za-z0-9]')
 
 
-def gap_spacing(crop, best, model, language='ko'):
+def gap_spacing(crop, best, model, language='ko', views=()):
     """The chosen Korean reading with a space at each word gap the line image shows.
 
     PaddleOCR's Korean model drops most word spaces, in every view: "장치는5도에서30도사이의" and
@@ -161,7 +161,13 @@ def gap_spacing(crop, best, model, language='ko'):
     visible gap, wider than the gap between syllables. A line with a word of four or more syllables
     (or a word glued after a colon) is cut at those gaps (split_word_crops) and the pieces are read; when the pieces
     give exactly the line's characters, a space is added at each cut. Characters never change and no
-    space is removed; a number is never split."""
+    space is removed; a number is never split.
+
+    views: other readings of the line. A cut is not made inside a word that a reading with the same
+    characters shows on its own between spaces, two or three syllables long, unless another reading
+    has a space there: on scans whose syllables stand further apart the cuts fell inside words ("서 면으로", "합니 다", "계 약의") although a view
+    read "합니다.", "계약의" whole (Korean held-out scans, 2026-11-24). Four syllables or more can be
+    glued words ("사무소세": "사무소 세") and are still cut."""
     text = best.get('text') or ''
     # Four syllables or more (Korean words are mostly two or three: "컨설팅시간", "감열라벨" in table
     # cells kept no space at six), or a word glued to what follows its colon ("소계:KRW").
@@ -195,6 +201,26 @@ def gap_spacing(crop, best, model, language='ko'):
         while position < len(key) and punct(key[position]):
             position += 1
         cuts.add(position)
+    if language == 'ko':
+        inside, seen = set(), set()
+        for view in views:
+            other = view.get('text') if isinstance(view, dict) else None
+            if not isinstance(other, str) or squeeze(other) != key:
+                continue
+            start, words = 0, other.split()
+            for n, word in enumerate(words):
+                if start:
+                    seen.add(start)
+                # A sentence ends a word too: "합니다.장치는" is "합니다." and "장치는".
+                tokens = re.findall(r'[^.!?;:,]+[.!?;:,]*|[.!?;:,]+', word)
+                for t, token in enumerate(tokens):
+                    # The line's last word is often a word and the start of one the line break cut
+                    # ("사상최" for "사상 최|고치를", "첫째주" for "첫째 주|말로"): it is still cut.
+                    last = n == len(words) - 1 and t == len(tokens) - 1
+                    if not last and 2 <= len(re.findall(r'[가-힣]', token)) <= 3:
+                        inside |= set(range(start + 1, start + len(token)))
+                    start += len(token)
+        cuts -= inside - seen
     own, position = set(), 0                   # the reading's own spaces, kept
     for ch in text.strip():
         if ch.isspace(): own.add(position)
@@ -1109,7 +1135,7 @@ def main(argv=None, model_factory=None):
                         if args.source_language in SCRIPT_LETTERS:
                             best=script_islands(best,candidates,args.source_language)
                         if args.source_language in ('ko','ja','zh') and model_name!=TESSERACT_RECOGNIZER:
-                            best=gap_spacing(crops[i],best,model,args.source_language)   # padded: the tight crop has no background rows
+                            best=gap_spacing(crops[i],best,model,args.source_language,candidates)   # padded: the tight crop has no background rows
                         if args.source_language=='ja':
                             for c in candidates:
                                 if isinstance(c.get('text'),str): c['text']=katakana_lookalikes(c['text'])

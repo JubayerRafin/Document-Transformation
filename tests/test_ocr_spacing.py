@@ -90,3 +90,28 @@ class GapSpacingTests(unittest.TestCase):
         self.assertIs(gap_spacing(self.line([3, 4, 5]), best, self.Model(['장치는', '5도애서', '30도사이의'])), best)
         short = {'text': '해야 합니다', 'score': .95}
         self.assertIs(gap_spacing(self.line([2, 3]), short, self.Model(['해야', '합니다'])), short)
+
+    def test_no_cut_inside_a_short_word_another_view_reads_whole(self):
+        # Syllables set wide apart: the image shows a gap inside "합니다" (pieces "합니", "다.").
+        from tools.ocr.recognize_paddle_boxes import gap_spacing
+        best = {'text': '서명해야합니다.장치는', 'score': .92}
+        model = self.Model(['서명해야', '합니', '다.장치는'])
+        views = [{'text': '서명해야 합니다.장치는', 'score': .91, 'variant': 'detector_bounds_2x'}]
+        self.assertEqual(gap_spacing(self.line([4, 2, 4]), best, model, 'ko', views)['text'], '서명해야 합니다.장치는')
+        # Without that view the cut is made, as before.
+        self.assertEqual(gap_spacing(self.line([4, 2, 4]), best, model)['text'], '서명해야 합니 다.장치는')
+
+    def test_a_cut_another_view_also_shows_is_kept(self):
+        from tools.ocr.recognize_paddle_boxes import gap_spacing
+        best = {'text': '지역사무소세곳으로', 'score': .92}
+        model = self.Model(['지역사무소', '세', '곳으로'])
+        views = [{'text': '지역 사무소세 곳으로', 'score': .9, 'variant': 'a'},
+                 {'text': '지역사무소 세곳으로', 'score': .9, 'variant': 'b'}]
+        self.assertEqual(gap_spacing(self.line([5, 1, 3]), best, model, 'ko', views)['text'], '지역사무소 세 곳으로')
+
+    def test_the_line_last_word_is_still_cut(self):
+        from tools.ocr.recognize_paddle_boxes import gap_spacing
+        best = {'text': '상승하여사상최', 'score': .92}
+        model = self.Model(['상승하여', '사상', '최'])
+        views = [{'text': '상승하여 사상최', 'score': .9, 'variant': 'a'}]
+        self.assertEqual(gap_spacing(self.line([4, 2, 1]), best, model, 'ko', views)['text'], '상승하여 사상 최')
