@@ -1,10 +1,12 @@
 """Score translation segments (evaluation/suite/translation.py) with COMET and chrF++.
 
-    python comet_score.py SEGMENTS.jsonl OUT.json [--comet DIR] [--kiwi DIR] [--batch 32]
+    python comet_score.py SEGMENTS.jsonl OUT.json [--comet DIR] [--kiwi DIR] [--qe DIR] [--batch 32]
 
 Runs on a GPU machine with unbabel-comet and sacrebleu installed (a separate environment).
 
   kiwi     COMET-KiWi (Unbabel/wmt22-cometkiwi-da), reference-free: every segment
+  qe20     COMET-QE (Unbabel/wmt20-comet-qe-da, Apache-2.0), reference-free: every segment; its
+           scores are not on KiWi's 0-1 scale, so compare them between runs and pairs only
   comet22  COMET-22 (Unbabel/wmt22-comet-da) against the reference, where there is one
   chrf     chrF++ (sacrebleu, word order 2) against the reference, segment and corpus level
 
@@ -30,12 +32,15 @@ def predict(folder, data, batch):
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('segments'); ap.add_argument('out')
-    ap.add_argument('--comet'); ap.add_argument('--kiwi'); ap.add_argument('--batch', type=int, default=32)
+    ap.add_argument('--comet'); ap.add_argument('--kiwi'); ap.add_argument('--qe'); ap.add_argument('--batch', type=int, default=32)
     args = ap.parse_args()
     rows = [json.loads(l) for l in Path(args.segments).read_text(encoding='utf-8').splitlines() if l.strip()]
     if args.kiwi:
         for row, score in zip(rows, predict(args.kiwi, [{'src': r['src'], 'mt': r['mt']} for r in rows], args.batch)):
             row['kiwi'] = round(float(score), 4)
+    if args.qe:
+        for row, score in zip(rows, predict(args.qe, [{'src': r['src'], 'mt': r['mt']} for r in rows], args.batch)):
+            row['qe20'] = round(float(score), 4)
     referenced = [r for r in rows if r.get('ref')]
     if args.comet and referenced:
         data = [{'src': r['src'], 'mt': r['mt'], 'ref': r['ref']} for r in referenced]
@@ -58,7 +63,7 @@ def main():
         refs = [r for r in items if r.get('ref')]
         summary.setdefault(axis, {})[name] = {
             'segments': len(items), 'with_reference': len(refs),
-            'kiwi': mean('kiwi'), 'comet22': mean('comet22'), 'chrf_segment': mean('chrf'),
+            'kiwi': mean('kiwi'), 'qe20': mean('qe20'), 'comet22': mean('comet22'), 'chrf_segment': mean('chrf'),
             'chrf_corpus': round(chrf.corpus_score([r['mt'] for r in refs], [[r['ref'] for r in refs]]).score, 2) if refs else None,
             'unchanged_share': round(sum(r['unchanged'] for r in items) / len(items), 4)}
     Path(args.out).write_text(json.dumps({'summary': summary, 'segments': rows}, ensure_ascii=False, indent=1), encoding='utf-8')
