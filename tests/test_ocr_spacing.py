@@ -42,3 +42,43 @@ class VotedSpacingTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class GapSpacingTests(unittest.TestCase):
+    """Korean scan, 2026-11-23: the Korean model dropped word spaces in every view."""
+
+    @staticmethod
+    def line(words):
+        """A 30 px line: each word a block of 10 px syllables 2 px apart, words 9 px apart."""
+        import numpy as np
+        blocks, x = [], 4
+        width = 8 + sum(12 * n for n in words) + 9 * (len(words) - 1)
+        image = np.full((30, width, 3), 255, np.uint8)
+        for n in words:
+            for _ in range(n):
+                image[6:24, x:x + 10] = 0
+                x += 12
+            x += 7
+        return image
+
+    class Model:
+        def __init__(self, pieces):
+            self.pieces = pieces
+
+        def predict(self, images):
+            assert len(images) == len(self.pieces), (len(images), self.pieces)
+            return [{'rec_text': t, 'rec_score': .9} for t in self.pieces]
+
+    def test_spaces_are_added_at_the_word_gaps_the_pieces_confirm(self):
+        from tools.ocr.recognize_paddle_boxes import gap_spacing
+        best = {'text': '장치는5도에서30도사이의', 'score': .95}
+        spaced = gap_spacing(self.line([3, 4, 5]), best, self.Model(['장치는', '5도에서', '30도사이의']))
+        self.assertEqual(spaced['text'], '장치는 5도에서 30도사이의')
+        self.assertEqual(spaced['spacing'], 'image_gaps')
+
+    def test_pieces_that_read_other_characters_or_short_lines_change_nothing(self):
+        from tools.ocr.recognize_paddle_boxes import gap_spacing
+        best = {'text': '장치는5도에서30도사이의', 'score': .95}
+        self.assertIs(gap_spacing(self.line([3, 4, 5]), best, self.Model(['장치는', '5도애서', '30도사이의'])), best)
+        short = {'text': '해야 합니다', 'score': .95}
+        self.assertIs(gap_spacing(self.line([2, 3]), short, self.Model(['해야', '합니다'])), short)

@@ -85,6 +85,46 @@ def voted_spacing(best, candidates):
     return dict(best, text=spaced, spacing='voted')
 
 
+def gap_spacing(crop, best, model):
+    """The chosen Korean reading with a space at each word gap the line image shows.
+
+    PaddleOCR's Korean model drops most word spaces, in every view: "장치는5도에서30도사이의" and
+    "지역 사무소세 곳으로" ("office tax" for "office, three places") were translated as "between
+    figures 5 and 30" and "several offices" (Korean scan, 2026-11-23). Korean separates words with a
+    visible gap, wider than the gap between syllables. A line with a word of six or more characters,
+    four of them syllables, is cut at those gaps (split_word_crops) and the pieces are read; when the pieces
+    give exactly the line's characters, a space is added at each cut. Characters never change and no
+    space is removed; a number is never split."""
+    text = best.get('text') or ''
+    long_words = [w for w in text.split() if len(w) >= 6 and len(re.findall(r'[가-힣]', w)) >= 4]
+    if not long_words or '@' in text:
+        return best
+    pieces = split_word_crops(crop)
+    if len(pieces) < 2:
+        return best
+    reads = [str(r['rec_text']).strip() for r in model.predict(pieces)]
+    squeeze = lambda value: re.sub(r'\s+', '', value)
+    key = squeeze(text)
+    if len(reads) != len(pieces) or not all(reads) or squeeze(''.join(reads)) != key:
+        return best
+    cuts, position = set(), 0
+    for read in reads[:-1]:
+        position += len(squeeze(read))
+        cuts.add(position)
+    own, position = set(), 0                   # the reading's own spaces, kept
+    for ch in text.strip():
+        if ch.isspace(): own.add(position)
+        else: position += 1
+    number = lambda ch: ch.isdigit() or ch in '.,:/-'
+    out = []
+    for position, ch in enumerate(key):
+        if position and (position in own or (position in cuts and not (number(key[position - 1]) and number(ch)))):
+            out.append(' ')
+        out.append(ch)
+    result = ''.join(out)
+    return best if result == text.strip() else dict(best, text=result, spacing='image_gaps')
+
+
 def consensus_key(text):
     """Ignore prose spacing and dash typography; keep structured literals exact."""
     literals=re.findall(r'[\w.+-]+@[\w.-]+|\b\w*_[\w._-]+|(?<!\w)[\w.+:/%–—−-]*\d[\w.,:/%–—−-]*',text)
@@ -751,6 +791,8 @@ def main(argv=None, model_factory=None):
                             elif dropped:
                                 review,decision=True,DIGITS_DROPPED
                         best=voted_spacing(best,candidates)
+                        if args.source_language=='ko' and model_name!=TESSERACT_RECOGNIZER:
+                            best=gap_spacing(unpadded_crops[i],best,model)
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
                         # Localization evidence supplements the transcription. It
