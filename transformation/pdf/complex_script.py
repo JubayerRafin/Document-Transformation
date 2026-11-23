@@ -174,7 +174,7 @@ def fit_shaped(rect, text, max_size, min_size, color=(0.0, 0.0, 0.0)):
     (one-page PDF of vector outlines, font size used), or None when even min_size does not fit."""
     rtl = bool(RTL.search(text))
     r, g, b = color
-    css = ('* {font-size: %.2fpt; line-height: 1.15; margin: 0; padding: 0; color: rgb(%d,%d,%d); '
+    css = ('* {font-family: sans-serif; font-size: %.2fpt; line-height: 1.15; margin: 0; padding: 0; color: rgb(%d,%d,%d); '
            'direction: %s; text-align: %s;}' % (max_size, r * 255, g * 255, b * 255,
                                                  'rtl' if rtl else 'ltr', RTL_ALIGN if rtl else 'left'))
     body = html.escape(_keep_left_to_right(text) if rtl else text).replace('\n', '<br>')
@@ -244,7 +244,7 @@ def draw(pdf_path, records, text_font=None):
             # cells keep full size (seen in translated tables).
             rect = rect + (0, -0.2 * record['font_size'], 0, 0.2 * record['font_size'])
             r, g, b = record['color']
-            css = ('* {font-size: %.2fpt; line-height: 1.15; margin: 0; padding: 0; color: rgb(%d,%d,%d); '
+            css = ('* {font-family: sans-serif; font-size: %.2fpt; line-height: 1.15; margin: 0; padding: 0; color: rgb(%d,%d,%d); '
                    'font-weight: %s; direction: %s; text-align: %s;}'
                    % (record['font_size'], r * 255, g * 255, b * 255, 'bold' if record['bold'] else 'normal',
                       'rtl' if record['rtl'] else 'ltr', RTL_ALIGN if record['rtl'] else 'left'))
