@@ -211,3 +211,16 @@ class ShortFragmentTests(unittest.TestCase):
         for source, target in (('PIN', 'Persönliche Identifikationsnummer'), ('FAQ', 'Frequently Asked Questions'),
                                ('Favorite', 'お気に入り'), ('合計', 'Total amount'), ('ID', 'Identifikationsnummer')):
             validate_candidate(source, target)
+
+
+class SingleAndFootnoteTests(unittest.TestCase):
+    """Canon manual into Japanese, 2026-11-23: eight paragraphs stayed in English."""
+
+    def test_single_is_one_and_a_glued_footnote_marker_is_its_number(self):
+        from transformation.llm.translation_guard import validate_candidate
+        validate_candidate('Print Multiple Pages on a Single Sheet', '1枚の用紙に複数のページを印刷する。')
+        validate_candidate('*4The toner cartridge is included.', '*4 トナーカートリッジが付属しています。')
+        for source, target in (('Print Multiple Pages on a Single Sheet', '2枚の用紙に複数のページを印刷する。'),
+                               ('*4The toner cartridge is included.', '*5 トナーカートリッジが付属しています。')):
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)

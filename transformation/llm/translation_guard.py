@@ -40,8 +40,11 @@ def glued_units(source, values=()):
     manual stayed in English (2026-11-23). Explicit protected spans are left as they are; returned
     document text is not rewritten."""
     explicit = [(m.start(), m.end()) for value in values for m in re.finditer(re.escape(value), source)]
-    return GLUED_UNIT.sub(lambda m: m.group(0) if any(a < m.end() and m.start() < b for a, b in explicit)
-                          else m.group(1) + ' ' + m.group(2), source)
+    spaced = GLUED_UNIT.sub(lambda m: m.group(0) if any(a < m.end() and m.start() < b for a, b in explicit)
+                            else m.group(1) + ' ' + m.group(2), source)
+    # A footnote marker glued to its note ("*1May vary ...", "*4The toner ...") is the marker's number;
+    # translations write "*1 使用環境..." (Canon manual, 2026-11-23).
+    return re.sub(r'(?<![\w*])([*†‡]\d{1,2})(?=[A-Za-z])', r'\1 ', spaced)
 
 
 # "percent" written out, in the languages that write it with Latin letters.

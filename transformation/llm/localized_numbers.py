@@ -38,6 +38,8 @@ def word_quantities(text,values=()):
     # In technical prose, non-zero is the same quantity expressed as non-0.
     # Keep this separate from subtraction and hyphenated numeric compounds.
     result[0]+=len(re.findall(r'\bnon-zero\b',ordinary,re.I))
+    # "onto a single sheet" is "1枚に" in Japanese and Chinese (Canon manual, 2026-11-23).
+    result[1]+=len(re.findall(r'\bsingle\b',ordinary,re.I))
     for match in _NUMBER.finditer(ordinary):
         total=current=0
         for word in re.split('[ -]',match.group().lower()):
