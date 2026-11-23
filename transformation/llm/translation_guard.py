@@ -191,7 +191,13 @@ def split_sentences(text):
     ends = []
     for m in _LATIN_END.finditer(text):
         word = m.group(1).rstrip('.').lower()
-        if (len(m.group(1)) == 1 and m.group(1).isupper()) or word in _ABBREVIATIONS or re.search(r'\d$', m.group(1)) and m.group(2) == '.' and re.match(r'\s*\d', text[m.end():]):
+        following = text[m.end():].lstrip()[:1]
+        # A sentence starts with a capital or another script, not a lowercase word; after a unit or
+        # short abbreviation ("3in.", "5 in.") a bracket or number continues it: "a minimum of 3in.
+        # (7.6 cm)" is one sentence, "…했습니다. 2개월 …" two.
+        unit = re.fullmatch(r'[A-Za-z]{1,3}|\S*\d\S*', m.group(1)) is not None
+        if ((len(m.group(1)) == 1 and m.group(1).isupper()) or word in _ABBREVIATIONS or following.islower()
+                or (unit and (following in '([{' or following.isdigit()))):
             continue
         ends.append(m.end())
     ends += [m.end() for m in _OTHER_END.finditer(text) if m.end() < len(text.rstrip())]
