@@ -132,7 +132,8 @@ class LongParagraphTests(unittest.TestCase):
         text = (sentence + ' ') * 70
         text = text[:1490]
         self.assertLessEqual(len(text), 1500)
-        echo = lambda *a, **k: (a[2][-1]['content'].split('\n\n\n')[-1], {})   # the text, as a model would
+        # The text with its words translated, as a model would.
+        echo = lambda *a, **k: (a[2][-1]['content'].split('\n\n\n')[-1].replace('Call', '전화').replace('for support.', '지원 문의.'), {})
         with patch('transformation.llm.ollama_native.chat', side_effect=echo):
             result, stats = translate('unused', 'translategemma:12b', text, 'Korean')
         self.assertIn('{v1}', result)

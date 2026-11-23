@@ -224,3 +224,16 @@ class SingleAndFootnoteTests(unittest.TestCase):
                                ('*4The toner cartridge is included.', '*5 トナーカートリッジが付属しています。')):
             with self.assertRaises(ValueError, msg=target):
                 validate_candidate(source, target)
+
+
+class EchoTests(unittest.TestCase):
+    def test_an_answer_repeating_the_source_is_refused(self):
+        """HP manual into Korean, 2026-11-23: "Please translate as follows:" and the English."""
+        from transformation.llm.translation_guard import validate_candidate, repeats_source
+        source = 'fed at one time. Scanning will stop if multiple pages are detected. If the Automatically retry'
+        with self.assertRaises(ValueError):
+            validate_candidate(source, '다음과 같이 번역해 주세요: ' + source)
+        validate_candidate(source, '한 번에 공급됩니다. 여러 페이지가 감지되면 스캔이 중지됩니다. Automatically retry가')
+        # A translation keeping a short English name, or a same-script language, is not an echo.
+        self.assertFalse(repeats_source('Open the Embedded Web Server and select General Settings to continue.',
+                                        'Öffnen Sie den Embedded Web Server und wählen Sie General Settings, um fortzufahren.'))

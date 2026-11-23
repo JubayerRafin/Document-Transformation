@@ -113,6 +113,28 @@ def glued_placeholders(source):
             if re.search(r'\d', m.group(1)) and re.search(r'[-_/.:]', m.group(1))]
 
 
+def repeats_source(source, target, run=8):
+    """True when the answer repeats the source: at least eight of its Latin-letter words in a row,
+    making up half of the source's words or more. A sentence fragment of an HP manual ("fed at one
+    time. Scanning will stop if multiple pages are detected. If the ...") was answered "다음과 같이
+    번역해 주세요: " ("Please translate as follows:") followed by the English, and printed on three
+    pages (2026-11-23)."""
+    words = lambda text: re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", re.sub(r'\{v\d+\}', ' ', text).lower())
+    a, b = words(source), words(target)
+    # An answer that is the source itself (names, a citation) is judged elsewhere, as unchanged text.
+    if len(a) < run or len(b) < run or ' '.join(source.split()) == ' '.join(target.split()):
+        return False
+    longest, previous = 0, [0] * (len(b) + 1)
+    for x in a:
+        current = [0] * (len(b) + 1)
+        for j, y in enumerate(b, 1):
+            if x == y:
+                current[j] = previous[j - 1] + 1
+                longest = max(longest, current[j])
+        previous = current
+    return longest >= run and longest * 2 >= len(a)
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
@@ -130,6 +152,8 @@ def validate_candidate(source, target, values=()):
     width = lambda text: sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text.strip())
     if len(source.strip()) <= 12 and width(target) > 4 * len(source.strip()) + 24:
         raise ValueError('Translation is far longer than its source.')
+    if repeats_source(source, target):
+        raise ValueError('Translation repeats the source text.')
     # A source with no letters or digits ("." after an inline icon) has nothing to translate: words in
     # the answer are the model talking ("no text was given, please provide text"), not a translation.
     if (not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', source))
