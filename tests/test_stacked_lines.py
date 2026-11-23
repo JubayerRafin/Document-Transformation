@@ -156,6 +156,19 @@ class ListMarkerTests(unittest.TestCase):
         self.assertEqual(self.run_split(self.list_paragraph([['1.5 percent'], ['2.5 more']]), [])[0], 0)
         self.assertEqual(self.run_split(self.list_paragraph([['1 . Die'], ['2. Bitte'], ['3 . Alle']]), [])[0], 2)
 
+    def test_right_to_left_numbered_items_line_up_on_the_right(self):
+        """Arabic manual, 2026-11-23: items of different lengths end at one right edge."""
+        chars, y = [], 600.0
+        for text in ['1. من المقرر إجراء', '2. يجب', '3. من المقرر']:
+            right = 300.0
+            for i, c in enumerate(text):           # logical order, drawn from the right
+                box = NS(x=right - 5 * (i + 1), y=y, x2=right - 5 * i, y2=y + 9)
+                chars.append(NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=9)))
+            y -= 12
+        paragraph = NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=chars, box=None))],
+                       debug_id='list', vertical=False)
+        self.assertEqual(self.run_split(paragraph, []), (2, ['1. من المقرر إجراء', '2. يجب', '3. من المقرر']))
+
     def test_lettered_sub_steps_become_paragraphs(self):
         paragraph = self.list_paragraph([['a. Click Add', 'on the page'], ['b. Open another'], ['c. Paste']])
         self.assertEqual(self.run_split(paragraph, []),
@@ -203,6 +216,26 @@ class LoneMarkTests(unittest.TestCase):
         self.assertFalse(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='स')]))])))
         self.assertTrue(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_formula=NS(pdf_character=[NS(char_unicode='\x00')]))])))
         self.assertFalse(_is_lone_mark(NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=[NS(char_unicode='•')]))])))
+
+
+class OverhangingSpaceTests(unittest.TestCase):
+    def test_a_space_running_past_the_letters_is_cut_back(self):
+        """Arabic manual, 2026-11-23: a line-end space from 526.7 to 650.2 pt widened a list item's
+        box past the page and its English translation ran off the page."""
+        from transformation.layout.stacked_lines import trim_overhanging_spaces
+        letters = [NS(char_unicode=c, box=NS(x=480 + 6 * i, y=0, x2=486 + 6 * i, y2=9), pdf_style=NS(font_size=9))
+                   for i, c in enumerate('مرحبا')]
+        space_box = NS(x=500.0, y=0, x2=650.2, y2=9)
+        space = NS(char_unicode=' ', box=space_box, visual_bbox=NS(box=space_box), advance=150.2, pdf_style=NS(font_size=9))
+        inner_box = NS(x=486.0, y=0, x2=492.0, y2=9)
+        inner = NS(char_unicode=' ', box=inner_box, visual_bbox=NS(box=inner_box), advance=6, pdf_style=NS(font_size=9))
+        paragraph = NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=letters + [space, inner]))])
+        updated = []
+        self.assertEqual(trim_overhanging_spaces(NS(pdf_paragraph=[paragraph]), updated.append), 1)
+        self.assertEqual((space_box.x, space_box.x2), (500.0, 503.0))
+        self.assertEqual((inner_box.x, inner_box.x2), (486.0, 492.0))    # inside the letters: kept
+        self.assertEqual(updated, [paragraph])
+        self.assertEqual(trim_overhanging_spaces(NS(pdf_paragraph=[paragraph]), updated.append), 0)
 
 
 class OverlappingFragmentTests(unittest.TestCase):

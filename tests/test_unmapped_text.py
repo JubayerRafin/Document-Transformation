@@ -116,6 +116,14 @@ class RightToLeftOrderTests(unittest.TestCase):
             {'c': 'و', 'bbox': (62.9, 0, 62.9, 9)}, {'c': 'ض', 'bbox': (51.4, 0, 61.9, 9)}]}]}
         self.assertEqual([t for _, t in _clusters(line)], ['ع', 'وّ', 'ض'])
 
+    def test_right_to_left_pieces_join_from_the_right(self):
+        """Arabic manual, 2026-11-23: an item's "1." is a line of its own, right of the text."""
+        from transformation.pdf.unmapped_text import join_pieces
+        pieces = [(50.0, 535.5, 546.3, '1.', 10.5), (50.0, 178.2, 535.5, 'من المقرر', 10.5)]
+        self.assertEqual(join_pieces(pieces, rtl=True), '1.من المقرر')          # touching: no space added
+        pieces = [(50.0, 535.5, 546.3, '1. ', 10.5), (50.0, 178.2, 533.0, 'من المقرر', 10.5)]
+        self.assertEqual(join_pieces(pieces, rtl=True), '1. من المقرر')
+
     def test_the_space_pymupdf_1_28_puts_in_a_marks_place_is_dropped(self):
         """"محوّل شبكة" as PyMuPDF 1.28 reads it on the pod: the shadda and its letter have no width
         and a space fills their place, so the model read "مح وّل" ("First network", 2026-11-23)."""

@@ -432,9 +432,13 @@ def split_at_list_markers(page, update, make_id):
         # together ("1. ... 2. ... 3. ..." on one block, 2026-11-21 competition set).
         number = _item_number(first)
         if number is not None:
+            from transformation.pdf.unmapped_text import RTL
+            # Right-to-left items line up on their right edge; their left ends are ragged (Arabic
+            # manual: four numbered items stayed one paragraph, 2026-11-23).
+            edge = 'x2' if RTL.search(first) else 'x'
             expected = number + 1
             for n, line in enumerate(lines[1:], 1):
-                if _item_number(_line_text(line)) == expected and abs(line['x'] - lines[0]['x']) <= 1.5:
+                if _item_number(_line_text(line)) == expected and abs(line[edge] - lines[0][edge]) <= 1.5:
                     starts.append(n)
                     expected += 1
         cuts = sorted(set(n for n in starts if n > 0))
@@ -918,6 +922,49 @@ def table_cells(finder, page):
         return ()
 
 
+def trim_overhanging_spaces(page, update):
+    """Cut back spaces that reach past every letter of their paragraph.
+
+    BabelDOC adds a space at each line end, as wide as the gap to the next line's first character
+    measured left to right. Right-to-left lines run the other way, so the gap was taken backwards: in
+    an Arabic manual's numbered lists a space ran from 526.7 to 650.2 pt, past the page edge, the
+    paragraph box grew with it, and the English translation was set into that box and ran off the
+    page (2026-11-23). A space wider than the font size that sticks out beyond the paragraph's
+    letters is cut to a third of the font size. Returns how many paragraphs changed."""
+    changed = 0
+    for paragraph in page.pdf_paragraph:
+        chars = [c for c in _characters(paragraph) if getattr(c, 'box', None)]
+        ink = [c.box for c in chars if (getattr(c, 'char_unicode', '') or '').strip()]
+        if not ink:
+            continue
+        left, right = min(b.x for b in ink), max(b.x2 for b in ink)
+        trimmed = False
+        for c in chars:
+            if getattr(c, 'char_unicode', None) != ' ':
+                continue
+            size = getattr(getattr(c, 'pdf_style', None), 'font_size', 0) or _size(paragraph) or 0
+            box = c.box
+            if not size or box.x2 - box.x <= size or (box.x2 <= right + 0.5 and box.x >= left - 0.5):
+                continue
+            width = size / 3
+            if box.x2 > right + 0.5:      # sticks out on the right: keep its left end
+                box.x = min(box.x, right)
+                box.x2 = box.x + width
+            else:                         # sticks out on the left: keep its right end
+                box.x2 = max(box.x2, left)
+                box.x = box.x2 - width
+            visual = getattr(getattr(c, 'visual_bbox', None), 'box', None)
+            if visual is not None and visual is not box:
+                visual.x, visual.x2 = box.x, box.x2
+            if getattr(c, 'advance', None) is not None:
+                c.advance = box.x2 - box.x
+            trimmed = True
+        if trimmed:
+            update(paragraph)
+            changed += 1
+    return changed
+
+
 def install(ParagraphFinder):
     if getattr(ParagraphFinder, '_transformx_stacked_lines', False):
         return
@@ -926,6 +973,7 @@ def install(ParagraphFinder):
     def process_page(self, page):
         logical_rtl_order(page)
         result = original(self, page)
+        trim_overhanging_spaces(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         counter = [0]
 
         def make_id(paragraph):

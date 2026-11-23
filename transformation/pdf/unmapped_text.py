@@ -35,16 +35,18 @@ def _alnum(text):
     return Counter(c for c in fold(text) if c.isalnum())
 
 
-def join_pieces(pieces):
+def join_pieces(pieces, rtl=False):
     """Text of (baseline, x0, x1, text, size) pieces in reading order. Pieces on the same baseline
-    are joined without a space when they touch, or when both sides are Indic letters (see above)."""
+    are joined without a space when they touch, or when both sides are Indic letters (see above).
+    rtl: the pieces read from the right, so the gap is from a piece's right end to the previous one's
+    left end."""
     out, previous = '', None
     for base, x0, x1, text, size in pieces:
         if previous is None:
             out = text
         else:
             same_line = abs(base - previous[0]) < 0.3 * size
-            gap = x0 - previous[2]
+            gap = previous[1] - x1 if rtl else x0 - previous[2]
             glued = (same_line and -0.5 * size < gap < 0.15 * size) or (
                 same_line and -0.5 * size < gap < 1.2 * size and out[-1:] and text[:1]
                 and _JOINED_SCRIPTS.match(out[-1]) and _JOINED_SCRIPTS.match(text[0]))
@@ -132,18 +134,32 @@ def _clusters(line):
 def read_area(page, rect):
     """MuPDF's text inside rect (MuPDF coordinates), horizontal lines only, or ''. Lines with
     right-to-left letters are put into reading order from their characters' positions."""
+    lines = [line for block in page.get_text('rawdict', clip=rect, sort=True)['blocks']
+             for line in block.get('lines', [])
+             if tuple(round(v) for v in line['dir']) == (1, 0) and line['spans']]
+    raw = [''.join(char['c'] for span in line['spans'] for char in span.get('chars', [])) for line in lines]
+    rtl = any(RTL.search(text) for text in raw)
     pieces = []
-    for block in page.get_text('rawdict', clip=rect, sort=True)['blocks']:
-        for line in block.get('lines', []):
-            if tuple(round(v) for v in line['dir']) != (1, 0) or not line['spans']:
-                continue
-            text = ''.join(char['c'] for span in line['spans'] for char in span.get('chars', []))
-            if RTL.search(text):
-                text = visual_to_logical(_clusters(line))
-            if text.strip():
-                size = max(span['size'] for span in line['spans']) or 1
-                pieces.append((line['spans'][0]['origin'][1], line['bbox'][0], line['bbox'][2], text, size))
-    return fold(join_pieces(pieces))
+    for line, text in zip(lines, raw):
+        # In a right-to-left area a piece without letters is read right to left too: an Arabic list's
+        # "1." is a line of its own, drawn ".1", and came back as ".1 The main production line ..."
+        # (Arabic manual, 2026-11-23).
+        if RTL.search(text) or (rtl and not any(ch.isalpha() for ch in text)):
+            text = visual_to_logical(_clusters(line))
+        if text.strip():
+            size = max(span['size'] for span in line['spans']) or 1
+            pieces.append((line['spans'][0]['origin'][1], line['bbox'][0], line['bbox'][2], text, size))
+    if rtl:
+        # Pieces on one baseline read from the right.
+        rows = []
+        for piece in pieces:
+            row = next((r for r in rows if abs(r[0][0] - piece[0]) < 0.3 * piece[4]), None)
+            if row is None:
+                rows.append([piece])
+            else:
+                row.append(piece)
+        pieces = [p for row in rows for p in sorted(row, key=lambda p: -p[1])]
+    return fold(join_pieces(pieces, rtl))
 
 
 # Parts of a garbled paragraph that BabelDOC still reads reliably: Latin words and longer numbers,
