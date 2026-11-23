@@ -1,6 +1,6 @@
 """Collect the evaluation results into one JSON file (and print the headline numbers).
 
-    python -m evaluation.suite.report EVAL_DIR OUT.json
+    python -m evaluation.suite.report EVAL_DIR OUT.json [--pii LABEL] [--combined LABEL] [--office RUN] [--office-pii LABEL]
 
 EVAL_DIR holds:
   heldout/                       run_site results of the held-out corpus (to-en and from-en)
@@ -10,6 +10,9 @@ EVAL_DIR holds:
   combined-layout.json           layout.py on the combined results
   ocr-heldout.json, ocr-dev.json evaluation/ocr/bench.py scores
 and reads output/pii-eval-v1/runs/<label>/scores.json (evaluation/pii/score.py) for PII.
+
+Word and PowerPoint (evaluation/office): output/office-eval/runs/<RUN> (run_site results),
+EVAL_DIR/office-scores.json and office-layout.json, and output/office-eval/heldout/pii/runs/<label>.
 """
 import json
 import statistics
@@ -69,7 +72,7 @@ def layout_summary(rows, key):
     return out
 
 
-def main(eval_dir, out):
+def main(eval_dir, out, pii_label='site-final', combined_label='site-combined', office_run=None, office_pii=None):
     eval_dir = Path(eval_dir)
     pair = lambda r: f"{r['source']}-{r['target']}"
     report = {}
@@ -81,19 +84,43 @@ def main(eval_dir, out):
     layout = load(eval_dir / 'layout.json')
     report['layout'] = {'all': layout_summary(layout, lambda r: 'all'), 'by_pair': layout_summary(layout, pair),
                         'by_kind': layout_summary(layout, lambda r: r.get('kind'))}
-    pii = load('output/pii-eval-v1/runs/site-final/scores.json')
+    pii = load(f'output/pii-eval-v1/runs/{pii_label}/scores.json')
     report['pii'] = pii.get('summary') if isinstance(pii, dict) and 'summary' in pii else pii
-    combined = jobs('output/pii-eval-v1/runs/site-combined')
+    combined = jobs(f'output/pii-eval-v1/runs/{combined_label}')
     report['combined_jobs'] = outcomes(combined, lambda r: 'all') if combined else None
-    pii_combined = load('output/pii-eval-v1/runs/site-combined/scores.json')
+    pii_combined = load(f'output/pii-eval-v1/runs/{combined_label}/scores.json')
     report['combined_pii'] = pii_combined.get('summary') if isinstance(pii_combined, dict) and 'summary' in pii_combined else pii_combined
     combined_scores = load(eval_dir / 'combined-scores.json')
     report['combined_quality'] = combined_scores['summary'] if combined_scores else None
     report['combined_layout'] = layout_summary(load(eval_dir / 'combined-layout.json'), lambda r: 'all')
     report['ocr'] = {'heldout': load(eval_dir / 'ocr-heldout.json'), 'dev': load(eval_dir / 'ocr-dev.json')}
+    if office_run:
+        office = jobs(f'output/office-eval/runs/{office_run}')
+        fmt = lambda r: 'docx' if (r['kind'] or '').endswith('report') else 'pptx'
+        direction = lambda r: 'into English' if r['target'] == 'en' else 'from English'
+        scores = load(eval_dir / 'office-scores.json')
+        layout = load(eval_dir / 'office-layout.json')
+        pii_scores = load(f'output/office-eval/heldout/pii/runs/{office_pii}/scores.json') if office_pii else None
+        pii_combined_scores = load(f'output/office-eval/heldout/pii/runs/{office_pii}-combined/scores.json') if office_pii else None
+        report['office'] = {
+            'jobs': {'all': outcomes(office, lambda r: 'all').get('all') if office else None,
+                     'by_format': outcomes(office, fmt), 'by_direction': outcomes(office, direction),
+                     'by_pair': outcomes(office, pair)},
+            'quality': scores['summary'] if scores else None,
+            'layout': {'all': layout_summary(layout, lambda r: 'all'),
+                       'by_format': layout_summary(layout, lambda r: 'docx' if (r.get('kind') or '').endswith('report') else 'pptx')},
+            'pii': pii_scores.get('summary') if isinstance(pii_scores, dict) and 'summary' in pii_scores else pii_scores,
+            'pii_combined': (pii_combined_scores.get('summary') if isinstance(pii_combined_scores, dict)
+                             and 'summary' in pii_combined_scores else pii_combined_scores)}
     Path(out).write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding='utf-8')
     print(json.dumps({k: report[k] for k in ('translation_jobs',)}, indent=1)[:1500])
 
 
 if __name__ == '__main__':
-    main(sys.argv[1], sys.argv[2])
+    import argparse
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('eval_dir'); ap.add_argument('out')
+    ap.add_argument('--pii', default='site-final'); ap.add_argument('--combined', default='site-combined')
+    ap.add_argument('--office'); ap.add_argument('--office-pii')
+    a = ap.parse_args()
+    main(a.eval_dir, a.out, a.pii, a.combined, a.office, a.office_pii)

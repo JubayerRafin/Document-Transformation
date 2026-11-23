@@ -131,9 +131,12 @@ def main(results, corpus, out):
         s = json.loads(summary.read_text(encoding='utf-8'))
         output = summary.parent / 'output.pdf'
         source = Path(corpus) / ((s.get('doc') or s.get('file', '').removesuffix('.pdf')) + '.pdf')
+        if (summary.parent / 'source-preview.pdf').exists():
+            # A Word or PowerPoint job: both sides are the website's LibreOffice previews.
+            source = summary.parent / 'source-preview.pdf'
         if not output.exists() or not source.exists():
             continue
-        row = {'doc': source.stem, 'source': s.get('source'), 'target': s.get('target'), 'kind': s.get('kind'),
+        row = {'doc': s.get('doc') or source.stem, 'source': s.get('source'), 'target': s.get('target'), 'kind': s.get('kind'),
                'operation': s.get('operation', 'translation')}
         try:
             row.update(document(source, output, s.get('source'), s.get('target')))
