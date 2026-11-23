@@ -600,6 +600,16 @@ def join_broken_line(page, update):
             left = min(c.visual_bbox.box.x for c in b['chars'] if (c.char_unicode or '').strip())
             return left - right
 
+        def advances_touch(a, b):
+            # The characters' advance boxes meet exactly: the two glyphs were set one after the other
+            # in one run of text. "You ca" | "n register ..." (Canon manual, 2026-11-23) was cut by the
+            # layout model with 1.5 pt of ink between "a" and "n", over the ink rule's 1.35 pt, and
+            # "You ca" was answered with "Sorry, no text was given to translate" in Japanese.
+            last = [c for c in a['chars'] if (c.char_unicode or '').strip()][-1]
+            first = [c for c in b['chars'] if (c.char_unicode or '').strip()][0]
+            return (getattr(last, 'box', None) is not None and getattr(first, 'box', None) is not None
+                    and abs(first.box.x - last.box.x2) <= 0.05 * a['size'])
+
         def fragment(item):
             return sum(ch.isalpha() for ch in item['text']) <= 4
 
@@ -613,15 +623,18 @@ def join_broken_line(page, update):
             # A lowercase letter touching a lowercase letter is one word cut in two, whatever the
             # pieces' lengths ("The control pa" | "nel provides ... printe" | "r.", HP manual,
             # 2026-11-23); fields of a form row do not start in lowercase.
-            continuation = (-0.1 * size <= gap <= 0.15 * size and a['text'][-1:].islower()
-                            and b['text'][:1].islower())
+            continuation = ((-0.1 * size <= gap <= 0.15 * size and a['text'][-1:].islower()
+                             and b['text'][:1].islower())
+                            or (a['text'][-1:].isalpha() and b['text'][:1].isalpha() and advances_touch(a, b)))
             pairs.append((a, b, gap, mid_word or continuation, short or continuation))
         # A line cut by the layout has many such cuts (the HP contents line had over a dozen); one or
         # two tight gaps between fields of a form row are not a broken line, unless a word runs on
         # across a cut in lowercase.
         if sum(1 for p in pairs if p[3]) < 3 and not any(
-                -0.1 * p[0]['size'] <= p[2] <= 0.15 * p[0]['size'] and p[0]['text'][-1:].islower()
-                and p[1]['text'][:1].islower() for p in pairs):
+                (-0.1 * p[0]['size'] <= p[2] <= 0.15 * p[0]['size'] and p[0]['text'][-1:].islower()
+                 and p[1]['text'][:1].islower())
+                or (p[0]['text'][-1:].isalpha() and p[1]['text'][:1].isalpha() and advances_touch(p[0], p[1]))
+                for p in pairs):
             continue
         groups, current = [], [line[0]]
         for a, b, gap, mid, short in pairs:

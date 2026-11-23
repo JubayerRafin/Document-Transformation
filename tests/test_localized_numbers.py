@@ -200,3 +200,14 @@ class GluedUnitTests(unittest.TestCase):
                                ('Part DS-C48S-300AC', 'القطعة DS-C48S-300 AC')):
             with self.assertRaises(ValueError, msg=target):
                 validate_candidate(source, target)
+
+
+class ShortFragmentTests(unittest.TestCase):
+    def test_a_chatty_answer_to_a_short_fragment_is_refused_and_real_short_translations_pass(self):
+        """Canon manual, 2026-11-23: "You ca" came back as an apology asking for text."""
+        from transformation.llm.translation_guard import validate_candidate
+        with self.assertRaises(ValueError):
+            validate_candidate('You ca', '申し訳ありませんが、翻訳するテキストが提供されていません。テキストを入力してください')
+        for source, target in (('PIN', 'Persönliche Identifikationsnummer'), ('FAQ', 'Frequently Asked Questions'),
+                               ('Favorite', 'お気に入り'), ('合計', 'Total amount'), ('ID', 'Identifikationsnummer')):
+            validate_candidate(source, target)

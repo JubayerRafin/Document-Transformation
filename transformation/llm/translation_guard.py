@@ -118,6 +118,15 @@ def validate_candidate(source, target, values=()):
     # (2026-11-19). Real translations stay within about four times the source, even CJK to English.
     if len(target.strip()) > 6 * len(source.strip()) + 40:
         raise ValueError('Translation is far longer than its source.')
+    # A short fragment ("You ca", a word cut by the page layout) was answered "Sorry, no text was
+    # given to translate. Please enter text" in Japanese and printed in a Canon manual (2026-11-23):
+    # 45 characters, under the limit above. For a source of up to 12 characters the answer may be at
+    # most four times as wide plus 24, counting a CJK character as two ("PIN" -> "Persönliche
+    # Identifikationsnummer" is 33; "Favorite" -> "お気に入り" is 10).
+    import unicodedata
+    width = lambda text: sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text.strip())
+    if len(source.strip()) <= 12 and width(target) > 4 * len(source.strip()) + 24:
+        raise ValueError('Translation is far longer than its source.')
     # A source with no letters or digits ("." after an inline icon) has nothing to translate: words in
     # the answer are the model talking ("no text was given, please provide text"), not a translation.
     if (not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', source))

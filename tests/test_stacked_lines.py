@@ -377,6 +377,22 @@ class BrokenLineTests(unittest.TestCase):
         count, texts = self.run_join(pieces)
         self.assertEqual(texts, ['The control panel provides the printer.'.replace(' panel', ' pa' + 'nel')])
 
+    def test_pieces_whose_advance_boxes_meet_inside_a_word_are_joined(self):
+        """Canon manual, 2026-11-23: "You ca" | "n register ...", 1.5 pt of ink between "a" and "n"."""
+        a, b = self.piece('a', 'You ca', 89.3, 116.9, size=9.0), self.piece('b', 'n register', 116.9, 160.0, size=9.0)
+        for p, inset in ((a, 0.4), (b, 0.7)):        # ink sits inside the advance box (side bearings)
+            for c in p.pdf_paragraph_composition[0].pdf_line.pdf_character:
+                c.box = c.visual_bbox.box
+                c.visual_bbox = NS(box=NS(x=c.box.x + inset, y=c.box.y, x2=c.box.x2 - inset, y2=c.box.y2))
+        count, texts = self.run_join([a, b])
+        self.assertEqual((count, texts), (1, ['You can register']))
+        # The same pieces with a word space between their advance boxes stay apart.
+        a, b = self.piece('a', 'You ca', 89.3, 116.9, size=9.0), self.piece('b', 'Nothing', 119.6, 160.0, size=9.0)
+        for p in (a, b):
+            for c in p.pdf_paragraph_composition[0].pdf_line.pdf_character:
+                c.box = c.visual_bbox.box
+        self.assertEqual(self.run_join([a, b])[0], 0)
+
     def test_separate_cells_and_words_of_unbroken_lines_stay_apart(self):
         count, texts = self.run_join([self.piece('a', 'Total', 50, 70), self.piece('b', 'USD 12', 72.5, 100)])
         self.assertEqual(count, 0)                                  # word gap only, nothing cut mid-word
