@@ -12,6 +12,7 @@ import {
   ApiClient,
   checkFindings,
   reviewSummary,
+  passedChecks,
   redactionSummary,
   downloadUrl,
   seconds,
@@ -19,16 +20,20 @@ import {
 } from "@/lib/api";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
+import { RedactedValuesPanel } from "./redacted-values";
 export function PreviewPanel({
   job,
   api,
   onError,
   readOnly = false,
+  onCreated,
 }: {
   job: Job;
   api: ApiClient;
   onError: (e: unknown) => void;
   readOnly?: boolean;
+  /** A new version of this job was made (values kept visible): open it. */
+  onCreated?: (id: string) => void;
 }) {
   const [urls, setUrls] = useState<{ source?: string; result?: string }>({}),
     [error, setError] = useState(""),
@@ -84,9 +89,15 @@ export function PreviewPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge className="border-amber-800 bg-amber-950 text-amber-200">
-            Review required
-          </Badge>
+          {passedChecks(job.metrics.checks) && !job.metrics.review_items?.some((i) => i.state === "suggested") ? (
+            <Badge className="border-emerald-800 bg-emerald-950 text-emerald-200">
+              Checks passed
+            </Badge>
+          ) : (
+            <Badge className="border-amber-800 bg-amber-950 text-amber-200">
+              Review suggested
+            </Badge>
+          )}
           {source && result && (
             <Button asChild size="sm" variant="outline">
               <a href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&compare=1`}>
@@ -94,7 +105,7 @@ export function PreviewPanel({
               </a>
             </Button>
           )}
-          {result && !readOnly && (
+          {result && !readOnly && /\.pdf$/i.test(result.filename) && (
             <Button asChild size="sm" variant="outline">
               <a href={`/redaction-review.html?job=${encodeURIComponent(job.id)}&new=1`}>
                 Review &amp; add redactions
@@ -153,11 +164,22 @@ export function PreviewPanel({
                 ? "passed"
                 : job.metrics.checks.privacy_verification === "failed"
                   ? "found items to review"
-                  : "not run"}
+                  : job.metrics.checks.privacy_verification === "not_needed"
+                    ? "not needed (no pictures; all text was checked directly)"
+                    : "not run"}
               . Automated checks do not replace a full human review.
             </p>
           )}
         </div>
+      )}
+      {job.parent_job_id && (job.options.pii_keep?.length || 0) > 0 && (
+        <p className="mb-0 text-xs text-muted-foreground" data-testid="kept-version">
+          New version made from the original, with {job.options.pii_keep!.length} value
+          {job.options.pii_keep!.length === 1 ? "" : "s"} kept visible.
+        </p>
+      )}
+      {result && onCreated && (job.options.operation === "pii" || job.options.operation === "combined") && (
+        <RedactedValuesPanel job={job} api={api} onError={onError} onCreated={onCreated} readOnly={readOnly} />
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="mb-0 text-xs text-muted-foreground">
@@ -173,7 +195,7 @@ export function PreviewPanel({
               className="select-input !h-9 !w-20"
             >
               {Array.from(
-                { length: Math.max(1, Math.min(200, job.pages || 1)) },
+                { length: Math.max(1, Math.min(1000, job.pages || 1)) },
                 (_, i) => (
                   <option key={i} value={i + 1}>
                     {i + 1}

@@ -113,6 +113,88 @@ def heading_slots(document, changes, source_images=None):
     return slots
 
 
+def _font_size(paragraph):
+    for composition in paragraph.pdf_paragraph_composition or []:
+        line = getattr(composition, 'pdf_line', None)
+        for char in (getattr(line, 'pdf_character', None) or []) if line else []:
+            style = getattr(char, 'pdf_style', None)
+            if style and style.font_size:
+                return float(style.font_size)
+    style = getattr(paragraph, 'pdf_style', None)
+    return float(style.font_size) if style and getattr(style, 'font_size', None) else None
+
+
+def _free_edge(box, size, others, shapes, page_edge):
+    """How far right box can grow: to the right edge of its column (paragraphs starting at its left
+    edge within six lines above or below; twice its width without one), before anything to its
+    right on its line, and inside a panel or cell drawn around it. Boxes are (x, y, x2, y2)."""
+    left, bottom, right, top = box
+    column = [o[2] for o in others if abs(o[0] - left) <= size and max(o[1] - top, bottom - o[3]) <= 6 * size]
+    limit = min(max(column) if column else right + (right - left), page_edge)
+    for x, y, x2, y2 in others:
+        # Anything on its line that starts after it, also a piece it already overlaps: a Hindi word
+        # split into overlapping pieces grew one piece over the next ("Sure" over "Hours", 2026-11-21).
+        if min(y2, top) > max(y, bottom) and x > left + 1:
+            limit = min(limit, max(right, x - 2))
+    for x, y, x2, y2 in shapes:
+        if not min(y2, top) > max(y, bottom):
+            continue
+        if x >= right - 1:                                   # something to the right on this line
+            limit = min(limit, x - 2)
+        elif x <= left + 1 and x2 >= right - 1 and y <= bottom + 1 and y2 >= top - 1:
+            limit = min(limit, x2 - 2)                       # a panel or cell around it
+        elif x2 > right:                                     # a shape crossing its line further right
+            limit = min(limit, max(right, x - 2))
+    return limit, bool(column)
+
+
+def widen_single_lines(document, source_images=None, skip=()):
+    """Let a one-line paragraph use the free space of its column.
+
+    A translation longer than its source ("계약 조건" -> "Contract Terms", "Finanzlage" ->
+    "Financial Position") was fitted into the source's short box and drawn at a third of its size
+    (Korean and German reports, 2026-11-21). A left-aligned line now reaches the right edge of its
+    column (_free_edge); a right-aligned one, as in Arabic documents, the left edge."""
+    changes = []
+    for page in document.page:
+        crop = getattr(getattr(page, 'cropbox', None), 'box', None)
+        paragraphs = [p for p in page.pdf_paragraph if getattr(p, 'box', None)]
+        shapes = [getattr(o, 'box', None) for attr in ('pdf_figure', 'pdf_curve', 'pdf_form')
+                  for o in (getattr(page, attr, None) or [])]
+        shapes.extend(getattr(o, 'box', None) for o in (source_images or {}).get(page.page_number, []))
+        shapes = [(b.x, b.y, b.x2, b.y2) for b in shapes if b is not None]
+        for paragraph in paragraphs:
+            b = paragraph.box
+            size = _font_size(paragraph)
+            if (paragraph.debug_id in skip or getattr(paragraph, 'vertical', False) or not size
+                    or b.y2 - b.y > 1.8 * size or b.x2 - b.x <= 0):
+                continue
+            others = [(o.box.x, o.box.y, o.box.x2, o.box.y2) for o in paragraphs if o is not paragraph]
+            box = (b.x, b.y, b.x2, b.y2)
+            limit, aligned = _free_edge(box, size, others, shapes, crop.x2 - 2 if crop else float('inf'))
+            if aligned and limit > b.x2 + 1:
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': 'single_line_widened', 'before': list(box),
+                                'after': [b.x, b.y, limit, b.y2]})
+                b.x2 = limit
+                continue
+            # Mirrored: the same rules for a line aligned with its column's right edge.
+            flip = lambda r: (-r[2], r[1], -r[0], r[3])
+            edge, right_aligned = _free_edge(flip(box), size, [flip(o) for o in others], [flip(s) for s in shapes],
+                                             -(crop.x + 2) if crop else float('inf'))
+            if right_aligned and -edge < b.x - 1:
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': 'single_line_widened_left', 'before': list(box),
+                                'after': [-edge, b.y, b.x2, b.y2]})
+                b.x = -edge
+            elif limit > b.x2 + 1:
+                changes.append({'page': page.page_number, 'paragraph_id': paragraph.debug_id,
+                                'reason': 'single_line_widened', 'before': list(box),
+                                'after': [b.x, b.y, limit, b.y2]})
+                b.x2 = limit
+    return changes
+
+
 def mark_date_units(units, protected_values=()):
     parts = [unit_text(u) for u in units]
     text = "".join(parts)
@@ -178,6 +260,67 @@ def install_whole_word_breaks(Typesetting):
 
     Typesetting._get_width_before_next_break_point = width_after
     Typesetting._transformx_whole_words = True
+
+
+def is_hangul(character):
+    """Korean letters: syllables, jamo and compatibility jamo."""
+    code = ord(character) if character else 0
+    return (0xAC00 <= code <= 0xD7AF or 0x1100 <= code <= 0x11FF or 0x3130 <= code <= 0x318F
+            or 0xA960 <= code <= 0xA97F or 0xD7B0 <= code <= 0xD7FF)
+
+
+def install_korean_word_breaks(TypesettingUnit):
+    """Break Korean lines between words, not inside them.
+
+    BabelDOC 0.6.4 lets a line break after any Chinese, Japanese or Korean character. Korean
+    separates words with spaces like English, and a word split over two lines ("사용 가 | 능.")
+    reads as two words (scanned caution label, 2026-11-21). Hangul letters are no break point now,
+    like Latin letters; a space still is. A single word wider than the line still breaks: BabelDOC
+    retries such a paragraph with character breaks (use_english_line_break=False)."""
+    if getattr(TypesettingUnit, '_transformx_korean_words', False):
+        return
+    original = TypesettingUnit.calc_can_break_line
+
+    def can_break(self):
+        text = self.try_get_unicode()
+        if text and len(text) == 1 and is_hangul(text):
+            return False
+        return original(self)
+
+    TypesettingUnit.calc_can_break_line = can_break
+    TypesettingUnit._transformx_korean_words = True
+
+
+INDENT_EMS = 0.5  # a first line starting this many ems right of the paragraph is indented
+
+
+def install_real_first_line_indents(ParagraphFinder):
+    """Indent a paragraph's first line only when the source really indents it.
+
+    BabelDOC 0.6.4 marks a paragraph as indented when its first character starts more than 1 pt right
+    of the paragraph's left edge, and then sets the translated first line four spaces in. Lines read
+    from a scan start a pixel or two apart, so a label's second line ("Badge EMP-2024-8831") came out
+    pushed right inside its box (2026-11-21). An indent now needs half an em of the first
+    character's size; typographic indents are about one em or more."""
+    if getattr(ParagraphFinder, '_transformx_real_indents', False):
+        return
+    original = ParagraphFinder.update_paragraph_data
+
+    def update(self, paragraph, *args, **kwargs):
+        result = original(self, paragraph, *args, **kwargs)
+        if getattr(paragraph, 'first_line_indent', False):
+            try:
+                first = paragraph.pdf_paragraph_composition[0].pdf_line.pdf_character[0]
+                offset = first.visual_bbox.box.x - paragraph.box.x
+                size = (first.pdf_style.font_size if first.pdf_style else None) or 0
+            except (AttributeError, IndexError, TypeError):
+                return result
+            if size > 0 and offset < INDENT_EMS * size:
+                paragraph.first_line_indent = False
+        return result
+
+    ParagraphFinder.update_paragraph_data = update
+    ParagraphFinder._transformx_real_indents = True
 
 
 ATTACHING_PUNCTUATION = set('.,:;!?)]}%’”') | set('([{“‘')

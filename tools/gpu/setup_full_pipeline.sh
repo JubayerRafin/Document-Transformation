@@ -8,13 +8,42 @@ if ! command -v soffice >/dev/null; then
   apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends libreoffice-writer libreoffice-impress fonts-noto-cjk fonts-dejavu-core
 fi
+# Word and PowerPoint previews (and their PII check) are drawn by LibreOffice with the system fonts:
+# without Noto's Bengali, Devanagari and Arabic faces those scripts render as empty boxes.
+if [ -z "$(fc-list :lang=bn family)" ] || [ -z "$(fc-list :lang=hi family)" ]; then
+  apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends fonts-noto-core
+fi
+# Bengali scans: PaddleOCR has no Bengali recognizer, Tesseract's LSTM model reads the line crops the
+# Paddle detector finds (tools/ocr/tesseract_line.py; 50% -> 99% of characters, 2026-11-23).
+# Arabic scans: Tesseract reads the digits PaddleOCR's Arabic model drops (dropped_digits).
+# A second model per script (Bengali "script" model, Hindi, Japanese, Chinese) confirms lines the first reads unsteadily
+# (tools/ocr/tesseract_line.SECOND_MODELS).
+langs=$(tesseract --list-langs 2>/dev/null || true)
+missing=0
+for lang in ben ara Bengali hin jpn chi_sim; do
+  printf '%s\n' "$langs" | grep -qx "$lang" || missing=1
+done
+if [ "$missing" = 1 ]; then
+  apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-ben tesseract-ocr-ara \
+    tesseract-ocr-script-beng tesseract-ocr-hin tesseract-ocr-jpn tesseract-ocr-chi-sim
+fi
 uv python install 3.11
 test -x /workspace/transformx-engine/bin/python || uv venv --python 3.11 /workspace/transformx-engine
 test -x /workspace/transformx-babeldoc/bin/python || uv venv --python 3.11 /workspace/transformx-babeldoc
-# Table extraction uses the server CPU; OCR and Ollama use its GPU.
-uv pip install --python /workspace/transformx-engine/bin/python torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Table extraction (Docling's layout and table models) runs on the GPU when there is one: on the CPU
+# it took about 3.5 s per page, half of a translation job (2026-11-21). TRANSFORMX_TORCH_INDEX picks
+# another PyTorch build (for example .../whl/cpu).
+torch_index="${TRANSFORMX_TORCH_INDEX:-https://download.pytorch.org/whl/cpu}"
+if [ -z "${TRANSFORMX_TORCH_INDEX:-}" ] && command -v nvidia-smi >/dev/null && nvidia-smi >/dev/null 2>&1; then
+  torch_index=https://download.pytorch.org/whl/cu128
+fi
+uv pip install --python /workspace/transformx-engine/bin/python torch torchvision --index-url "$torch_index"
 uv pip install --python /workspace/transformx-engine/bin/python -r requirements-deep-doc.txt 'docling-core==2.85.0' 'pymupdf==1.27.2.2' 'Pillow>=11,<13' 'python-docx>=1.1,<2' 'python-pptx>=1,<2'
 uv pip install --python /workspace/transformx-babeldoc/bin/python -r requirements-transformation.txt 'pymupdf==1.28.2'
+# Fonts, layout model and character maps BabelDOC otherwise downloads during the first jobs.
+/workspace/transformx-babeldoc/bin/python -c 'from babeldoc.assets.assets import warmup; warmup()'
 uv pip check --python /workspace/transformx-engine/bin/python
 # BabelDOC's page-layout model runs on the GPU with ONNX Runtime's CUDA build (BabelDOC's own "cuda"
 # extra; transformation/pdf/layout_device.py). Both builds provide the same module, so the CPU build is

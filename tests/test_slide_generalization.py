@@ -36,7 +36,8 @@ class SlideGeneralizationTests(unittest.TestCase):
             self.assertIn('NEIGHBOR_ONLY_SENTINEL',chat.call_args.args[2][0]['content'])
 
     def test_bad_heading_retry_is_not_trimmed_into_acceptance(self):
-        with patch('transformation.llm.ollama_native.chat',return_value=('이동\n추가된 내용',{})) as chat:
+        # Without a second model configured: on a server, servers.env names one (TranslateGemma's fallback).
+        with patch.dict('os.environ',{'TRANSFORMX_PII_ENDPOINT':'','TRANSFORMX_PII_MODEL':''}),patch('transformation.llm.ollama_native.chat',return_value=('이동\n추가된 내용',{})) as chat:
             with self.assertRaisesRegex(ValueError,'added lines'):
                 translate('unused','translategemma:12b','MOBILITY','Korean')
             self.assertEqual(chat.call_count,2)

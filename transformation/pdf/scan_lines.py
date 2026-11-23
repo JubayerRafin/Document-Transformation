@@ -118,14 +118,28 @@ def _continues(upper, lower):
     # English did not fit the line (scanned newsletter and contract, 2026-11-19).
     if (HANGUL.search(a) and HANGUL.search(b)) or (HAN_KANA.search(a) and HAN_KANA.search(b)):
         return len(a) >= 12 and not NEW_ITEM.match(b)
+    # An email or web address on its own line is a field of its own, not the end of a sentence,
+    # though it starts in lower case (a name and the email under it were joined, 2026-11-23).
+    if '@' in b.split()[0] or '://' in b or b.lower().startswith('www.'):
+        return False
     last = a.split()[-1].lower()
     return b[0].islower() or a[-1] in ',&-–' or last in CONNECTORS
 
 
-def _wrapped(upper, lower, rules, inks):
+def _wrapped(upper, lower, rules, inks, sizes=None):
     ra, rb = pymupdf.Rect(upper['bbox']), pymupdf.Rect(lower['bbox'])
     height = min(ra.height, rb.height)
-    if height <= 0 or max(ra.height, rb.height) / height > 1.3:
+    if height <= 0:
+        return False
+    # Two lines of one size can have boxes of very different heights: a line of small letters only
+    # ("cover.") has a box about two thirds as high as a line with tall letters above it. The source
+    # font sizes measured from the glyphs are compared when both are known (warning picture of a
+    # manual: the wrapped "cover." was translated alone, 2026-11-23).
+    estimates = [sizes.get(upper['id']), sizes.get(lower['id'])] if sizes else [None, None]
+    if all(estimates):
+        if max(estimates) / min(estimates) > 1.3:
+            return False
+    elif max(ra.height, rb.height) / height > 1.3:
         return False
     if not 0 <= rb.y0 - ra.y1 <= LINE_GAP * height:
         return False
@@ -139,7 +153,7 @@ def _wrapped(upper, lower, rules, inks):
     return _continues(upper, lower)
 
 
-def join_wrapped_lines(regions, mapping, rules, reliable, styles):
+def join_wrapped_lines(regions, mapping, rules, reliable, styles, sizes=None):
     """(regions, mapping, styles) with a line and its wrapped continuation below joined into one
     paragraph. Each line keeps its own box (metadata wrapped_lines) and is drawn there as before;
     only translation and the locked paragraph area cover both."""
@@ -154,7 +168,7 @@ def join_wrapped_lines(regions, mapping, rules, reliable, styles):
         while ok(regions[lines[-1]]):
             tail = lines[-1]
             below = [j for j in order if j not in used and ok(regions[j])
-                     and _wrapped(regions[tail], regions[j], rules, (styles[tail]['ink'], styles[j]['ink']))]
+                     and _wrapped(regions[tail], regions[j], rules, (styles[tail]['ink'], styles[j]['ink']), sizes)]
             if len(below) != 1:
                 break
             lines.append(below[0]); used.add(below[0])

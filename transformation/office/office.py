@@ -8,12 +8,44 @@ import json
 import pymupdf
 
 
-def render(data,filename,executable=None):
+# Word 97-2003 (.doc) and PowerPoint 97-2003 (.ppt) files are converted to their current formats on
+# arrival (modernize) and come back as .docx and .pptx.
+LEGACY={'.doc':'docx','.ppt':'pptx'}
+LEGACY_FILTERS={'docx':'docx:MS Word 2007 XML','pptx':'pptx:Impress MS PowerPoint 2007 XML'}
+
+
+def modernize(data,filename,executable=None):
+    """(bytes, file name) of a .doc or .ppt converted by LibreOffice to .docx or .pptx; other files
+    unchanged. A file LibreOffice cannot convert (damaged, password-protected) raises ValueError."""
+    suffix=Path(filename).suffix.lower()
+    if suffix not in LEGACY:
+        return data,filename
+    if data[:4]!=b'\xd0\xcf\x11\xe0':
+        raise ValueError('This file is not a Word 97-2003 or PowerPoint 97-2003 document.')
+    target=LEGACY[suffix]
+    executable=executable or os.environ.get('TRANSFORMX_LIBREOFFICE') or shutil.which('soffice')
+    if not executable:
+        raise ValueError('Converting .doc and .ppt files requires LibreOffice.')
+    with tempfile.TemporaryDirectory(prefix='transformx-legacy-') as folder:
+        root=Path(folder)
+        source=root/('source'+suffix); source.write_bytes(data)
+        command=[str(executable),'-env:UserInstallation='+(root/'profile').as_uri(),'--headless','--convert-to',
+                 LEGACY_FILTERS[target],'--outdir',str(root/'out'),str(source)]
+        result=subprocess.run(command,capture_output=True,text=True,timeout=300,check=False)
+        output=root/'out'/('source.'+target)
+        if result.returncode or not output.exists():
+            raise ValueError('This file could not be converted; it may be damaged or password-protected.')
+        return output.read_bytes(),Path(filename).stem+'.'+target
+
+
+def render(data,filename,executable=None,convert='pdf'):
+    """(PDF bytes, report). convert is LibreOffice's --convert-to argument (a PDF export filter with
+    options, e.g. speaker notes pages; see transformation/office/native.NOTES_FILTER)."""
     suffix=Path(filename).suffix.lower()
     if suffix=='.pdf':
         return data,{'renderer':'input PDF','overflow':[]}
-    if suffix not in {'.docx','.pptx'}:
-        raise ValueError('Supported inputs are PDF, DOCX and PPTX.')
+    if suffix not in {'.docx','.pptx','.doc','.ppt'}:
+        raise ValueError('Supported inputs are PDF, DOCX, PPTX, DOC and PPT.')
     if executable and not Path(executable).is_file():
         raise ValueError('Explicit renderer requires LibreOffice at a valid executable path.')
     executable=executable or os.environ.get('TRANSFORMX_LIBREOFFICE') or shutil.which('soffice')
@@ -29,12 +61,12 @@ def render(data,filename,executable=None):
         output=root/'source.pdf'
         report={'renderer':'LibreOffice','overflow':[]}
         if executable and Path(executable).is_file():
-            command=[str(executable),'-env:UserInstallation='+(root/'profile').as_uri(),'--headless','--convert-to','pdf','--outdir',str(root),str(source)]
+            command=[str(executable),'-env:UserInstallation='+(root/'profile').as_uri(),'--headless','--convert-to',convert,'--outdir',str(root),str(source)]
         elif os.name=='nt':
             command=['powershell.exe','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',str(Path(__file__).with_name('render_office.ps1')),'-Source',str(source),'-Destination',str(output),'-Report',str(root/'render.json')]
         else:
             raise ValueError('Office rendering requires Microsoft Office on Windows or LibreOffice.')
-        result=subprocess.run(command,capture_output=True,text=True,timeout=120,check=False)
+        result=subprocess.run(command,capture_output=True,text=True,timeout=300,check=False)
         if result.returncode or not output.exists():
             raise RuntimeError('Office rendering failed: '+result.stderr[-1000:])
         if (root/'render.json').exists(): report=json.loads((root/'render.json').read_text(encoding='utf-8-sig'))

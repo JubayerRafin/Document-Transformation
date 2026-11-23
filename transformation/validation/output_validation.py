@@ -11,6 +11,24 @@ def normalized(value):
     return re.sub(r'\s+','',unquote(value)).casefold()
 
 
+def residual_in(value,text):
+    """True when value is still in text, spaces and letter case aside (a name split by a line break
+    counts). A value that starts and ends with a letter or digit of a script written with spaces
+    must stand as a word: the name "Mat" was found in "Format" and blocked a Samsung guide
+    (2026-11-23). Other scripts (Arabic words take prefixes; CJK has no word spaces) are found anywhere."""
+    from urllib.parse import unquote
+    key=normalized(value)
+    if not key:return False
+    bounded=lambda ch:ch.isalnum() and ord(ch)<0x0590      # Latin, Greek, Cyrillic letters and digits
+    if not (bounded(key[0]) and bounded(key[-1])):
+        return key in normalized(text)
+    # Only a neighbouring letter or digit of the same kind of script ends the word: "EMP-2026-14033은"
+    # (a Korean particle attached) still holds the value.
+    near=r'[0-9a-zÀ-ɏͰ-ϿЀ-ӿ]'
+    pattern=r'(?<!'+near+r')'+r'\s*'.join(re.escape(c) for c in key)+r'(?!'+near+r')'
+    return re.search(pattern,unquote(text).casefold()) is not None
+
+
 def partial_name_residuals(source,output,names):
     """Words of a selected multi-word name left behind while other words were removed.
 
@@ -32,7 +50,26 @@ def partial_name_residuals(source,output,names):
     return sorted(residual)
 
 
-def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intended_overlays=()):
+def source_floor(span_box,sources):
+    """The floor for an output line drawn where source text was: 70% of that text's size, never below
+    4 pt (None when less than 30% of the line lies over source text). Translation shrinks text to
+    70% of its source size before it takes more room (BabelDOC's typesetting); a scanned invoice whose
+    own table text is 7 pt was reported as 31 layout problems against a flat 8 pt floor (2026-11-23).
+    sources: (rect, size) of the source page's text."""
+    area=span_box.get_area()
+    if area<=0:return None
+    best=max(sources,key=lambda s:(s[0]&span_box).get_area(),default=None)
+    if best is None or (best[0]&span_box).get_area()<area*.3:return None
+    # Squeezed further, text is still legible down to 6 pt (common fine print) if it keeps 60% of its
+    # source size: German and Spanish table headers of 9.5 pt scans set at 6.1-6.6 pt ("Menge",
+    # "Einheitspreis") were reported as layout problems (12 of 19 flagged dev jobs, 2026-11-23).
+    size=best[1]
+    return max(4.0,min(.7*size,max(6.0,.6*size)))
+
+
+def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intended_overlays=(),source_text=None):
+    """source_text: {page number: [(rect, size), ...]} of the source document; with it, text below
+    min_font_size is accepted down to source_floor() where it covers source text."""
     residual=[]; uninspected=[]; geometry=[]; candidates=[]
     import math
     for region in font_regions:
@@ -40,7 +77,7 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
             raise ValueError('Invalid source-relative font validation region.')
     def check(text,location):
         for value in values:
-            if normalized(value) and normalized(value) in normalized(text):
+            if residual_in(value,text):
                 residual.append({'location':location,'value':value})
     if kind=='pdf':
         with pymupdf.open(stream=data,filetype='pdf') as pdf:
@@ -51,12 +88,18 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                 for block in page.get_text('dict')['blocks']:
                     for line in block.get('lines',[]):
                         for span in line['spans']:
-                            text_spans.append(span)
+                            # Blank spans (spaces LibreOffice draws over Korean text) overlap nothing real.
+                            if span['text'].strip(): text_spans.append(span)
                             minimum=min_font_size
                             matching=[r['minimum'] for r in font_regions if r['page']==number and
                                       (pymupdf.Rect(r['bbox'])+(-.25,-.25,.25,.25)).contains(pymupdf.Rect(span['bbox']))]
                             if minimum is not None and matching:minimum=min(minimum,min(matching))
-                            if minimum is not None and span['text'].strip() and span['size']<minimum-.05:
+                            if minimum is not None and source_text:
+                                floor=source_floor(pymupdf.Rect(span['bbox']),source_text.get(number,()))
+                                if floor is not None:minimum=min(minimum,floor)
+                            # A quarter point of rounding: 7.9 pt text against an 8 pt floor was
+                            # reported as a layout problem on most scanned pages (2026-11-23).
+                            if minimum is not None and span['text'].strip() and span['size']<minimum-.25:
                                 geometry.append({'page':number,'reason':'text below configured font limit',
                                                  'text':span['text'],'font_size':span['size'],'minimum':minimum})
                             if not page.rect.contains(pymupdf.Rect(span['bbox'])):
@@ -85,7 +128,9 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                     if overlap>min(areas[index],areas[other_index])*.35:
                         candidates.append({'page':number,'kind':'text_text_overlap',
                                            'text':[text_spans[index]['text'],text_spans[other_index]['text']]})
-                for link in page.get_links(): check(str(link),'page '+str(number)+' link')
+                # A link's address and file, not its record: "105088" matched a link's object number
+                # and blocked a Cisco manual (2026-11-23).
+                for link in page.get_links(): check(' '.join(str(link.get(k) or '') for k in ('uri','file')),'page '+str(number)+' link')
                 for annot in page.annots() or []: check(str(annot.info),'page '+str(number)+' annotation')
                 # annots() excludes form fields; their values are not page text.
                 for widget in page.widgets() or []: check(str(widget.field_value or '')+' '+str(widget.field_name or ''),'page '+str(number)+' form field')
@@ -116,3 +161,25 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
             'layout_review_candidates':candidates,
             'uninspected_content':uninspected,'privacy_complete':False if values else None,
             'acceptable':not residual and not geometry and not uninspected and not candidates}
+
+
+INTENDED_PLACEMENT = 'intended_raster_text_placement_requires_review'
+
+
+def set_aside_expected(independent, redact):
+    """Move findings that are expected, not problems, out of the counts that mark a result for review.
+
+    Every result was marked for review (2026-11-23), also when nothing was wrong: translated text drawn
+    into a picture where its source text was is the intended placement, not an overlap
+    (kept as picture_text_placements); and a picture in a document that is only translated holds no
+    selected value whose removal needs checking (kept as pictures). Changes `independent` in place."""
+    candidates = independent.get('layout_review_candidates') or []
+    intended = [c for c in candidates if c.get('classification') == INTENDED_PLACEMENT]
+    if intended:
+        independent['picture_text_placements'] = intended
+        independent['layout_review_candidates'] = [c for c in candidates if c.get('classification') != INTENDED_PLACEMENT]
+    if not redact:
+        content = independent.get('uninspected_content') or []
+        independent['pictures'] = [c for c in content if c.get('kind') in {'image', 'raster'}]
+        independent['uninspected_content'] = [c for c in content if c.get('kind') not in {'image', 'raster'}]
+    return independent

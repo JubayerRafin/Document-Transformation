@@ -23,7 +23,8 @@ MANUAL_LIMIT_SECONDS=600
 UPLOAD_RETRY_DELAYS=(5,15,30,60,120)
 # Must match FAILURE_CODES in cloud/src/index.mjs. Engine free text is never uploaded.
 FAILURE_CODES={'ENGINE_FAILED','ENGINE_TIMEOUT','INPUT_REJECTED','OUTPUT_INVALID','RESULT_UPLOAD_FAILED',
-               'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED','TRANSLATION_MODEL_UNAVAILABLE'}
+               'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED','TRANSLATION_MODEL_UNAVAILABLE',
+               'PII_MODEL_UNAVAILABLE'}
 
 
 class JobFailure(Exception):
@@ -253,7 +254,11 @@ def summarize_checks(result):
             'uninspected_content':count(independent.get('uninspected_content')),
             'scan_acceptance_blockers':count(result.get('scan_acceptance_blockers')),
             'translation_errors':errors if type(errors) is int and errors>=0 else 0,
-            'privacy_verification':'not_run' if not isinstance(privacy,dict) else 'passed' if privacy.get('passed') is True else 'failed'}
+            # Fresh OCR of the output is needed only for pictures; without any, the text layer is the
+            # whole output and was checked directly ("not run" read as a missing check).
+            'privacy_verification':('passed' if privacy.get('passed') is True else 'failed') if isinstance(privacy,dict)
+                                    else 'not_needed' if independent and not (independent.get('uninspected_content') or independent.get('ocr_checked_content')
+                                                              or independent.get('pictures')) else 'not_run'}
 
 PROFILE_OVERRIDES=(('pii_endpoint','TRANSFORMX_PII_ENDPOINT'),('pii_model','TRANSFORMX_PII_MODEL'),
                    ('translation_endpoint','TRANSFORMX_TRANSLATION_ENDPOINT'),('translation_model','TRANSFORMX_TRANSLATION_MODEL'),
@@ -312,40 +317,56 @@ class _environment:
     def __exit__(self,*a):os.environ.clear();os.environ.update(self.saved)
 
 
-def translation_models(profile,translation_ok):
-    """The translation models users may choose on the website: the default one (when this server
-    translates) and each [translation_models.<id>] in transformx.toml whose server answers and serves
-    its model. Only ids and labels leave this server; addresses and keys never do."""
+def offered_models(role,profile,role_ok):
+    """The models users may choose on the website for role ('translation' or 'pii'): the default one
+    (when this server serves it) and each [translation_models.<id>] / [pii_models.<id>] in
+    transformx.toml whose server answers and serves its model. Only ids and labels leave this server;
+    addresses and keys never do."""
     from transformation import settings
-    try:choices=settings.translation_choices()
+    try:choices=settings.model_choices(role)
     except Exception:return []
     from transformation.llm.endpoints import is_loopback
-    default_endpoint=profile.get('translation_endpoint','http://127.0.0.1:11434/v1')
+    default_endpoint=profile.get(role+'_endpoint','http://127.0.0.1:11434/v1')
+    workflow='Translation only' if role=='translation' else 'PII only'
     # external: document text goes to another machine (shown to the user before they choose it).
-    offered=[{'id':'default','label':choices[0]['label'],'external':not is_loopback(default_endpoint)}] if translation_ok else []
+    offered=[{'id':'default','label':choices[0]['label'],'external':not is_loopback(default_endpoint)}] if role_ok else []
     for choice in choices[1:]:
-        with _environment(settings.choice_environment(choice)):
-            ready=_served('Translation only',choice['model'],choice['endpoint'],None,())
+        with _environment(settings.choice_environment(choice,role=role)):
+            ready=_served(workflow,choice['model'],choice['endpoint'],None,())
         if ready:offered.append({'id':choice['id'],'label':choice['label'],'external':not is_loopback(choice['endpoint'])})
     return offered
 
 
+def translation_models(profile,translation_ok):
+    return offered_models('translation',profile,translation_ok)
+
+
+def pii_models(profile,pii_ok):
+    return offered_models('pii',profile,pii_ok)
+
+
 def job_translation(cfg,options):
-    """(profile, environment) for a job: the chosen translation model's server, model and key file,
-    or this server's default. A choice this server does not offer fails the job before it starts."""
+    """(profile, environment) for a job: the chosen translation and PII models' servers, models and
+    key files, or this server's defaults. A choice this server does not offer fails the job before it
+    starts. The environment is None when the job uses only the defaults."""
     from transformation import settings
-    wanted=options.get('translation_model') or 'default'
-    choices={c['id']:c for c in settings.translation_choices()}
-    if options.get('operation')=='pii' or wanted=='default':
-        return cfg['engine_profile'],None
-    if wanted not in choices:raise JobFailure('TRANSLATION_MODEL_UNAVAILABLE','The chosen translation model is not configured on this server.')
-    choice=choices[wanted]
-    return settings.choice_profile(choice,cfg['engine_profile']),settings.choice_environment(choice)
+    profile,env=cfg['engine_profile'],None
+    operation=options.get('operation')
+    for role,option,code,used in (('translation','translation_model','TRANSLATION_MODEL_UNAVAILABLE',operation!='pii'),
+                                  ('pii','pii_model','PII_MODEL_UNAVAILABLE',operation in ('pii','combined'))):
+        wanted=options.get(option) or 'default'
+        if not used or wanted=='default':continue
+        choices={c['id']:c for c in settings.model_choices(role)}
+        if wanted not in choices:raise JobFailure(code,f'The chosen {role} model is not configured on this server.')
+        choice=choices[wanted]
+        profile=settings.choice_profile(choice,profile,role)
+        env=settings.choice_environment(choice,env,role)
+    return profile,env
 
 
 def preflight(cfg):
     """Advertise installed prerequisites, not a claim that inference was GPU-verified."""
-    capabilities={'ready':False,'operations':[],'gpu':'','models':[],'note':'','translation_models':[]}
+    capabilities={'ready':False,'operations':[],'gpu':'','models':[],'note':'','translation_models':[],'pii_models':[]}
     try:
         gpu=subprocess.check_output(['nvidia-smi','--query-gpu=name','--format=csv,noheader'],timeout=10,text=True).strip()
         if not gpu:raise RuntimeError('No allocated NVIDIA GPU visible.')
@@ -366,6 +387,9 @@ def preflight(cfg):
         if capabilities['translation_models'] and 'translation' not in capabilities['operations']:
             capabilities['operations'].append('translation')
         if pii_ready(cfg['engine_profile'],OLLAMA_BASE,names):capabilities['operations'].append('pii')
+        capabilities['pii_models']=pii_models(cfg['engine_profile'],'pii' in capabilities['operations'])
+        if capabilities['pii_models'] and 'pii' not in capabilities['operations']:
+            capabilities['operations'].append('pii')
         if len(capabilities['operations'])==2:capabilities['operations'].append('combined')
         if capabilities['operations']:capabilities['operations'].append('manual_redaction')
         capabilities['ready']=bool(capabilities['operations'])

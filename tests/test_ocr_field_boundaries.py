@@ -125,6 +125,22 @@ class GridTests(unittest.TestCase):
         self.assertFalse(result['acceptable'])
         self.assertTrue(any(r['reason']=='text below configured font limit' for r in result['geometry_blockers']))
 
+    def test_scanned_text_as_small_as_its_source_is_not_a_readability_regression(self):
+        """Korean scan, 2026-11-23: its table text is 7 pt and the English table text was 7 pt too."""
+        import pymupdf
+        from transformation.validation.output_validation import inspect_output
+        with pymupdf.open() as pdf:
+            page=pdf.new_page()
+            page.insert_text((40,60),'Barcode Scanner',fontsize=7)      # the source cell's size
+            page.insert_text((40,120),'Kim Min-jun',fontsize=5)         # 62% of its 8 pt source
+            page.insert_text((40,300),'Moved label',fontsize=6.5)       # over no source text
+            spans=[s for b in page.get_text('dict')['blocks'] for l in b['lines'] for s in l['spans']]
+            data=pdf.tobytes()
+        source={1:[(pymupdf.Rect(40,52,110,62),7.0),(pymupdf.Rect(40,110,90,122),8.0)]}
+        result=inspect_output(data,'pdf',min_font_size=8,source_text=source)
+        flagged=sorted(r['text'] for r in result['geometry_blockers'])
+        self.assertEqual(flagged,['Kim Min-jun','Moved label'],spans)
+
     def test_general_grid_and_callout_distinction(self):
         import cv2
         image=np.full((500,650,3),255,np.uint8)

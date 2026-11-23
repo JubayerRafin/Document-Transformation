@@ -159,6 +159,19 @@ class SpelledCountTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_candidate('Ref INV-2025-3', 'Ref INV-2025-three')
 
+    def test_a_count_written_as_the_same_ordinal_word_is_accepted(self):
+        """Japanese scan, 2026-11-23: the right answer was refused three times and the paragraph kept in Japanese."""
+        from transformation.llm.translation_guard import validate_candidate
+        source = '主要生産ラインの保守点検は、毎月第1週末に予定されています。委員会は、試験プログラムをさらに3つの地域事務所に拡大することを推奨します。'
+        validate_candidate(source, 'The maintenance and inspection of the main production line are scheduled for the first weekend '
+                                   'of each month. The committee recommends expanding the testing program to 3 additional regional offices.')
+        for target in ('The maintenance of the main production line is scheduled for the second weekend of each month. '
+                       'The committee recommends expanding the testing program to 3 additional regional offices.',
+                       'The maintenance of the main production line is scheduled for the weekend of each month. '
+                       'The committee recommends expanding the testing program to 3 additional regional offices.'):
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)
+
 
 class LengthTests(unittest.TestCase):
     def test_an_answer_far_longer_than_its_source_is_refused(self):
@@ -169,3 +182,61 @@ class LengthTests(unittest.TestCase):
         validate_candidate('概要', 'Overview')
         validate_candidate('従業員は会計年度末までに年次セキュリティ研修を修了する必要があります。',
                            'Employees must complete their annual security training by the end of the fiscal year.')
+
+
+class GluedUnitTests(unittest.TestCase):
+    """Cisco manual into Arabic, 2026-11-23: three paragraphs stayed in English over "240V" and "3in."."""
+
+    def test_a_number_glued_to_its_unit_may_be_written_apart_with_the_unit_translated(self):
+        from transformation.llm.translation_guard import validate_candidate
+        validate_candidate('to 240V AC', 'إلى 240 فولت تيار متردد')
+        validate_candidate('a minimum of 3in. (7.6 cm), and a minimum of 5 in. (12.7 cm)',
+                           'بحد أدنى 3 بوصات (7.6 سم)، وبحد أدنى 5 بوصات (12.7 سم)')
+        validate_candidate('a 42U rack', 'حامل بارتفاع 42 وحدة')
+
+    def test_another_number_or_a_split_part_number_is_still_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for source, target in (('to 240V AC', 'إلى 230 فولت تيار متردد'),
+                               ('Part DS-C48S-300AC', 'القطعة DS-C48S-300 AC')):
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)
+
+
+class ShortFragmentTests(unittest.TestCase):
+    def test_a_chatty_answer_to_a_short_fragment_is_refused_and_real_short_translations_pass(self):
+        """Canon manual, 2026-11-23: "You ca" came back as an apology asking for text."""
+        from transformation.llm.translation_guard import validate_candidate
+        with self.assertRaises(ValueError):
+            validate_candidate('You ca', '申し訳ありませんが、翻訳するテキストが提供されていません。テキストを入力してください')
+        for source, target in (('PIN', 'Persönliche Identifikationsnummer'), ('FAQ', 'Frequently Asked Questions'),
+                               ('Favorite', 'お気に入り'), ('合計', 'Total amount'), ('ID', 'Identifikationsnummer')):
+            validate_candidate(source, target)
+
+
+class SingleAndFootnoteTests(unittest.TestCase):
+    """Canon manual into Japanese, 2026-11-23: eight paragraphs stayed in English."""
+
+    def test_single_is_one_and_a_glued_footnote_marker_is_its_number(self):
+        from transformation.llm.translation_guard import validate_candidate
+        validate_candidate('Print Multiple Pages on a Single Sheet', '1枚の用紙に複数のページを印刷する。')
+        validate_candidate('*4The toner cartridge is included.', '*4 トナーカートリッジが付属しています。')
+        for source, target in (('Print Multiple Pages on a Single Sheet', '2枚の用紙に複数のページを印刷する。'),
+                               ('*4The toner cartridge is included.', '*5 トナーカートリッジが付属しています。')):
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)
+
+
+class EchoTests(unittest.TestCase):
+    def test_an_answer_repeating_the_source_is_refused(self):
+        """HP manual into Korean, 2026-11-23: "Please translate as follows:" and the English."""
+        from transformation.llm.translation_guard import validate_candidate, repeats_source
+        source = 'fed at one time. Scanning will stop if multiple pages are detected. If the Automatically retry'
+        with self.assertRaises(ValueError):
+            validate_candidate(source, '다음과 같이 번역해 주세요: ' + source)
+        validate_candidate(source, '한 번에 공급됩니다. 여러 페이지가 감지되면 스캔이 중지됩니다. Automatically retry가')
+        # A list of product names returned with its line breaks changed is unchanged text, not an echo.
+        products = ' '.join(f'• Cisco MDS Fibre Channel SW SFP+ module number {n}' for n in ('one', 'two', 'three'))
+        self.assertFalse(repeats_source(products, products.replace(' • ', chr(10) + '• ')))
+        # A translation keeping a short English name, or a same-script language, is not an echo.
+        self.assertFalse(repeats_source('Open the Embedded Web Server and select General Settings to continue.',
+                                        'Öffnen Sie den Embedded Web Server und wählen Sie General Settings, um fortzufahren.'))

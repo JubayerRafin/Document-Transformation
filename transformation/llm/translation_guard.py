@@ -27,6 +27,57 @@ def source_unit_spacing(source,target,values=()):
     return target
 
 
+# Unit abbreviations a number is often glued to in technical text ("240V", "3in.", "50mm", "42U").
+GLUED_UNIT = re.compile(r'(?<![A-Za-z0-9_.+-])(\d+(?:[.,]\d+)?)'
+                        r'(mm|cm|km|m|in|ft|kg|g|lb|lbs|mA|A|kV|V|kW|W|VA|kVA|Hz|kHz|MHz|GHz|KB|MB|GB|TB|ms|dBm|dB|U)'
+                        r'(?=\.?(?![A-Za-z0-9_]))')
+
+
+def glued_units(source, values=()):
+    """Comparison-only: a number glued to a unit in the source ("240V", "3in.") is the number itself;
+    translations write it apart and translate the unit ("240 فولت", "3 بوصات"). The check did not
+    count the glued number, took the spaced one for an added value, and three paragraphs of a Cisco
+    manual stayed in English (2026-11-23). Explicit protected spans are left as they are; returned
+    document text is not rewritten."""
+    explicit = [(m.start(), m.end()) for value in values for m in re.finditer(re.escape(value), source)]
+    spaced = GLUED_UNIT.sub(lambda m: m.group(0) if any(a < m.end() and m.start() < b for a, b in explicit)
+                            else m.group(1) + ' ' + m.group(2), source)
+    # A footnote marker glued to its note ("*1May vary ...", "*4The toner ...") is the marker's number;
+    # translations write "*1 使用環境..." (Canon manual, 2026-11-23).
+    return re.sub(r'(?<![\w*])([*†‡]\d{1,2})(?=[A-Za-z])', r'\1 ', spaced)
+
+
+# "percent" written out, in the languages that write it with Latin letters.
+PERCENT_WORDS=r'(?:percent|per\s?cent|prozent|pour\s?cent|por\s?ciento|por\s?cento|procent|per\s?cento|percento)'
+
+
+def percent_signs(source,target):
+    """Comparison-only: "8 percent" in the source may come back as "8%" or "8 %": the model's usual
+    rendering in Korean, Chinese and Japanese. The check took "8%" for a changed value and kept the
+    English sentence after three attempts, 63 paragraphs of a 250-page report (2026-11-21). Only a
+    number the source writes with a percent word is folded, and only when the source has no "N%" of
+    its own. Returned document text is not rewritten."""
+    for number in set(re.findall(r'(?<![\w.,])(\d+(?:[.,]\d+)?)\s*'+PERCENT_WORDS+r'(?![^\W\d_])',source,flags=re.I)):
+        # Chinese and Japanese write the number against the word before it ("增长了8%").
+        if re.search(r'(?<![0-9A-Za-z.,])'+re.escape(number)+r'\s?[%％]',source):continue
+        target=re.sub(r'(?<![0-9A-Za-z.,])'+re.escape(number)+r'\s?[%％]',number,target)
+    return target
+
+
+ROMANIZED_NAME = re.compile(r'\b[A-Z][a-z]+ [A-Z][a-z]+-[a-z]+\b')
+
+
+def transliterated_names(source,target):
+    """Comparison-only: a name written in another script ("김민준") is written in Latin letters in a
+    translation ("Kim Min-jun"), which the literal patterns protect as a romanized name. When the
+    source has letters of a non-Latin script and does not itself contain that name, the
+    romanized name in the translation is ordinary text, not an added value. Returned document
+    text is not rewritten."""
+    if not any(c.isalpha() and not c.isascii() for c in source):
+        return target
+    return ROMANIZED_NAME.sub(lambda m: m.group() if m.group() in source else m.group().replace('-',''),target)
+
+
 def joined_separator_spacing(source,values=()):
     """Comparison-only: a number broken by a stray space after its separator ("2024-03- 20", from
     PDF text extraction) may come back joined ("2024-03-20"). Only digit-separator-space-digit is
@@ -62,6 +113,69 @@ def glued_placeholders(source):
             if re.search(r'\d', m.group(1)) and re.search(r'[-_/.:]', m.group(1))]
 
 
+def repeats_source(source, target, run=8):
+    """True when the answer repeats the source: at least eight of its Latin-letter words in a row,
+    making up half of the source's words or more. A sentence fragment of an HP manual ("fed at one
+    time. Scanning will stop if multiple pages are detected. If the ...") was answered "다음과 같이
+    번역해 주세요: " ("Please translate as follows:") followed by the English, and printed on three
+    pages (2026-11-23)."""
+    words = lambda text: re.findall(r"[A-Za-z]+(?:'[A-Za-z]+)?", re.sub(r'\{v\d+\}', ' ', text).lower())
+    a, b = words(source), words(target)
+    if len(a) < run or len(b) < run:
+        return False
+    # An answer made only of the source's words (names, a list of product names with its line breaks
+    # changed) is judged elsewhere, as unchanged text: an echo adds words of its own ("Please
+    # translate as follows:"). A Cisco list of English product names was refused (2026-11-23).
+    from collections import Counter
+    every = lambda text: re.findall(r'[^\W\d_]+', re.sub(r'\{v\d+\}|ZXKEEP\w+', ' ', text).lower())
+    if sum((Counter(every(target)) - Counter(every(source))).values()) < 3:
+        return False
+    longest, previous = 0, [0] * (len(b) + 1)
+    for x in a:
+        current = [0] * (len(b) + 1)
+        for j, y in enumerate(b, 1):
+            if x == y:
+                current[j] = previous[j - 1] + 1
+                longest = max(longest, current[j])
+        previous = current
+    return longest >= run and longest * 2 >= len(a)
+
+
+_TERM_PAIR = re.compile(r'([^\s:：，。,.;；()（）]{1,30})\s*[:：]\s*([^\s:：，。,.;；()（）]{1,30})')
+
+
+def appended_glossary(source, target):
+    """True when the answer carries a word list the source does not have: "... 上涨。能源成本：能源成本
+    上涨：上涨 计划中的：计划中的 savings: 节省的费用 higher: 较高" (an English newsletter paragraph into
+    Chinese, 2026-11-23). Two or more term pairs beyond the source's own, one of them a term paired with
+    itself, or four or more; times and numbers ("09:41") are not pairs."""
+    pairs = lambda text: [(a, b) for a, b in _TERM_PAIR.findall(text) if not (a.isdigit() and b.isdigit())]
+    extra = pairs(target)
+    surplus = len(extra) - len(pairs(source))
+    return surplus >= 4 or (surplus >= 2 and any(a == b for a, b in extra))
+
+
+# Full-width digits (Japanese, Chinese and Korean text) are the same numbers as ASCII digits: "（１）"
+# translated "(1)" was refused as an added number, every attempt, and 27 paragraphs of a Japanese
+# government deck stayed untranslated (Word and PowerPoint mass test, 2026-11-24).
+FULLWIDTH_DIGITS = str.maketrans('０１２３４５６７８９', '0123456789')
+# Japanese era years: the year before each era's first year.
+ERAS = {'明治': 1867, '大正': 1911, '昭和': 1925, '平成': 1988, '令和': 2018}
+_ERA_YEAR = re.compile(r'(明治|大正|昭和|平成|令和)\s*(\d{1,2}|元)\s*年')
+
+
+def era_years(source):
+    """The source with its Japanese era years as Western years, and with both, for the literal check.
+
+    "平成28年12月14日" is December 14, 2016: a translation may write 2016, or "2016 (Heisei 28)"; the
+    number 28 is not omitted and 2016 is not added. 元年 is an era's first year."""
+    if not _ERA_YEAR.search(source):
+        return []
+    year = lambda m: ERAS[m.group(1)] + (1 if m.group(2) == '元' else int(m.group(2)))
+    return [_ERA_YEAR.sub(lambda m: f'{year(m)}年', source),
+            _ERA_YEAR.sub(lambda m: f'{year(m)}年（{m.group(1)}{m.group(2)}年）', source)]
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
@@ -70,17 +184,40 @@ def validate_candidate(source, target, values=()):
     # (2026-11-19). Real translations stay within about four times the source, even CJK to English.
     if len(target.strip()) > 6 * len(source.strip()) + 40:
         raise ValueError('Translation is far longer than its source.')
+    # A short fragment ("You ca", a word cut by the page layout) was answered "Sorry, no text was
+    # given to translate. Please enter text" in Japanese and printed in a Canon manual (2026-11-23):
+    # 45 characters, under the limit above. For a source of up to 12 characters the answer may be at
+    # most four times as wide plus 24, counting a CJK character as two ("PIN" -> "Persönliche
+    # Identifikationsnummer" is 33; "Favorite" -> "お気に入り" is 10).
+    import unicodedata
+    width = lambda text: sum(2 if unicodedata.east_asian_width(c) in 'WF' else 1 for c in text.strip())
+    if len(source.strip()) <= 12 and width(target) > 4 * len(source.strip()) + 24:
+        raise ValueError('Translation is far longer than its source.')
+    if repeats_source(source, target):
+        raise ValueError('Translation repeats the source text.')
+    if appended_glossary(source, target):
+        raise ValueError('Translation appended a word list to the paragraph.')
+    # A source with no letters or digits ("." after an inline icon) has nothing to translate: words in
+    # the answer are the model talking ("no text was given, please provide text"), not a translation.
+    if (not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', source))
+            and any(c.isalpha() for c in re.sub(r'\{v\d+\}', '', target))):
+        raise ValueError('Translation added words to a source without text.')
+    source, target = source.translate(FULLWIDTH_DIGITS), target.translate(FULLWIDTH_DIGITS)
+    values = [v.translate(FULLWIDTH_DIGITS) for v in values]
     for piece, count in Counter(glued_placeholders(source)).items():
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.localized_numbers import permits_numeric_additions,permits_numeric_omissions
-    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,target,values)),values)
+    actual=literal_inventory(split_compounds(source,source_unit_spacing(source,transliterated_names(source,percent_signs(source,target)),values)),values)
     def preserved(source):
         expected=literal_inventory(source,values)
         return (permits_numeric_omissions(source,target,expected-actual,values)
                 and permits_numeric_additions(source,target,actual-expected,values))
     joined=joined_separator_spacing(source,values)
-    if not preserved(source) and (joined==source or not preserved(joined)):
+    spaced=glued_units(source,values)
+    if (not preserved(source) and (joined==source or not preserved(joined))
+            and (spaced==source or not preserved(spaced))
+            and not any(preserved(variant) for variant in era_years(source))):
         raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.role_bindings import validate_bindings
     validate_bindings(source,target,values)

@@ -40,6 +40,17 @@
 # endpoint = "http://127.0.0.1:8000/v1"
 # model = "qwen3.5-9b-fp8"
 # key_file = "/run/secrets/pii_key"
+# Name of the default model in the website's "PII model" list.
+# label = "Standard (this server)"
+
+# More PII models users may choose per job (website upload form, PII and combined jobs), like
+# [translation_models] above. An outside service receives the document's text WITH the personal data
+# that is to be removed: offer one only if you trust it with that data.
+# [pii_models.openai]
+# label = "OpenAI GPT-5 mini"
+# endpoint = "https://api.openai.com/v1"
+# model = "gpt-5-mini"
+# key_file = "/run/secrets/openai_key"
 
 [models]
 # Model servers on other machines. A remote endpoint above is refused unless it is listed here.

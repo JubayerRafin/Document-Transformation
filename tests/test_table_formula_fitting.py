@@ -11,26 +11,27 @@ from transformation.layout.table_fitting import install_table_fitting
 
 
 class FormulaFittingTests(unittest.TestCase):
-    def test_unchanged_source_atom_is_retained_only_after_bounded_layout_fails(self):
+    def test_unchanged_source_atom_is_drawn_from_its_source_characters_before_any_layout(self):
         from transformation.layout.source_atoms import capture_source_atoms
         from babeldoc.format.pdf.document_il.il_version_1 import PdfParagraphComposition
         char=PdfCharacter(char_unicode='8',box=Box(x=10,y=10,x2=15,y2=18),pdf_style=PdfStyle(font_size=8),pdf_character_id=1)
         char.visual_bbox=NS(box=char.box)
-        p=NS(debug_id='atom',unicode='8',vertical=False,box=char.box,pdf_paragraph_composition=[PdfParagraphComposition(pdf_character=char)])
-        page=NS(page_number=0,pdf_paragraph=[p],cropbox=NS(box=Box(x=0,y=0,x2=100,y2=100)))
-        class Harness:
-            def render_paragraph(self,*args):raise AssertionError('No expanding fallback')
-            def create_typesetting_units(self,*args):return [TypesettingUnit(char=char)]
-            def _layout_typesetting_units(self,*args,**kwargs):return [],False
-            def _update_paragraph_render_order(self,*args):pass
-        install_table_fitting(Harness)
-        fitter=Harness();fitter._transformx_source_atoms=capture_source_atoms(NS(page=[page]))
-        fitter._transformx_table_slots={(1,'atom'):{'bbox':[10,10,11,11]}}
-        fitter._transformx_table_fit_results=[]
-        fitter.render_paragraph(p,page,{})
-        self.assertEqual(fitter._transformx_table_fit_results[0]['status'],'preserved_source_atomic_geometry')
-        self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.box.x2,15)
-        self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.pdf_style.font_size,8)
+        for slots in ({(1,'atom'):{'bbox':[10,10,11,11]}}, {}):   # in a table cell and in running text
+            with self.subTest(in_slot=bool(slots)):
+                p=NS(debug_id='atom',unicode='8',vertical=False,box=char.box,pdf_paragraph_composition=[PdfParagraphComposition(pdf_character=char)])
+                page=NS(page_number=0,pdf_paragraph=[p],cropbox=NS(box=Box(x=0,y=0,x2=100,y2=100)))
+                class Harness:
+                    def render_paragraph(self,*args):raise AssertionError('An unchanged value is not re-typeset')
+                    def create_typesetting_units(self,*args):raise AssertionError('An unchanged value is not re-typeset')
+                    def _update_paragraph_render_order(self,*args):pass
+                install_table_fitting(Harness)
+                fitter=Harness();fitter._transformx_source_atoms=capture_source_atoms(NS(page=[page]))
+                fitter._transformx_table_slots=slots
+                fitter._transformx_table_fit_results=[]
+                fitter.render_paragraph(p,page,{})
+                self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.box.x2,15)
+                self.assertEqual(p.pdf_paragraph_composition[0].pdf_character.pdf_style.font_size,8)
+                self.assertEqual(p.scale,1.0)
 
     def test_vertical_text_in_a_slot_is_typeset_normally_not_failed(self):
         rendered=[]
@@ -44,6 +45,20 @@ class FormulaFittingTests(unittest.TestCase):
         fitter.render_paragraph(paragraph,NS(page_number=0),{})
         self.assertEqual(rendered,['side'])
         self.assertEqual(fitter._transformx_table_fit_results[0]['status'],'vertical_text_typeset_normally')
+
+    def test_a_slot_paragraph_with_nothing_to_typeset_is_typeset_normally_not_failed(self):
+        rendered=[]
+        class Harness:
+            def render_paragraph(self,paragraph,*args):rendered.append(paragraph.debug_id)
+            def create_typesetting_units(self,*args):return []
+        install_table_fitting(Harness)
+        fitter=Harness()
+        fitter._transformx_table_slots={(1,'mark'):{'bbox':[10,10,40,20]}}
+        fitter._transformx_table_fit_results=[];fitter._transformx_heading_fit_results=[];fitter._transformx_panel_fit_results=[]
+        paragraph=NS(debug_id='mark',unicode='ु',vertical=False,box=NS(x=10,y=10,x2=15,y2=12),pdf_paragraph_composition=[])
+        fitter.render_paragraph(paragraph,NS(page_number=0),{})
+        self.assertEqual(rendered,['mark'])
+        self.assertEqual(fitter._transformx_table_fit_results[0]['status'],'empty_typeset_normally')
 
     def test_formula_only_slot_seeds_layout_font_without_changing_source_glyphs(self):
         char=PdfCharacter(char_unicode='8',box=Box(x=0,y=0,x2=5,y2=9),pdf_style=PdfStyle(font_size=9))
@@ -128,9 +143,11 @@ class FormulaFittingTests(unittest.TestCase):
         if graphics:
             formula.pdf_curve.append(NS())
 
+        self.typeset_normally = typeset_normally = []
+
         class Harness:
             def render_paragraph(self, *args):
-                raise AssertionError('Assigned slot must use bounded rendering')
+                typeset_normally.append(args[0].debug_id)   # BabelDOC's own typesetting
 
             def create_typesetting_units(self, *args):
                 return [TypesettingUnit(formular=formula)]
@@ -143,6 +160,7 @@ class FormulaFittingTests(unittest.TestCase):
 
         install_table_fitting(Harness)
         fitter = Harness()
+        self.fitter = fitter
         fitter._transformx_table_slots = {(1, 'grade'): {'bbox': [10, 10, 30, 30]}}
         fitter._transformx_table_fit_results = []
         if heading:
@@ -157,12 +175,16 @@ class FormulaFittingTests(unittest.TestCase):
 
     def test_formula_symbol_is_preserved(self):
         paragraph = self.fit()
+        self.assertEqual(self.typeset_normally, [])      # an assigned slot uses bounded rendering
         self.assertEqual(paragraph.pdf_paragraph_composition[0].pdf_character.char_unicode, '+')
 
-    def test_graphics_are_rejected_without_mutation(self):
-        with self.assertRaisesRegex(RuntimeError, 'Non-text formulas'):
-            self.fit(graphics=True)
+    def test_graphics_are_typeset_normally_without_mutation_and_listed_for_review(self):
+        """Canon manual, 2026-11-23: one heading with an inline icon failed the whole document."""
+        self.fit(graphics=True)
+        self.assertEqual(self.typeset_normally, ['grade'])
         self.assertEqual(self.paragraph.pdf_paragraph_composition, ['original'])
+        record = self.fitter._transformx_table_fit_results[0]
+        self.assertEqual((record['status'], record['requires_review']), ('formula_typeset_normally', True))
 
     def test_overflow_rejected_without_mutation(self):
         with self.assertRaisesRegex(RuntimeError, 'cannot fit'):

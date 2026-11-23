@@ -28,6 +28,9 @@ PHONE = re.compile(r'\+?\d[\d ()\t.-]{6,}\d')
 IPV4 = re.compile(r'(?:\d{1,3}\.){3}\d{1,3}')
 
 
+RTL_LETTERS = re.compile(r'[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefe]')
+
+
 def label_like(text):
     """A field label: short, has letters, no digits, not a sentence."""
     text = text.strip().rstrip(':：').strip()
@@ -91,18 +94,29 @@ def field_pairs(units, cells, blocks):
     for table_cells in by_table.values():
         columns = {}
         for cell in table_cells: columns.setdefault(cell['metadata']['column'], []).append(cell)
-        # Columns whose cells (below the first row) all look like labels.
-        label_columns = {c for c, items in columns.items() if c + 1 in columns
+        # A right-to-left form reads from the right: its labels are in the right-hand column of each
+        # pair, "value | label" left to right. Read as "label | value", an Arabic form's first row
+        # (a person's name and "Full name") became column headers and its employee number stayed in
+        # the output (Arabic invoice, 2026-11-23).
+        rtl = sum(bool(RTL_LETTERS.search(c['text'])) for c in table_cells) > sum(
+            bool(re.search(r'[A-Za-z]', c['text'])) and not RTL_LETTERS.search(c['text']) for c in table_cells)
+        step = -1 if rtl else 1
+        # Columns whose cells (below the first row) all look like labels, with a value column beside.
+        label_columns = {c for c, items in columns.items() if c + step in columns
                          and all(label_like(i['text']) for i in items if i['metadata']['row'] > 0)}
         # A form table pairs labels with values across each row: "label | value", or
-        # "label | value | label | value" with a label in every even column. Any other table is a
-        # data table (rosters, invoices, schedules): its column headers describe its cells, and its
-        # short text columns (names, departments, tasks) only look like labels.
-        form = len(columns) % 2 == 0 and all(c in label_columns for c in columns if c % 2 == 0)
+        # "label | value | label | value" with a label in every even column (every odd column from
+        # the left in a right-to-left form). Any other table is a data table (rosters, invoices,
+        # schedules): its column headers describe its cells, and its short text columns (names,
+        # departments, tasks) only look like labels.
+        label_parity = 1 if rtl else 0
+        form = len(columns) % 2 == 0 and all(c in label_columns for c in columns if c % 2 == label_parity)
         for cell in table_cells:
             meta = cell['metadata']; row, col = meta['row'], meta['column']
             values = meta.get('row_values') or []
-            label = str(values[col - 1]).strip() if form and col % 2 == 1 and col - 1 < len(values) else ''
+            beside = col - step
+            label = (str(values[beside]).strip() if form and col % 2 != label_parity and 0 <= beside < len(values)
+                     else '')
             if row == 0:
                 # A form may have no header row: its first row is a field too ("Full name | Ann
                 # Moor"). Pair it; the label classifier decides whether the label is personal,
@@ -175,7 +189,8 @@ def ocr_column_pairs(lines):
         for inside in table:
             for cell, j in inside:
                 pairs.append({'label': headers[j]['text'].strip().rstrip(':：').strip(), 'value': cell['text'].strip(),
-                              'region_id': cell['id'], 'kind': 'ocr_column'})
+                              'region_id': cell['id'], 'kind': 'ocr_column',
+                              'header_row': [h['text'].strip() for h in headers]})
     return pairs
 
 
@@ -250,6 +265,39 @@ def name_sweep(units, endpoint, model, chunk=6000):
                     and not any(c.isdigit() for c in name) and literal_spans(part, name.strip())):
                 names.add(name.strip())
     return names
+
+
+ORGANIZATION = re.compile(r'(?<![\w-])(?:Inc|Incorporated|Corp|Corporation|Ltd|Limited|LLC|GmbH|PLC|Company|Technologies|'
+                          r'Systems|Holdings|Group|Foundation|Institute|University|Association)\.?(?![\w-])', re.I)
+
+
+def person_names(values, units, sweep=False, known=()):
+    """The values that can be people's names. The model lists companies and brands as people
+    despite the instruction: in a Canon manual "CANON INC", "Adobe Systems Incorporated" and
+    "SunSoft, Inc" (whose part "Inc" was then masked everywhere), in a Samsung guide "Samsung" and
+    "Bixby", over 300 masks; the result was then blocked or failed (2026-11-23). Left out: a value
+    with a company word (Inc, Ltd, Corporation, Technologies, ...); in the document-wide name list
+    (sweep=True, spread to every occurrence) a single word of three letters or fewer ("Yes", "Heb"
+    read in photos; the model's own findings in context keep "Kim" or "Li"); and a single word standing alone ten times or more in
+    the document that is never part of a longer listed name (a brand). A repeated surname of a
+    person ("Smith") also appears in a full name ("John Smith") and stays."""
+    values = [v for v in values if isinstance(v, str) and v.strip()]
+    text = '\n'.join(u.get('text', '') for u in units)
+    longer = [v for v in list(values) + [k for k in known if isinstance(k, str)] if len(v.split()) > 1]
+    kept = []
+    for value in values:
+        v = value.strip()
+        if ORGANIZATION.search(v):
+            continue
+        if len(v.split()) == 1 and not CJK.search(v):
+            letters = sum(c.isalpha() for c in v)
+            if sweep and letters <= 3:
+                continue
+            alone = len(re.findall(r'(?<![\w-])' + re.escape(v) + r'(?![\w-])', text))
+            if alone >= 10 and not any(re.search(r'(?<![\w-])' + re.escape(v) + r'(?![\w-])', other) for other in longer):
+                continue
+        kept.append(value)
+    return kept
 
 
 def name_occurrences(units, names, longer_names=()):
@@ -480,19 +528,29 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
         findings = detected.result()
         decisions = labelled.result() if labelled else {}
         names = swept.result() if swept else set()
+    model_names = [f['value'] for f in findings if f.get('category') == 'Names']
+    names = set(person_names(names, units, sweep=True, known=model_names))
+    people = set(person_names(model_names, units, known=names))
+    findings = [f for f in findings if f.get('category') != 'Names' or f.get('method') != 'model_proposal'
+                or f['value'] in people]
     if smart:
         evidence['field_labels'] = decisions
         sensitive, plain = {}, {}
+        # A scanned "header row" with a person's name in it is a form row read as a table header
+        # ("Full name | Priya Verma"); its columns overrule nothing.
+        named = lambda pair: any(compact(n) in compact(h) for h in pair.get('header_row', ()) for n in names if compact(n))
         for pair in pairs:
             decision = decisions.get(pair['label'])
             if decision is None: continue
             key = compact(pair['value'])
             if decision != 'none':
                 sensitive.setdefault(key, []).append((pair, decision))
-            elif pair.get('kind') == 'column':
+            elif pair.get('kind') in ('column', 'ocr_column') and not named(pair):
                 # Only a table column header suppresses model guesses: the same header covers
                 # every row, so one decision keeps a column consistent. Inline labels never
-                # suppress, so a single label misclassification cannot hide real PII.
+                # suppress, so a single label misclassification cannot hide real PII. Headers read
+                # from a scan count too: without them every product code of a scanned invoice was
+                # masked as an identifier (2026-11-23).
                 plain.setdefault(key, []).append((pair, decision))
         # In key/value tables a cell's own row label ("Start Date") decides; a generic
         # column header ("Value") must not override it.
@@ -503,9 +561,12 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
                 if pair['value'].strip() and format_ok(pair['value'], decision):
                     findings.append({'region_id': pair['region_id'], 'value': pair['value'], 'category': decision,
                                      'method': 'field_label', 'label': pair['label']})
-        # A value seen only under non-personal labels is not an identifier/account by model guess.
+        # A value seen only under non-personal column headers is not an identifier, account or name by
+        # model guess: item names under "Item" were masked as names on a Hindi scan, and one, read
+        # differently by OCR on another row, then blocked the whole result (2026-11-23). Names the
+        # model lists as people across the document (name sweep below) are still masked.
         only_plain = {k for k in plain if k not in sensitive}
-        overruled = lambda f: (f.get('method') == 'model_proposal' and f['category'] in {'Identifiers', 'Bank accounts'}
+        overruled = lambda f: (f.get('method') == 'model_proposal' and f['category'] in {'Identifiers', 'Bank accounts', 'Names'}
                                and compact(f['value']) in only_plain)
         # Kept for the review queue: the model and the column label disagreed, so a person decides.
         suppressed = [dict(f) for f in findings if overruled(f)]
@@ -571,13 +632,29 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
     # classifier confirmed is a personal field (a key/value table without a header row).
     first_row_values = {compact(p['value']) for p in pairs if p.get('first_row')
                         and evidence['field_labels'].get(p['label']) not in (None, 'none')}
-    headers = {compact(c['text']) for c in cells if c['metadata']['row'] == 0} - first_row_values
-    findings = [f for f in findings if compact(f['value']) not in headers]
+    # Only a real table has a header row: two rows and two columns at least. LibreOffice draws a box
+    # round a commented word in a Word letter, the box was read as a one-cell "table", and the
+    # commented customer number in it counted as a header, so it was never masked (Word and
+    # PowerPoint mass test, 2026-11-24: every letter's commented number stayed readable). A value
+    # found after its own label outside any table ("Customer number: AH-7032088") is a value.
+    shape = {}
+    for c in cells:
+        rows, columns = shape.setdefault(c['metadata'].get('table_parent'), (set(), set()))
+        rows.add(c['metadata'].get('row')); columns.add(c['metadata'].get('column'))
+    real = {t for t, (rows, columns) in shape.items() if len(rows) >= 2 and len(columns) >= 2}
+    headers = {compact(c['text']) for c in cells if c['metadata']['row'] == 0
+               and c['metadata'].get('table_parent') in real} - first_row_values
+    cell_ids = {c['id'] for c in cells}
+    findings = [f for f in findings if compact(f['value']) not in headers
+                or (f.get('method') == 'field_label' and f['region_id'] not in cell_ids)]
     # A model-proposed identifier/account looks like one: it has a digit or an ID symbol.
     # Plain words ("API key", "Device Console") are labels or headings, not values.
+    # The same shape rules as the final check (privacy.plausible), so a head count ("618") proposed
+    # as an identifier is dropped here too (Arabic invoice, 2026-11-23).
+    from transformation.validation.privacy import plausible
     findings = [f for f in findings if not (f.get('method') == 'model_proposal'
                 and f['category'] in {'Identifiers', 'Bank accounts'}
-                and not re.search(r'[\d_@.:/#\-]', f['value']))]
+                and not plausible(f['value'], f['category']))]
     # "minjun.kim" is a user handle, not a written name. Where it only appears inside email
     # addresses (already masked) it is dropped; elsewhere it is a user name (an identifier).
     handle = re.compile(r'[a-z0-9]+(?:[._][a-z0-9]+)+')

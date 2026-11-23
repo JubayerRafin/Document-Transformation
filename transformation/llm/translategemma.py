@@ -37,6 +37,18 @@ def foreign_script(source, target, language):
     return ', '.join(sorted(found))
 
 
+def unchanged_in_other_script(source, target, language):
+    """Whether a translation into a Latin-script language (English, French, German, Spanish,
+    Portuguese) returned text with Korean, Chinese, Japanese, Arabic or Indic letters unchanged."""
+    from transformation.pdf.runner import LANGUAGES
+    code = LANGUAGES.get(language, language)
+    if TARGET_SCRIPTS.get(code) != set():
+        return False
+    if ' '.join(source.split()) != ' '.join(target.split()):
+        return False
+    return any(_script(c) not in (None, 'Latin') for c in source if c.isalpha())
+
+
 def foreign_share(source, target, language):
     """Share of the translation's letters in a script that belongs to neither language."""
     from transformation.pdf.runner import LANGUAGES
@@ -59,6 +71,38 @@ import re as _re
 _CJK = r'[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]'
 _FULL = {'ja': {':': '：', '(': '（', ')': '）', '.': '。', ',': '、', '!': '！', '?': '？', ';': '；'},
          'zh': {':': '：', '(': '（', ')': '）', '.': '。', ',': '，', '!': '！', '?': '？', ';': '；'}}
+
+
+_LEADER = _re.compile(r'\s*([.·…‥・_\-])(?:\s?\1){4,}\s*$')
+
+
+def _width(text):
+    """Rough width of text in ems: wide (CJK, Hangul, Indic) letters count as one em, others as 0.5 (narrow, so the leader errs short)."""
+    return sum(1.0 if (ord(c) >= 0x0900 and not c.isspace()) else 0.3 if c in '.,·:;\'"|il' else 0.5
+               for c in text)
+
+
+def fit_leader(source, target):
+    """A table-of-contents line's dot leader, sized for the translated title.
+
+    The source line fills its width with a leader ("Check the sender's fax machine......"); the model
+    returned it as a longer run of another character ("·········"), and a run of dots cannot break,
+    so translated contents lines ran past the page edge (HP user guide, 2026-11-21). The leader is
+    rebuilt with the source's character, shorter by however much wider the translated title is
+    (estimated, erring short), at least three."""
+    match = _LEADER.search(source)
+    if not match:
+        return target
+    leader = source[match.start():].strip()
+    char = match.group(1)
+    count = sum(1 for c in leader if c == char)
+    title_source, title = source[:match.start()], _LEADER.sub('', target)
+    if title == target and not _re.search(r'[.·…‥・_]{3,}\s*$', target):
+        return target  # the model dropped the leader; nothing to fit
+    title = _re.sub(r'\s*[.·…‥・_]{3,}\s*$', '', title)
+    spare = (_width(title_source) - _width(title)) * 1.1
+    fitted = max(3, int(count + spare / 0.3) - 2)
+    return title.rstrip() + ' ' + char * min(fitted, count)
 
 
 def cjk_punctuation(target, language):
@@ -253,6 +297,26 @@ def _unglued(text):
     return re.sub(r'(?<![\w-])([A-Za-z][a-z]{2,})'+placeholder,r'\1 \2',text)
 
 
+def _second_model_translation(text,language,protected,context,source,model):
+    """The paragraph translated by the server's other model, when the translator mixed in words of a
+    third script twice: TranslateGemma answers the same way again, so its retry does not help
+    ("তৃতীয় ত্রৈমাসিক подряд" in a Bengali report, 2026-11-21). The other model is the one named by
+    TRANSFORMX_PII_ENDPOINT / TRANSFORMX_PII_MODEL (Qwen on the self-hosted server); its answer is used
+    only when it passes the same checks and has no third script. Returns (text, stats) or None."""
+    import os
+    endpoint,other=os.environ.get('TRANSFORMX_PII_ENDPOINT'),os.environ.get('TRANSFORMX_PII_MODEL')
+    if not endpoint or not other or other==model:
+        return None
+    try:
+        result,stats=translate(endpoint,other,text,language,protected,context,source)
+    except Exception:
+        return None
+    if result==text or foreign_script(text,result,language) or any(
+            stats.get(flag) for flag in ('kept_source_requires_review','foreign_script_review_required','recovery_review_required')):
+        return None
+    return result,{key:stats[key] for key in ('prompt_eval_count','eval_count') if key in stats}
+
+
 def translate(endpoint,model,text,language,protected=(),context='',source='en'):
     import hashlib,time
     from transformation.llm.ollama_native import chat,record_progress,needs_no_translation
@@ -357,12 +421,23 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
             restored=match_terminal_punctuation(text,restored)
             restored=cjk_punctuation(restored,language)
             restored=middle_dot(restored,language)
+            restored=fit_leader(text,restored)
             from transformation.llm.translation_guard import validate_candidate
             validate_candidate(text,restored,protected)
+            if unchanged_in_other_script(text,restored,language):
+                # A name alone ("김민준") came back as written for an English document; the second
+                # model, tried after both attempts, writes it in the target's letters (2026-11-21).
+                raise ValueError('Translation returned text in the source script unchanged for a Latin-script target.')
             stray=foreign_script(text,restored,language)
             if stray and attempt==1:
                 raise ValueError(f'Translation contains {stray} text that is in neither the source nor the target language; '
                                  'answer only in the target language.')
+            if stray:
+                second=_second_model_translation(text,language,protected,context,source,model)
+                if second is not None:
+                    record_progress('foreign_script_second_model',source_sha256=digest,script=stray,model=model)
+                    return second[0],{**totals,**second[1],'translation_backend':_backend(model),
+                                      'second_model_after_foreign_script':True}
             if stray and (foreign_share(text,restored,language)>=FOREIGN_KEEP_SOURCE
                           or len(text.split())<=SHORT_LABEL_WORDS):
                 # Mostly another language, or a short label: the source reads better than that.
@@ -386,6 +461,14 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                 (audit/(uuid4().hex+'.json')).write_text(json.dumps({'source':text,'candidate':result,
                     'reason':str(error),'attempt':attempt,'model':model},ensure_ascii=False,indent=2),encoding='utf-8')
             if attempt==2:
+                # Both answers changed a value ("letter-size" -> "A4", an invented web address after a
+                # sentence cut at a line end; HP manual, 2026-11-21): the server's other model gets one
+                # try under the same checks before the paragraph is spliced or kept in English.
+                second=_second_model_translation(text,language,protected,context,source,model)
+                if second is not None:
+                    record_progress('validation_second_model',source_sha256=digest,model=model,reason=failure_reason[:120])
+                    return second[0],{**totals,**second[1],'translation_backend':_backend(model),
+                                      'second_model_after_validation':True}
                 # Never attempt to repair a field/value relationship by splicing.
                 # Recovery is bounded and retains the same final validation.
                 if tokens and (isinstance(error,PlaceholderIntegrityError)

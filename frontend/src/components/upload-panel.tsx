@@ -18,7 +18,12 @@ import {
   ApiClient,
   PII_CATEGORIES,
   type PiiStyle,
-  validatePdf,
+  validateDocument,
+  documentKind,
+  resultFormat,
+  DOCUMENT_LABEL,
+  MAX_PAGES,
+  MAX_MB,
   type Operation,
   type TransformOptions,
   type Worker,
@@ -33,7 +38,6 @@ export function UploadPanel({
   workers,
   initialMode = "translation",
   onSubmitted,
-  onServers,
   onError,
   readOnly = false,
 }: {
@@ -41,7 +45,6 @@ export function UploadPanel({
   workers: Worker[];
   initialMode?: Operation;
   onSubmitted: (id: string) => Promise<void>;
-  onServers: () => void;
   onError: (e: unknown) => void;
   readOnly?: boolean;
 }) {
@@ -53,7 +56,6 @@ export function UploadPanel({
   const [mode, setMode] = useState<Operation>(initialMode),
     [source, setSource] = useState("en"),
     [target, setTarget] = useState("ko"),
-    [server, setServer] = useState(""),
     [context, setContext] = useState(""),
     [protectedValues, setProtected] = useState(""),
     [categories, setCategories] = useState<string[]>([
@@ -64,21 +66,26 @@ export function UploadPanel({
     [piiStyle, setPiiStyle] = useState<PiiStyle>("box"),
     [keepVisible, setKeepVisible] = useState(""),
     [translationModel, setTranslationModel] = useState("default"),
+    [piiModelId, setPiiModelId] = useState("default"),
     [consent, setConsent] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null),
     selection = useRef(0),
     attempt = useRef<{ file: File; options: string; key: string } | null>(null),
     reduced = useReducedMotion();
-  const worker = workers.find((w) => w.id === server),
-    eligible = workers.filter((w) => w.enabled);
+  // One server: the GPU server this website runs on.
+  const worker = workers[0],
+    limits = worker?.capabilities?.limits ?? { max_pages: MAX_PAGES, max_mb: MAX_MB };
   // Translation models the chosen server offers; the selector appears only when there is a choice.
   const models = worker?.capabilities?.translation_models ?? [],
     model = models.find((m) => m.id === translationModel) ?? models[0];
+  // PII models the server offers; the selector appears only when there is a choice.
+  const piiModels = worker?.capabilities?.pii_models ?? [],
+    piiModel = piiModels.find((m) => m.id === piiModelId) ?? piiModels[0];
   const select = async (f?: File) => {
     if (!f) return;
     const version = ++selection.current;
     setFileError("");
-    const problem = await validatePdf(f);
+    const problem = await validateDocument(f, undefined, worker?.capabilities?.limits);
     if (version !== selection.current) return;
     if (problem) {
       setFile(null);
@@ -95,7 +102,7 @@ export function UploadPanel({
       if (e.dataTransfer.files.length !== 1) {
         selection.current++;
         setFile(null);
-        setFileError("Choose one PDF at a time.");
+        setFileError("Choose one document at a time.");
         return;
       }
       void select(e.dataTransfer.files[0]);
@@ -106,11 +113,11 @@ export function UploadPanel({
     if (busy) return;
     setError("");
     if (!file) {
-      setFileError("Choose a PDF document to continue.");
+      setFileError("Choose a document to continue.");
       return;
     }
-    if (!worker?.enabled) {
-      setError("Choose one of your processing servers.");
+    if (!worker) {
+      setError("The TransformX server is not answering. Reload the page.");
       return;
     }
     if (mode !== "translation" && !categories.length) {
@@ -125,8 +132,8 @@ export function UploadPanel({
       operation: mode,
       source_language: source,
       target_language: target,
-      worker_id: server,
-      output_format: "pdf",
+      worker_id: worker.id,
+      output_format: resultFormat(documentKind(file.name) || "pdf"),
       protected_values: protectedValues
         .split("\n")
         .map((v) => v.trim())
@@ -136,6 +143,9 @@ export function UploadPanel({
     };
     if (mode !== "pii" && model && model.id !== "default") {
       options.translation_model = model.id;
+    }
+    if (mode !== "translation" && piiModel && piiModel.id !== "default") {
+      options.pii_model = piiModel.id;
     }
     if (mode !== "translation") {
       options.pii_style = piiStyle;
@@ -213,12 +223,12 @@ export function UploadPanel({
               type="file"
               id="document-upload"
               className="sr-only"
-              accept=".pdf,application/pdf"
+              accept=".pdf,.docx,.pptx,.doc,.ppt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/msword,application/vnd.ms-powerpoint"
               onChange={(e) => {
                 void select(e.target.files?.[0]);
                 e.target.value = "";
               }}
-              aria-label="Choose a PDF"
+              aria-label="Choose a PDF, Word or PowerPoint file"
               aria-describedby="upload-hint"
             />
             <div
@@ -240,7 +250,7 @@ export function UploadPanel({
                       {file.name}
                     </p>
                     <p className="mb-0 text-xs text-muted-foreground">
-                      {(file.size / 1_000_000).toFixed(2)} MB · PDF document
+                      {(file.size / 1_000_000).toFixed(2)} MB · {DOCUMENT_LABEL[documentKind(file.name) || "pdf"]}
                     </p>
                   </div>
                   <Button
@@ -261,7 +271,7 @@ export function UploadPanel({
                   <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-xl border border-border bg-background text-primary">
                     <UploadCloud className="size-6" strokeWidth={1.6} />
                   </div>
-                  <p className="mb-1 text-sm font-medium">Drop your PDF here</p>
+                  <p className="mb-1 text-sm font-medium">Drop your document here</p>
                   <p className="mb-4 text-xs text-muted-foreground">
                     or choose a file from your device
                   </p>
@@ -279,8 +289,9 @@ export function UploadPanel({
               id="upload-hint"
               className="mb-0 mt-3 text-xs leading-5 text-muted-foreground"
             >
-              One PDF per job. Maximum 50 MB and 200 pages. Encrypted PDFs are
-              not supported.
+              One PDF, Word (.docx, .doc) or PowerPoint (.pptx, .ppt) file per job. Maximum {limits.max_mb} MB
+              and {limits.max_pages} pages. Word and PowerPoint files come back in their own format (.doc and
+              .ppt as .docx and .pptx). Password-protected files are not supported.
             </p>
             {fileError && (
               <p className="mb-0 mt-3 text-sm text-destructive" role="alert">
@@ -318,7 +329,7 @@ export function UploadPanel({
               {(["translation", "pii", "combined"] as const).map((value) => (
                 <TabsContent key={value} value={value} className="sr-only">
                   {value === "translation"
-                    ? "Translate your PDF into your selected language."
+                    ? "Translate your document into your selected language."
                     : value === "pii"
                       ? "Select the information you want to redact."
                       : "Translate your document and redact selected information."}
@@ -477,47 +488,25 @@ export function UploadPanel({
                 3
               </span>
               <h2 className="mb-0 text-base font-semibold">
-                Select your processing server
+                Processing server
               </h2>
             </div>
-            <div className="field">
-              <Label htmlFor="processing-server">GPU server</Label>
-              <select
-                id="processing-server"
-                className="select-input"
-                value={server}
-                onChange={(e) => {
-                  setServer(e.target.value);
-                  setTranslationModel("default");
-                }}
-                required
-              >
-                <option value="">Choose a connected server</option>
-                {eligible.map((w) => (
-                  <option key={w.id} value={w.id}>
-                    {w.name} ·{" "}
-                    {w.ready ? "Ready" : w.online ? "Not ready" : "Offline"}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <p className="mb-0 text-xs leading-5 text-muted-foreground">
-                {worker?.ready
-                  ? "This server reports its processing prerequisites are ready."
-                  : worker
-                    ? "Your job will wait for this server to become ready."
-                    : "Jobs run on a private server registered to your account."}
-              </p>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                onClick={onServers}
-              >
-                Manage servers <ArrowRight />
-              </Button>
-            </div>
+            <p className="mb-0 text-sm leading-6">
+              {worker ? (
+                <>
+                  <span className="font-medium">{worker.name}</span>
+                  {" · "}
+                  {worker.ready ? "Ready" : "Not ready yet"}
+                </>
+              ) : (
+                "Checking the server…"
+              )}
+            </p>
+            <p className="mb-0 mt-1 text-xs leading-5 text-muted-foreground">
+              {worker?.ready
+                ? "The models on this server are loaded and ready."
+                : worker?.capabilities?.note || "Your job will wait until the server is ready."}
+            </p>
             {mode !== "pii" && models.length > 1 && (
               <div className="field mt-4">
                 <Label htmlFor="translation-model">Translation model</Label>
@@ -538,6 +527,31 @@ export function UploadPanel({
                   <p className="mb-0 mt-2 text-xs leading-5 text-amber-200">
                     This model runs on an outside service chosen by your server&apos;s administrator:
                     the document&apos;s text is sent there to be translated.
+                  </p>
+                )}
+              </div>
+            )}
+            {mode !== "translation" && piiModels.length > 1 && (
+              <div className="field mt-4">
+                <Label htmlFor="pii-model">PII model</Label>
+                <select
+                  id="pii-model"
+                  className="select-input"
+                  value={piiModel?.id ?? "default"}
+                  onChange={(e) => setPiiModelId(e.target.value)}
+                >
+                  {piiModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                      {m.external ? " · outside service" : ""}
+                    </option>
+                  ))}
+                </select>
+                {piiModel?.external && (
+                  <p className="mb-0 mt-2 text-xs leading-5 text-amber-200">
+                    This model runs on an outside service chosen by your server&apos;s administrator:
+                    the document&apos;s text, including the personal data to be removed, is sent there
+                    to be checked.
                   </p>
                 )}
               </div>
@@ -569,8 +583,8 @@ export function UploadPanel({
         )}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="mb-0 flex items-center gap-2 text-xs text-muted-foreground">
-            <ShieldCheck className="size-4" /> Your files stay private to
-            permitted accounts.
+            <ShieldCheck className="size-4" /> Your files stay on this
+            server.
           </p>
           <Button type="submit" size="lg" disabled={busy}>
             {busy ? <Loader2 className="animate-spin" /> : <ArrowRight />}
@@ -597,7 +611,7 @@ export function UploadPanel({
           </p>
           <ol className="space-y-4 text-xs text-muted-foreground">
             {[
-              "Your document enters the selected server’s queue.",
+              "Your document joins this server’s queue.",
               "The engine extracts, transforms and reconstructs your document.",
               "Your result appears here for review and download.",
             ].map((t) => (

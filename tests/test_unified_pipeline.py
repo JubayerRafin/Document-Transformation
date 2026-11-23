@@ -136,7 +136,9 @@ class UnifiedTests(unittest.TestCase):
             last=list(run_pipeline(office_fixture('docx'),'form.docx',output_kind='docx',translate=True,
                 redact=True,pii_categories=['Email addresses'],pii_assist=False,root=Path(folder)))[-1]
             self.assertEqual(last['status'],'generated',last.get('error'))
-            self.assertTrue(any('[REDACTED]' in t for t in seen))
+            # The default "box" style masks Office text with a block (transformation/office/native.BOX_MASK).
+            from transformation.office.native import BOX_MASK
+            self.assertTrue(any(BOX_MASK in t or '[REDACTED]' in t for t in seen))
 
     @unittest.skipUnless(HAS_OFFICE,'Office dependencies not installed')
     def test_entire_protected_literal_skips_translation_and_audit(self):

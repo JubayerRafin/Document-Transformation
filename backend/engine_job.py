@@ -16,10 +16,18 @@ def local_cache_options(options,cfg,folder):
 
 
 def input_problem(source):
-    """INPUT_REJECTED for a file the engine cannot work on (not a PDF, damaged, password-protected
-    or without pages), so callers that do not check it themselves (engine service, test harness)
-    report the real reason instead of ENGINE_FAILED."""
+    """INPUT_REJECTED for a file the engine cannot work on (not a PDF, Word or PowerPoint file,
+    damaged, password-protected or without pages), so callers that do not check it themselves
+    (engine service, test harness) report the real reason instead of ENGINE_FAILED."""
+    kind=Path(source).suffix.lower().lstrip('.')
     try:
+        if kind in {'doc','ppt'}:
+            # Word and PowerPoint 97-2003 (compound file); converted by the pipeline.
+            return None if Path(source).read_bytes()[:4]==b'\xd0\xcf\x11\xe0' else 'INPUT_REJECTED'
+        if kind in {'docx','pptx'}:
+            from transformation.office.package_ir import open_package
+            open_package(Path(source).read_bytes(),kind).close()
+            return None
         import pymupdf
         with pymupdf.open(source,filetype='pdf') as pdf:
             if not pdf.is_pdf or pdf.needs_pass or not len(pdf):return 'INPUT_REJECTED'
@@ -41,7 +49,7 @@ def main():
     cfg=request['profile'];opts=request['options'];folder=request_path.parent
     operation={'translation':'Translation only','pii':'PII only','combined':'Translation + PII'}[opts['operation']]
     options=dict(cfg.get('engine_options',{}),root=folder/'engine',source=opts['source_language'],
-        target=opts['target_language'],output_kind='pdf',protected_values=opts['protected_values'],
+        target=opts['target_language'],output_kind={'doc':'docx','ppt':'pptx'}.get(Path(request['source']).suffix.lower().lstrip('.'),Path(request['source']).suffix.lower().lstrip('.')) or 'pdf',protected_values=opts['protected_values'],
         document_context=opts['document_context'],pii_categories=opts['pii_categories'],
         timeout=cfg.get('timeout_seconds',3600),translation_model='translategemma:12b',pii_model='qwen3.5:9b')
     for key in ('pii_style','pii_keep'):

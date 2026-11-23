@@ -1,4 +1,5 @@
 """Version-pinned BabelDOC integration hooks; no vendor files are modified."""
+import functools
 import json
 import os
 import sys
@@ -280,8 +281,53 @@ def constrain_table_headings(document, source_tables):
                 box.y2 = top
 
     return changes
+def cells_with_undrawn_borders(cells, words, ink, scale):
+    """Indexes of found table cells with a border that runs through a word and is not drawn there:
+    such a border is a line of a picture's drawing, clipped away outside the picture, or an edge
+    PyMuPDF extended across text when it merged two tables; that cell is not a cell.
+
+    Two printer drawings of an HP manual page made a "table" whose cells reached over the text above
+    them; a list step was moved to the top of a cell in the picture area and drawn over the heading
+    (2026-11-23). Borders drawn through words (a newsletter's date column spilling over its table)
+    are kept. `ink` is a 2-D boolean array of the rendered page (True where something is drawn),
+    `scale` its pixels per point; cells are (x0, top, x1, bottom) and words as from
+    get_text("words")."""
+    height, width = ink.shape
+
+    def drawn(edge):
+        kind, at, start, stop = edge
+        a, b = max(0, int(start * scale)), int(stop * scale)
+        c = int(round(at * scale))
+        lo, hi = max(0, c - 1), c + 2
+        if kind == 'v':
+            strip = ink[a:min(height, b), lo:min(width, hi)].any(axis=1) if lo < width else None
+        else:
+            strip = ink[lo:min(height, hi), a:min(width, b)].any(axis=0) if lo < height else None
+        return strip is not None and strip.size and strip.mean() >= 0.8
+
+    seen, out = {}, set()
+    for number, cell in enumerate(cells):
+        if cell is None:
+            continue
+        x0, top, x1, bottom = cell
+        for word in words:
+            wx0, wy0, wx1, wy1 = word[:4]
+            middle, centre = (wy0 + wy1) / 2, (wx0 + wx1) / 2
+            edges = [('v', x, top, bottom) for x in (x0, x1) if wx0 + 1 < x < wx1 - 1 and top < middle < bottom]
+            edges += [('h', y, x0, x1) for y in (top, bottom) if wy0 + 1 < y < wy1 - 1 and x0 < centre < x1]
+            for edge in edges:
+                if edge not in seen:
+                    seen[edge] = drawn(edge)
+            if any(not seen[edge] for edge in edges):
+                out.add(number)
+                break
+    return out
+
+
+@functools.lru_cache(maxsize=4)
 def source_table_cells(path):
-    """Read strict table-cell boundaries in bottom-left coordinates."""
+    """Read strict table-cell boundaries in bottom-left coordinates (once per file: paragraph
+    finding and typesetting both use them). Callers must not change the result."""
     import pymupdf
 
     result = {}
@@ -298,9 +344,16 @@ def source_table_cells(path):
 
             cells = []
             tables = page.find_tables(strategy="lines_strict")
+            words = ink = None
 
             for table_number, table in enumerate(tables.tables):
-                seen = set()
+                if words is None:
+                    words = page.get_text("words")
+                    pix = page.get_pixmap(dpi=100, colorspace=pymupdf.csGRAY, alpha=False)
+                    import numpy as np
+                    ink = np.frombuffer(pix.samples, np.uint8).reshape(pix.height, pix.width) < 245
+                undrawn = {tuple(table.cells[i]) for i in cells_with_undrawn_borders(table.cells, words, ink, 100 / 72)}
+                seen = set(undrawn)
 
                 for row_number, row in enumerate(table.rows):
                     for column_number, boundary in enumerate(row.cells):
@@ -384,11 +437,16 @@ def resolve_cell_claims(candidates):
     return None
 
 
-def plan_table_text_slots(cell_report, padding=1.0, gap=1.0):
+def plan_table_text_slots(cell_report, padding=1.0, gap=1.0, images=None):
     """Plan bounded text areas without modifying the document.
 
     Supports one block or vertically separated blocks per cell.
     More complex arrangements are flagged for review.
+
+    images: {page index: [objects with .box (bottom-left coordinates)]}. In a cell holding a picture
+    (a warning triangle between "CAUTION:" and its text), each block's slot starts where the block
+    starts and ends above the next block or picture below it. Equal shares of the cell put the text
+    below the triangle over the triangle (HP manual tables, 2026-11-23).
     """
     plans = []
 
@@ -441,9 +499,21 @@ def plan_table_text_slots(cell_report, padding=1.0, gap=1.0):
             plan["reason"] = "Insufficient space for separate text slots."
             continue
 
+        pictures = [im.box for im in (images or {}).get(cell["page"] - 1, [])
+                    if im.box.x < right and im.box.x2 > left and im.box.y < top and im.box.y2 > bottom
+                    and (im.box.x2 - im.box.x) < (right - left) * 0.95]
         for index, block in enumerate(blocks):
             slot_top = top - padding - index * (slot_height + gap)
             slot_bottom = slot_top - slot_height
+            if pictures:
+                block_top, block_bottom = block["bbox"][3], block["bbox"][1]
+                slot_top = top - padding if index == 0 else min(top - padding, block_top + padding)
+                slot_bottom = (blocks[index + 1]["bbox"][3] + gap) if index + 1 < len(blocks) else bottom + padding
+                for picture in pictures:
+                    if block_bottom + 1 >= picture.y2 > slot_bottom:
+                        slot_bottom = picture.y2 + gap
+                if slot_top - slot_bottom < 6:
+                    slot_bottom = slot_top - 6
 
             plan["slots"].append({
                 "paragraph_id": block["paragraph_id"],
@@ -597,6 +667,12 @@ def main():
     install_whole_word_breaks(Typesetting)
     from babeldoc.format.pdf.document_il.midend.typesetting import TypesettingUnit
     install_attached_punctuation(TypesettingUnit)
+    from transformation.layout.line_breaks import install_korean_word_breaks, install_real_first_line_indents
+    install_korean_word_breaks(TypesettingUnit)
+    from babeldoc.format.pdf.document_il.midend.paragraph_finder import ParagraphFinder
+    install_real_first_line_indents(ParagraphFinder)
+    from transformation.layout.stacked_lines import install as install_stacked_lines
+    install_stacked_lines(ParagraphFinder)
     install_table_fitting(Typesetting)
     original = Typesetting.typesetting_document
 
@@ -607,7 +683,7 @@ def main():
         # These refer to the same immutable input PDF throughout this hook.
         # Reuse geometry for before/after audits rather than detecting its
         # tables three times and enumerating its images twice.
-        source_cells = source_table_cells(input_file)
+        source_cells = source_table_cells(str(input_file))
         source_images = source_image_boxes(input_file)
         source_tables = source_table_boxes(input_file)
         if folder:
@@ -630,13 +706,16 @@ def main():
                 document, source_tables
             )
         )
+        from transformation.layout.line_breaks import widen_single_lines
+        changes.extend(widen_single_lines(document, source_images, {c.get('paragraph_id') for c in changes}))
         folder = os.environ.get("TRANSFORMX_RUN_DIR")
         if folder:
             Path(folder, "layout-adjustments.json").write_text(json.dumps(changes, indent=2), encoding="utf-8")
         plans = plan_table_text_slots(
             inspect_table_cell_text(
                 document, source_cells
-            )
+            ),
+            images=source_images,
         )
 
         self._transformx_table_slots = {}
@@ -789,4 +868,13 @@ def main():
             )
 
 if __name__ == "__main__":
-    main()
+    # TRANSFORMX_PROFILE_FILE: write a cProfile of this run there (for measuring; off by default).
+    if os.environ.get("TRANSFORMX_PROFILE_FILE"):
+        import cProfile
+        profiler = cProfile.Profile()
+        try:
+            profiler.runcall(main)
+        finally:
+            profiler.dump_stats(os.environ["TRANSFORMX_PROFILE_FILE"])
+    else:
+        main()

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { ApiClient, ApiError, validatePdf, downloadUrl } from "../src/lib/api";
+import { ApiClient, ApiError, validatePdf, validateDocument, documentKind, downloadUrl } from "../src/lib/api";
 import { job } from "./fixtures";
 describe("existing API contract", () => {
   it("uses session cookies, safe errors and exact sign-in fields", async () => {
@@ -70,8 +70,25 @@ describe("existing API contract", () => {
     expect(await validatePdf(new File(["%PDF-"], "sample.txt"))).toContain(
       "PDF",
     );
-    const large = { name: "large.pdf", size: 50_000_001 } as File;
-    expect(await validatePdf(large)).toContain("50 MB");
+    const large = { name: "large.pdf", size: 100_000_001 } as File;
+    expect(await validatePdf(large)).toContain("100 MB");
+  });
+  it("accepts Word and PowerPoint packages and rejects other files", async () => {
+    expect(documentKind("Report.DOCX")).toBe("docx");
+    expect(documentKind("deck.pptx")).toBe("pptx");
+    expect(documentKind("notes.txt")).toBe("");
+    expect(await validateDocument(new File(["PK00030004rest"], "report.docx"))).toBeNull();
+    expect(await validateDocument(new File(["PK00030004rest"], "deck.pptx"))).toBeNull();
+    expect(await validateDocument(new File(["not a package"], "report.docx"))).toContain("Word document");
+    expect(await validateDocument(new File(["not a package"], "deck.pptx"))).toContain("PowerPoint");
+    expect(await validateDocument(new File(["text"], "notes.txt"))).toContain("Word (.docx, .doc)");
+    expect(await validateDocument({ name: "big.pptx", size: 100_000_001 } as File)).toContain("100 MB");
+    expect(await validateDocument(new File(["%PDF-1.7\n"], "sample.pdf"))).toBeNull();
+    const ole = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1]);
+    expect(await validateDocument(new File([ole], "old.doc"))).toBeNull();
+    expect(await validateDocument(new File([ole], "old.ppt"))).toBeNull();
+    expect(await validateDocument(new File(["PK\u0003\u0004"], "old.doc"))).toContain("Word document");
+    expect(documentKind("Report.DOC")).toBe("doc");
   });
   it("retains cancellation authorization errors", async () => {
     const api = new ApiClient(
@@ -115,4 +132,20 @@ it("reads the page count with pdf.js and recognises a password", async () => {
   const locked = Object.assign(new Error("No password given"), { name: "PasswordException" });
   expect(await pdfFacts(pdf, fake(async () => Promise.reject(locked)))).toEqual({ encrypted: true });
   expect(await pdfFacts(pdf, async () => Promise.reject(new Error("no pdf.js")))).toEqual({});
+});
+
+import { passedChecks, checkFindings, type JobChecks } from "../src/lib/api";
+describe("result badge", () => {
+  const clean: JobChecks = {
+    acceptable: true, privacy_verification: "not_needed", known_sensitive_residuals: 0, geometry_blockers: 0,
+    layout_review_candidates: 0, uninspected_content: 0, scan_acceptance_blockers: 0, translation_errors: 0,
+  };
+  it("says the checks passed only when nothing was found", () => {
+    expect(passedChecks(clean)).toBe(true);
+    expect(checkFindings(clean)).toEqual([]);
+    expect(passedChecks({ ...clean, layout_review_candidates: 2 })).toBe(false);
+    expect(passedChecks({ ...clean, acceptable: false })).toBe(false);
+    expect(passedChecks({ ...clean, privacy_verification: "failed" })).toBe(false);
+    expect(passedChecks(undefined)).toBe(false);
+  });
 });

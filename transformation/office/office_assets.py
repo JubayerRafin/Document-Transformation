@@ -21,16 +21,25 @@ def process(data,filename,run,translate,redact,categories,assist,options):
                 image=Image.open(BytesIO(raw)); image.load(); image_format=image.format
             except OSError:
                 reports.append({'part':part,'status':'blocked','reason':'Unsupported image format needs a renderer and OCR.'}); continue
+            if image.width < 48 or image.height < 24:
+                # Icons and rules: too small to hold readable text.
+                reports.append({'part':part,'status':'kept_too_small'}); continue
             with pymupdf.open() as pdf:
                 page=pdf.new_page(width=image.width,height=image.height)
                 source=BytesIO(); image.convert('RGB').save(source,format='PNG')
                 page.insert_image(page.rect,stream=source.getvalue()); wrapped=pdf.tobytes()
             asset_options=dict(options)
             asset_options.pop('ocr_recognition_dir',None)
+            event=None
             for event in run_pipeline(wrapped,Path(part).stem+'.pdf',root=Path(run)/'image-runs',translate=translate,
                     redact=redact,pii_categories=categories,pii_assist=assist,table_strategy='native',**asset_options):
                 yield {'part':part,'progress':event}
-            if event['status']!='generated': raise RuntimeError('Office image processing failed: '+event.get('error','unknown'))
+            if event is None or event['status']!='generated':
+                reason=(event or {}).get('error') or 'unknown'
+                if reason.startswith('No OCR text detected'):
+                    # A picture without text (a chart, a photo) is kept exactly as it was.
+                    reports.append({'part':part,'status':'no_text'}); continue
+                raise RuntimeError('Office image processing failed: '+reason)
             with pymupdf.open(event['output_pdf']) as result:
                 pix=result[0].get_pixmap(alpha=False)
                 output_image=Image.frombytes('RGB',[pix.width,pix.height],pix.samples).resize(image.size)

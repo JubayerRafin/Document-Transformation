@@ -75,6 +75,21 @@ def install_table_fitting(Typesetting):
         if key in getattr(self, "_transformx_shaped_keys", ()):
             # Drawn with shaping after the PDF is written (transformation/pdf/complex_script.py).
             return None
+        if not paragraph.vertical:
+            # An amount, code, date or quantity the translation left unchanged is drawn with its own
+            # source characters where they were. Re-typeset, digits moved inside their tight boxes
+            # (quantities above or below their row), commas sank under Chinese amounts and dates
+            # mixed two fonts (2026-11-21).
+            from transformation.layout.source_atoms import preserved_source_characters
+            entry = getattr(self, '_transformx_source_atoms', {}).get(key)
+            source_chars = preserved_source_characters(entry, paragraph, page) if entry else None
+            if source_chars:
+                from copy import deepcopy
+                paragraph.box = deepcopy(entry['paragraph'].box)
+                paragraph.scale = 1.0
+                paragraph.pdf_paragraph_composition = [PdfParagraphComposition(pdf_character=c) for c in source_chars]
+                self._update_paragraph_render_order(paragraph)
+                return None
         slot = getattr(self, "_transformx_table_slots", {}).get(key)
         heading = False
         panel = False
@@ -116,16 +131,24 @@ def install_table_fitting(Typesetting):
             units = self.create_typesetting_units(paragraph, fonts)
 
             if not units:
-                raise RuntimeError("Empty table blocks require review.")
+                # Nothing to fit (a stray mark or an empty translation): BabelDOC typesets it as
+                # usual and it is listed for review, instead of failing the whole document.
+                record.update(status='empty_typeset_normally', requires_review=True)
+                return original_render(self, paragraph, page, fonts)
             # BabelDOC also represents grade symbols such as B+ as formulas.
             # Its layout engine relocates these characters; apply the same
             # containment/font checks below, without accepting vector graphics.
+            # A formula with drawings (an icon or symbol drawn inline) cannot be kept inside the slot
+            # safely: BabelDOC typesets the paragraph as usual and it is listed for review. Raising
+            # here failed a whole 235-page manual over one heading on page 38 (Canon, 2026-11-23).
             for unit in units:
                 formula = unit.formular
                 if formula is not None and (
                     not formula.pdf_character or formula.pdf_curve or formula.pdf_form
                 ):
-                    raise RuntimeError("Non-text formulas inside a table slot require review.")
+                    record.update(status='formula_typeset_normally', requires_review=True,
+                                  reason='Non-text formulas inside a table slot require review.')
+                    return original_render(self, paragraph, page, fonts)
 
             if not any(getattr(unit,'font_size',None) or getattr(unit,'char',None) for unit in units):
                 # Vendor layout takes the mode of unit font sizes, but formula
@@ -135,7 +158,10 @@ def install_table_fitting(Typesetting):
                 for unit in units:
                     sizes=[c.pdf_style.font_size for c in unit.formular.pdf_character
                            if c.pdf_style and c.pdf_style.font_size and c.pdf_style.font_size>0]
-                    if not sizes:raise RuntimeError('Formula layout requires a measured source font size.')
+                    if not sizes:
+                        record.update(status='formula_typeset_normally', requires_review=True,
+                                      reason='Formula layout requires a measured source font size.')
+                        return original_render(self, paragraph, page, fonts)
                     unit.font_size=median(sizes)
                 record['formula_layout_font_seeded_from_source']=True
 

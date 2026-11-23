@@ -7,8 +7,6 @@ import { UploadPanel } from "../src/components/upload-panel";
 import { HistoryPanel } from "../src/components/history-panel";
 import { ProgressPanel } from "../src/components/progress-panel";
 import { PreviewPanel } from "../src/components/preview-panel";
-import { SignIn } from "../src/components/sign-in";
-import { WorkersPanel } from "../src/components/workers-panel";
 import { job, worker } from "./fixtures";
 function upload(api = new ApiClient()) {
   const submitted = vi.fn().mockResolvedValue(undefined);
@@ -18,7 +16,6 @@ function upload(api = new ApiClient()) {
         api={api}
         workers={[worker]}
         onSubmitted={submitted}
-        onServers={vi.fn()}
         onError={vi.fn()}
       />
     </LazyMotion>,
@@ -31,11 +28,10 @@ it("submits a selected PDF using the exact selected server and mode", async () =
     submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
   const { submitted } = upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
   await u.click(screen.getByRole("button", { name: /Start transformation/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
@@ -62,17 +58,16 @@ it("offers the server's translation models and sends the chosen one", async () =
     };
   render(
     <LazyMotion features={domAnimation}>
-      <UploadPanel api={api} workers={[withModels]} onSubmitted={vi.fn()} onServers={vi.fn()} onError={vi.fn()} />
+      <UploadPanel api={api} workers={[withModels]} onSubmitted={vi.fn()} onError={vi.fn()} />
     </LazyMotion>,
   );
-  // No selector until a server with more than one model is chosen.
-  expect(screen.queryByLabelText("Translation model")).not.toBeInTheDocument();
+  // This server offers two models, so the choice is shown at once.
+  expect(screen.getByLabelText("Translation model")).toBeInTheDocument();
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   const select = screen.getByLabelText("Translation model");
   expect(select).toHaveValue("default");
   await u.selectOptions(select, "openai");
@@ -89,11 +84,10 @@ it("sends no model choice for the default model or for PII only", async () => {
     submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   expect(screen.queryByLabelText("Translation model")).not.toBeInTheDocument();
   await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
   await u.click(screen.getByRole("button", { name: /Start transformation/i }));
@@ -121,7 +115,7 @@ it("blocks invalid PDF content and never submits", async () => {
     submit = vi.spyOn(api, "submit");
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["invalid"], "fake.pdf", { type: "application/pdf" }),
   );
   expect(await screen.findByRole("alert")).toHaveTextContent("valid PDF");
@@ -136,11 +130,10 @@ it("reuses the idempotency key after a failed unchanged submission", async () =>
     .mockResolvedValueOnce({ job_id: job.id });
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "retry.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("retry.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
   await u.click(screen.getByRole("button", { name: /Start transformation/ }));
   await screen.findByRole("alert");
@@ -161,11 +154,10 @@ it("does not open an uploaded job after its account session changed", async () =
   );
   const { submitted } = upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "private.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("private.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
   await u.click(screen.getByRole("button", { name: /Start transformation/ }));
   expect(
@@ -186,11 +178,10 @@ it("requires a selected PII category before sending a redaction job", async () =
     submit = vi.spyOn(api, "submit");
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "pii.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("pii.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   await u.click(screen.getByRole("tab", { name: "PII redaction" }));
   for (const name of ["Names", "Email addresses", "Phone numbers"])
     await u.click(screen.getByRole("checkbox", { name }));
@@ -274,45 +265,6 @@ it("previews the matched source/output artifacts and keeps authorized download l
     `/v1/jobs/${job.id}/artifacts/${job.artifacts[1].id}`,
   );
 });
-it("sign-in uses the existing API and displays sanitized authentication errors", async () => {
-  const api = new ApiClient();
-  vi.spyOn(api, "login").mockRejectedValue(new ApiError("INVALID_LOGIN", 401));
-  render(<SignIn open onOpenChange={vi.fn()} api={api} onAccount={vi.fn()} />);
-  await userEvent.type(
-    screen.getByLabelText("Email address"),
-    "test@example.com",
-  );
-  await userEvent.type(screen.getByLabelText("Password"), "bad-password");
-  await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  expect(await screen.findByRole("alert")).toHaveTextContent("didn’t match");
-});
-it("registers a private server without displaying the secret token", async () => {
-  const api = new ApiClient();
-  vi.spyOn(api, "registerWorker").mockResolvedValue({
-    id: worker.id,
-    token: "never-show-this-secret",
-    name: "GPU",
-    supabase_url: "https://test.supabase.co",
-  });
-  render(
-    <WorkersPanel
-      api={api}
-      workers={[]}
-      onRefresh={vi.fn().mockResolvedValue(undefined)}
-      onError={vi.fn()}
-    />,
-  );
-  await userEvent.type(screen.getByLabelText("Server name"), "GPU");
-  await userEvent.click(
-    screen.getByRole("button", { name: "Register server" }),
-  );
-  expect(
-    await screen.findByRole("button", {
-      name: "Download private configuration",
-    }),
-  ).toBeVisible();
-  expect(screen.queryByText("never-show-this-secret")).not.toBeInTheDocument();
-});
 it("sends the chosen masking style and keep-visible values with a PII job", async () => {
   const u = userEvent.setup(),
     api = new ApiClient(),
@@ -320,13 +272,12 @@ it("sends the chosen masking style and keep-visible values with a PII job", asyn
   upload(api);
   await u.click(screen.getByRole("tab", { name: "PII redaction" }));
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
   await u.selectOptions(screen.getByLabelText("How removed text looks"), "pseudonym");
   await u.type(screen.getByLabelText("Keep visible, one per line"), "Northwind Supply{enter}  {enter}Head office");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
   await u.click(screen.getByRole("button", { name: /Start/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
@@ -342,11 +293,10 @@ it("translation jobs do not send PII masking options", async () => {
     submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id });
   upload(api);
   await u.upload(
-    screen.getByLabelText("Choose a PDF"),
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
     new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
   );
   await screen.findByText("test.pdf");
-  await u.selectOptions(screen.getByLabelText("GPU server"), worker.id);
   await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
   await u.click(screen.getByRole("button", { name: /Start transformation/i }));
   await waitFor(() => expect(submit).toHaveBeenCalled());
@@ -402,4 +352,80 @@ it("summarizes what was masked and how it was found", async () => {
   expect(await screen.findByTestId("redaction-summary")).toHaveTextContent(
     "4 areas masked: 2 Names, 1 Email addresses, 1 Identifiers · found by: field label or format 2, language model 1, name list or consistency 1",
   );
+});
+it("offers the server's PII models for redaction and warns before an outside service", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    submit = vi.spyOn(api, "submit").mockResolvedValue({ job_id: job.id }),
+    withPiiModels = {
+      ...worker,
+      capabilities: {
+        ...worker.capabilities,
+        pii_models: [
+          { id: "default", label: "Qwen 3.5 9B", external: false },
+          { id: "openai", label: "OpenAI GPT-5 mini", external: true },
+        ],
+      },
+    };
+  render(
+    <LazyMotion features={domAnimation}>
+      <UploadPanel api={api} workers={[withPiiModels]} onSubmitted={vi.fn()} onError={vi.fn()} />
+    </LazyMotion>,
+  );
+  // Translation only: no PII model choice.
+  expect(screen.queryByLabelText("PII model")).not.toBeInTheDocument();
+  await u.click(screen.getByRole("tab", { name: "PII redaction" }));
+  await u.upload(
+    screen.getByLabelText("Choose a PDF, Word or PowerPoint file"),
+    new File(["%PDF-1.7\n"], "test.pdf", { type: "application/pdf" }),
+  );
+  await screen.findByText("test.pdf");
+  const select = screen.getByLabelText("PII model");
+  expect(select).toHaveValue("default");
+  await u.selectOptions(select, "openai");
+  expect(screen.getByText(/including the personal data to be removed/i)).toBeVisible();
+  await u.click(screen.getByRole("checkbox", { name: /authorized/i }));
+  await u.click(screen.getByRole("button", { name: /Start transformation/i }));
+  await waitFor(() => expect(submit).toHaveBeenCalled());
+  expect(submit.mock.calls[0][1]).toMatchObject({ operation: "pii", pii_model: "openai" });
+  expect(submit.mock.calls[0][1]).not.toHaveProperty("translation_model");
+});
+it("lists the removed values and makes a new version with the ticked ones kept visible", async () => {
+  const u = userEvent.setup(),
+    api = new ApiClient(),
+    created = vi.fn();
+  vi.spyOn(api, "preview").mockResolvedValue({ url: "https://test.supabase.co/x" });
+  vi.spyOn(api, "redactedValues").mockResolvedValue({
+    values: [
+      { value: "Northwind Ltd", category: "Names", occurrences: 3, pages: [1, 2, 3, 5], parts: [] },
+      { value: "alex.m@north\nwind.example", category: "Email addresses", occurrences: 2, pages: [2], parts: ["alex.m@north"] },
+    ],
+    kept: ["Contoso"],
+    truncated: false,
+  });
+  const keep = vi.spyOn(api, "keepVisible").mockResolvedValue({ job_id: "new-job" });
+  const redacted = { ...job, options: { ...job.options, operation: "pii" as const, pii_keep: ["Contoso"] } };
+  render(<PreviewPanel job={redacted} api={api} onError={vi.fn()} onCreated={created} />);
+  expect(await screen.findByText("2 values removed · 1 kept visible")).toBeInTheDocument();
+  await u.click(screen.getByRole("button", { name: "Show what was removed" }));
+  const list = screen.getByTestId("removed-values");
+  expect(list).toHaveTextContent("alex.m@north ↵ wind.example");
+  expect(list).toHaveTextContent("Names · p. 1–3, 5 · 3 times");
+  expect(list).toHaveTextContent("also as “alex.m@north”");
+  const make = screen.getByRole("button", { name: "Make a new version" });
+  expect(make).toBeDisabled();
+  await u.click(screen.getByRole("checkbox", { name: "Keep visible: Northwind Ltd" }));
+  await u.click(screen.getByRole("checkbox", { name: "Keep visible: Contoso" }));
+  await u.click(make);
+  expect(keep).toHaveBeenCalledWith(redacted.id, ["Northwind Ltd"], expect.any(String));
+  expect(created).toHaveBeenCalledWith("new-job");
+});
+it("shows no removed-values list for translation results", async () => {
+  const api = new ApiClient();
+  vi.spyOn(api, "preview").mockResolvedValue({ url: "https://test.supabase.co/x" });
+  const list = vi.spyOn(api, "redactedValues");
+  render(<PreviewPanel job={job} api={api} onError={vi.fn()} onCreated={vi.fn()} />);
+  await screen.findByTitle("Original document");
+  expect(list).not.toHaveBeenCalled();
+  expect(screen.queryByRole("region", { name: "Removed values" })).toBeNull();
 });

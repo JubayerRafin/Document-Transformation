@@ -23,10 +23,12 @@ def extract(path, source_hash, output_dir, options, progress):
                 for table in page.find_tables().tables:
                     box = display_box(table.bbox)
                     if box:
-                        tables.append((table.bbox, Region("", "table", box, cells=table.extract(), metadata={
+                        # Read the table's text once: once per cell made one invoice page take 2.5 s.
+                        cells = table.extract()
+                        tables.append((table.bbox, Region("", "table", box, cells=cells, metadata={
                             "rows": table.row_count, "columns": table.col_count,
                             "cell_bboxes": [display_box(c) if c else None for c in table.cells],
-                            "cell_records":[{'row':r,'column':c,'bbox':display_box(box),'text':table.extract()[r][c] or ''}
+                            "cell_records":[{'row':r,'column':c,'bbox':display_box(box),'text':cells[r][c] or ''}
                                 for r,row in enumerate(table.rows) for c,box in enumerate(row.cells) if box],
                             "method": "native ruled-table detection"})))
             except Exception as exc:

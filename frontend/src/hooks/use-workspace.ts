@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ApiClient,
-  ApiError,
   type Account,
   type Job,
   type Worker,
@@ -10,25 +9,13 @@ import {
 export function useWorkspace() {
   const [api] = useState(() => new ApiClient()),
     [account, setAccount] = useState<Account | null>(null),
-    [loading, setLoading] = useState(true),
-    [signIn, setSignIn] = useState(false);
+    [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]),
     [workers, setWorkers] = useState<Worker[]>([]),
     [error, setError] = useState("");
-  const expire = useCallback(() => {
-    api.csrf = "";
-    setAccount(null);
-    setJobs([]);
-    setWorkers([]);
-    setSignIn(true);
-  }, [api]);
-  const handleError = useCallback(
-    (e: unknown) => {
-      if (e instanceof ApiError && e.status === 401) expire();
-      setError(e instanceof Error ? e.message : "The service is unavailable.");
-    },
-    [expire],
-  );
+  const handleError = useCallback((e: unknown) => {
+    setError(e instanceof Error ? e.message : "The service is unavailable.");
+  }, []);
   const refresh = useCallback(
     async (signal?: AbortSignal) => {
       const session = api.csrf;
@@ -40,8 +27,7 @@ export function useWorkspace() {
         if (signal?.aborted || !session || api.csrf !== session) return;
         if (j.status === "fulfilled") setJobs(j.value);
         if (w.status === "fulfilled") setWorkers(w.value);
-        const failures = [j, w].filter((r) => r.status === "rejected");
-        const failed = failures.find((r) => r.reason instanceof ApiError && r.reason.status === 401) || failures[0];
+        const failed = [j, w].find((r) => r.status === "rejected");
         if (failed) handleError(failed.reason);
         else setError("");
       } catch (e) {
@@ -59,9 +45,7 @@ export function useWorkspace() {
         if (!ctrl.signal.aborted) setAccount(u);
       })
       .catch((e) => {
-        if (ctrl.signal.aborted) return;
-        if (e instanceof ApiError && e.status === 401) setSignIn(true);
-        else handleError(e);
+        if (!ctrl.signal.aborted) handleError(e);
       })
       .finally(() => {
         if (!ctrl.signal.aborted) setLoading(false);
@@ -93,28 +77,16 @@ export function useWorkspace() {
       document.removeEventListener("visibilitychange", wake);
     };
   }, [account, refresh]);
-  const logout = async () => {
-    try {
-      await api.logout();
-      expire();
-      setSignIn(false);
-    } catch (e) {
-      handleError(e);
-    }
-  };
   return {
     api,
     account,
     setAccount,
     loading,
-    signIn,
-    setSignIn,
     jobs,
     workers,
     error,
     setError,
     refresh,
     handleError,
-    logout,
   };
 }

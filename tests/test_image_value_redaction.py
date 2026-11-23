@@ -208,3 +208,41 @@ class ImageRedactionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class ScriptAndWidthTests(unittest.TestCase):
+    def test_visual_length_counts_marks_as_nothing_and_wide_letters_as_two(self):
+        from transformation.validation.value_redaction import visual_length
+        self.assertEqual(visual_length('EMP-1'), 5)
+        self.assertEqual(visual_length('\u0995\u09b0\u09cd\u09ae'), 3)       # Bengali: the virama has no width
+        self.assertEqual(visual_length('\u8acb\u6c42\u66f8'), 6)
+
+    def test_script_tokens_split_a_label_stored_against_its_value(self):
+        from transformation.validation.value_redaction import script_tokens, space_tokens
+        text = '\u8acb\u6c42\u66f8INV-2022-75013'
+        self.assertEqual(space_tokens(text), [(0, 17)])
+        self.assertEqual(script_tokens(text), [(0, 3), (3, 17)])
+        self.assertEqual(script_tokens('Badge EMP-2024'), [(0, 5), (6, 14)])
+
+    def test_a_cjk_label_read_without_a_space_keeps_its_pixels(self):
+        """Japanese scan, 2026-11-23: OCR read the header "請求書 INV-2022-75013" as one word; the
+        value was trimmed by character counts and the mask covered part of the label."""
+        label, value = '\u8acb\u6c42\u66f8', 'INV-2022-75013'
+        with pymupdf.open() as drawing:
+            page = drawing.new_page(width=420, height=160)
+            page.insert_text((30, 60), label, fontname='japan', fontsize=14)
+            end = 30 + pymupdf.Font('japan').text_length(label, fontsize=14)
+            page.insert_text((end + 5, 60), value, fontsize=14)
+            label_box = pymupdf.Rect(30, 45, end, 64)
+            line_box = pymupdf.Rect(28, 44, end + 5 + pymupdf.get_text_length(value, fontsize=14) + 2, 65)
+            png = page.get_pixmap(dpi=200).tobytes('png')
+        with pymupdf.open() as pdf:
+            page = pdf.new_page(width=420, height=160)
+            page.insert_image(page.rect, stream=png)
+            data = pdf.tobytes()
+        region = {'id': 'r', 'kind': 'text', 'text': label + value, 'bbox': list(line_box)}
+        ir = {'units': [{'id': 'u', 'number': 1, 'regions': [region]}]}
+        output, audit = redact_pdf(data, ir, [{'region_id': 'r', 'value': value, 'category': 'Identifiers'}])
+        self.assertEqual(audit[-1]['localization'], 'pixel_word_gaps')
+        self.assertLess(image_pixels(output, label_box + (0, 0, -2, 0)).min(), 100)          # label pixels kept
+        self.assertEqual(image_pixels(output, pymupdf.Rect(end + 6, 47, line_box.x1 - 2, 62)).min(), 255)  # value cleared

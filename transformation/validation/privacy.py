@@ -19,6 +19,8 @@ CATEGORY_DEFINITIONS={
     'Addresses':'postal or street addresses',
     'Identifiers':('identifiers linked to a person, account or record: national/personal ID numbers; employee, staff, '
                    'member, customer, patient, account, policy, case, tenant, document, record and invoice numbers; '
+                   'ticket, incident, request, order, booking, reservation, claim, application, reference and '
+                   'transaction numbers that point to one person or their record; '
                    'user names, device names, IP addresses; passwords, API keys, access tokens and secrets. '
                    'Not product codes, SKUs, model numbers, prices, amounts, quantities or dates'),
     'Bank accounts':'bank account, IBAN, card and routing/sort-code numbers',
@@ -107,6 +109,12 @@ def plausible(value,category):
     v=value.strip().rstrip('.,;:')
     if not v:return False
     if category in {'Identifiers','Bank accounts'} and not re.search(r'[\d_@.:/#\-]',v):return False
+    # Three digits or fewer identify nobody: a head count ("618 people") was masked as an identifier
+    # and could not be removed on its own, which failed an Arabic invoice (2026-11-23).
+    if category=='Identifiers' and v.isdigit() and len(v)<=3:return False
+    # One character repeated ("00 000 000", "000000000000") is a pattern, not a number: OCR reads a
+    # photo's grille as zeros, and a Cisco manual was blocked by such a reading (2026-11-23).
+    if category in {'Identifiers','Bank accounts','Phone numbers'} and len(set(re.sub(r'[\W_]','',v)))<=1:return False
     if category=='Names' and any(c.isdigit() for c in v):return False
     if category!='Dates of birth' and is_date(v):return False
     return True
@@ -307,7 +315,13 @@ def detect(regions,categories,endpoint,model,assist=True,workers=8,unresolved=No
             gap=r'[ \t]*(?:\n[ \t]*)?'
             label=r'[\w-]+(?:[ \t]*\n[ \t]*[\w-]+){0,2}'
             email=r'[\w.+-]+@'+gap+label+r'(?:'+gap+r'\.'+gap+label+r')*'+gap+r'\.'+gap+r'[A-Za-z]{2,}'
-            values.extend((m.group(),'Email addresses','pattern') for m in re.finditer(email,text))
+            from transformation.validation.scripts import changes
+            for m in re.finditer(email,text):
+                # The address starts after a change of script: a word of the label stored against it
+                # ("الإلكترونيhr80@example.com") is not part of it (Arabic invoice, 2026-11-23).
+                local=text[m.start():text.index('@',m.start())]
+                cut=max((i for i in range(1,len(local)) if changes(local[i-1],local[i])),default=0)
+                values.append((m.group()[cut:],'Email addresses','pattern'))
         if 'Phone numbers' in categories:
             timestamps=_timestamp_spans(text)+_not_phone_spans(text)
             # A bracketed area code ("(312) 555-0147") is the usual North American layout.

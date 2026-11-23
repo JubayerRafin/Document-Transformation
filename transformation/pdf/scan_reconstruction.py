@@ -2,7 +2,7 @@
 
 Not PII redaction: uncertain regions retain the original source pixels.
 """
-from transformation.ocr.read_alike import reads_consistently
+from transformation.ocr.read_alike import reads_consistently, literal_line
 import json
 import hashlib
 import math
@@ -97,6 +97,31 @@ def fit_text(box, text, font, max_size=None, min_size=8):
 SAME_SIZE = 1.12  # source text sizes within this ratio are one size (one table, one paragraph style)
 
 
+def narrowed_line(box, text, font, policy):
+    """One line of unshaped right-to-left or Indic letters at the size the shaped line has, squeezed
+    horizontally to the box: [(baseline, text, size, horizontal scale)], or None.
+
+    A scan made native for translation draws Arabic, Hindi and Bengali letters unshaped, each in its
+    isolated form, which is wider than the joined script: an Arabic invoice's table cells and lines
+    did not fit at 8 pt and kept their Arabic pixels, untranslated (15 lines, 2026-11-23). The text is
+    only the translator's input; its size, not its width, decides the size of the translation."""
+    from transformation.pdf.complex_script import fit_shaped
+    if not text or '\n' in text:
+        return None
+    shaped = fit_shaped(box, text, policy['maximum'], policy['minimum'])
+    if not shaped:
+        return None
+    shaped[0].close()
+    size = min(shaped[1], box.height / (font.ascender - font.descender) * .95)
+    width = font.text_length(text, fontsize=size)
+    if size < policy['minimum'] - 1e-6 or width <= 0:
+        return None
+    scale = min(1.0, box.width * .95 / width)
+    if scale < .3:
+        return None
+    return [((box.x0, box.y0 + font.ascender * size), text, size, scale)]
+
+
 def harmonize_sizes(planned, font):
     """Draw lines that had one size in the source at one size again.
 
@@ -104,7 +129,8 @@ def harmonize_sizes(planned, font):
     sizes depending on how tight their box was ("SKU-PR-0417" larger than the other SKUs, a heading
     smaller than its body; scanned page, 2026-11-17). Lines are grouped by measured source size;
     a line drawn above its group's median size is refitted at the median, when that fits."""
-    measured = sorted((p for p in planned if (p['policy'] or {}).get('source_font_estimate') and not p.get('wrapped')),
+    measured = sorted((p for p in planned if (p['policy'] or {}).get('source_font_estimate') and not p.get('wrapped')
+                       and p.get('scale', 1.0) >= 1),
                       key=lambda p: p['policy']['source_font_estimate'])
     groups = []
     for item in measured:
@@ -201,23 +227,95 @@ def validate_placements(box,placements,font):
 
 def available_line_box(region, regions, pixels, rules):
     """Use a small clear vertical margin without crossing other text or rules."""
+    # The margin above and the margin below are found separately. A line with no tall letters
+    # ("cover.") has a box only as high as its small letters; with one margin for both sides, the line
+    # above limited the space below too, the line could not be redrawn at its own size and kept its
+    # source pixels (warning picture of a manual, 2026-11-23).
     box = pymupdf.Rect(region['bbox'])
     height, width = pixels.shape[:2]
     x0,x1 = max(0,math.floor(box.x0)), min(width,math.ceil(box.x1))
-    for pad in (4,3,2,1):
-        candidate = pymupdf.Rect(box.x0,max(0,box.y0-pad),box.x1,min(height,box.y1+pad))
+    color,_ = background(pixels[math.floor(box.y0):math.ceil(box.y1),x0:x1])
+
+    def clear(candidate, strip_rows):
         if any(r['id'] != region['id'] and (candidate & pymupdf.Rect(r['bbox'])).get_area() > 0 for r in regions):
-            continue
-        top, bottom = math.floor(candidate.y0), math.ceil(candidate.y1)
-        strips = [pixels[top:math.floor(box.y0),x0:x1],pixels[math.ceil(box.y1):bottom,x0:x1]]
-        masks = [rules[top:math.floor(box.y0),x0:x1],rules[math.ceil(box.y1):bottom,x0:x1]]
-        if any(m.any() for m in masks):
-            continue
-        sample = pixels[math.floor(box.y0):math.ceil(box.y1),x0:x1]
-        color,_ = background(sample)
-        if all(s.size and np.mean(np.max(abs(s.astype(float)-color),axis=2)<30) > .98 for s in strips):
-            return candidate
-    return box
+            return False
+        strip, mask = pixels[strip_rows, x0:x1], rules[strip_rows, x0:x1]
+        return bool(strip.size) and not mask.any() and np.mean(np.max(abs(strip.astype(float)-color),axis=2)<30) > .98
+
+    # Toward another line, a margin takes at most half the gap: that line may grow toward this one
+    # too, and two lines grown into the same gap drew a wrapped word over the next line (German
+    # warning box of a scan, 2026-11-23).
+    def room(side):
+        gaps = []
+        for r in regions:
+            other = pymupdf.Rect(r['bbox'])
+            if r['id'] == region['id'] or other.x0 >= box.x1 or other.x1 <= box.x0:
+                continue
+            if side == 'above' and other.y1 <= box.y0 + .5:
+                gaps.append(box.y0 - other.y1)
+            elif side == 'below' and other.y0 >= box.y1 - .5:
+                gaps.append(other.y0 - box.y1)
+        return min([4.0] + [max(0.0, g / 2) for g in gaps])
+
+    def pads(limit):
+        return [p for p in (limit, limit - 1, limit - 2, limit - 3) if p >= .5]
+
+    above = next((pad for pad in pads(room('above')) if box.y0 - pad >= 0 and clear(
+        pymupdf.Rect(box.x0, box.y0-pad, box.x1, box.y1), slice(math.floor(box.y0-pad), math.floor(box.y0)))), 0)
+    below = next((pad for pad in pads(room('below')) if box.y1 + pad <= height and clear(
+        pymupdf.Rect(box.x0, box.y0, box.x1, box.y1+pad), slice(math.ceil(box.y1), math.ceil(box.y1+pad)))), 0)
+    return pymupdf.Rect(box.x0, box.y0-above, box.x1, box.y1+below)
+
+
+def faint_vertical_rules(pixels, contrast=10, minimum=40):
+    """A mask of thin vertical lines at least `minimum` points long that are `contrast` grey levels
+    darker than the pixels two points to each side. Scanned table borders are often light grey: a
+    Korean invoice's column borders were 16 levels darker than the cells, under rule_pixels' 25, and
+    no border was found (2026-11-23). Used only for vertical_rule_segments, never to erase pixels."""
+    gray = pixels.astype(float).mean(axis=2)
+    dark = np.zeros(gray.shape, dtype=bool)
+    dark[:, 2:-2] = (gray[:, 2:-2] + contrast < gray[:, :-4]) & (gray[:, 2:-2] + contrast < gray[:, 4:])
+    mask = np.zeros(gray.shape, dtype=bool)
+    for x in np.flatnonzero(dark.sum(axis=0) >= minimum):
+        padded = np.r_[False, dark[:, x], False].astype(int)
+        starts, ends = np.flatnonzero(np.diff(padded) == 1), np.flatnonzero(np.diff(padded) == -1)
+        # Where the border crosses a row rule its contrast drops for a point or two: pieces up to 3
+        # points apart are one border (the shaded header row above a row rule, 2026-11-23).
+        runs = []
+        for a, b in zip(starts, ends):
+            if runs and a - runs[-1][1] <= 3:
+                runs[-1][1] = b
+            else:
+                runs.append([a, b])
+        for a, b in runs:
+            if b - a >= minimum:
+                mask[a:b, x] = True
+    return mask
+
+
+def vertical_rule_segments(rules, minimum=12):
+    """[(x, top, bottom)] of the vertical rules in a rule_pixels mask, in page points (the mask is
+    rendered at 72 dpi). A scan made native for translation gets each as an invisible line over the
+    scanned one: BabelDOC joined the header cells "수량" and "단가" across a scanned cell border and
+    drew "Qty Unit Price" in the first cell (Korean scan, 2026-11-23); with the line, the paragraph is
+    split at the border as on a digital page (stacked_lines.split_at_rules)."""
+    runs = {}
+    for x in np.flatnonzero(rules.any(axis=0)):
+        padded = np.r_[False, rules[:, x], False].astype(int)
+        starts, ends = np.flatnonzero(np.diff(padded) == 1), np.flatnonzero(np.diff(padded) == -1)
+        runs[int(x)] = [(int(a), int(b)) for a, b in zip(starts, ends) if b - a >= minimum]   # not a horizontal rule's pixel
+    segments, done = [], set()
+    for x in sorted(runs):
+        for run in runs[x]:
+            if (x, run) in done:
+                continue
+            group, top, bottom = [x], run[0], run[1]
+            while any(abs(a - top) <= 2 and abs(b - bottom) <= 2 for a, b in runs.get(group[-1] + 1, [])):
+                nxt = group[-1] + 1
+                match = next((a, b) for a, b in runs[nxt] if abs(a - top) <= 2 and abs(b - bottom) <= 2)
+                done.add((nxt, match)); group.append(nxt)
+            segments.append((sum(group) / len(group) + .5, float(top), float(bottom)))
+    return segments
 
 
 def rule_pixels(pixels):
@@ -347,6 +445,7 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
         original_pixels = pixels.copy()
         erase_mask=np.zeros(pixels.shape[:2],dtype=bool)
         rules = rule_pixels(pixels)
+        scanned_rules = rules | faint_vertical_rules(pixels)
         if mapping is not None and not force_native:
             # Translations made for joined lines (scan_lines.py) are drawn over the lines they join.
             from transformation.pdf.scan_lines import regroup_for_translations
@@ -366,7 +465,9 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 items.append((region['bbox'], background(crop)[0] if crop.size else np.array([255, 255, 255]), region.get('text', '')))
             styles = page_styles(source[0], items)
             from transformation.pdf.scan_lines import join_wrapped_lines
-            regions, mapping, styles = join_wrapped_lines(regions, mapping, rules, reliable, styles)
+            from transformation.layout.ocr_fitting import source_fit_policy
+            sizes = {r['id']: source_fit_policy(r, source[0]).get('source_font_estimate') for r in regions}
+            regions, mapping, styles = join_wrapped_lines(regions, mapping, rules, reliable, styles, sizes)
         grouped = [[] for _ in regions]
         unmatched = []
         line_number = 0
@@ -385,6 +486,9 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                         grouped[best].append(dict(span, source_line=line_number))
         font = pymupdf.Font('cjk')
         records, placements, shaped_placements, planned = [], [], [], []
+        native_fonts = {}
+        from transformation.layout.ocr_fitting import source_fit_policy, neighbour_policy
+        measured_policies = [(r, source_fit_policy(r, source[0])) for r in regions]
         for index, (region, spans) in enumerate(zip(regions, grouped)):
             correction = corrections.get(region['id'])
             region_style = styles[index] if styles else None
@@ -415,6 +519,14 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             # (transformation/ocr/read_alike.py).
             if not correction and region.get('metadata', {}).get('requires_review', False) and not reads_consistently(region):
                 reason = 'Uncertain OCR or recognition variants disagree; preserve source, review transcription.'
+                if literal_line(region):
+                    # An e-mail address, code or number has nothing to translate: its source pixels are
+                    # the right output, whatever the exact reading ("ops11@example.com" read alike five
+                    # times was a review item on every Korean scan, 2026-11-23).
+                    record.update(reason='Literal line (address, code or number); source pixels kept.',
+                                  expected_preservation=True, preservation_basis='literal_needs_no_translation')
+                    records.append(record)
+                    continue
             elif agreement < (OVERLAY_NONUNIFORM if region_style and _inpaint_available() and _overlay_line(region) else .75):
                 reason = 'Nonuniform background; preserve source artwork.'
             elif not correction and mapping is None and (not spans or any(s['size'] < 6 for s in spans)):
@@ -451,8 +563,7 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 top=max(0,math.floor(box.y0)-3)
                 bottom=min(pix.height,math.ceil(box.y1)+3)
                 rules[top:bottom,edge]=True
-            from transformation.layout.ocr_fitting import source_fit_policy
-            font_policy=source_fit_policy(region,source[0])
+            font_policy=neighbour_policy(region,measured_policies[index][1],measured_policies)
             record['font_policy']=font_policy
             from transformation.pdf.complex_script import needs_shaping, fit_shaped
             shaped = None
@@ -493,6 +604,23 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                         fitting_box |= line_box
                 if any(not region_font.has_glyph(ord(c)) for c in text if not c.isspace()):
                     reason = reason or 'Output font lacks required characters; preserve original text.'
+            elif needs_shaping(text) and force_native:
+                # A scan made native for translation needs text the translator can read: shaped
+                # outlines are not text, and such lines stayed untranslated (Arabic scan, 2026-11-21).
+                # The letters are drawn unshaped, in a font that has them, in drawing order.
+                from transformation.pdf.native_text import covering_font
+                choice = covering_font(text)
+                if choice:
+                    font_name, region_font = choice
+                    native_fonts[font_name] = region_font
+                fitted = fit_text(fitting_box, text.strip(), region_font, max_size=font_policy['maximum'], min_size=font_policy['minimum'])
+                if fitted and not validate_placements(fitting_box, fitted, region_font):
+                    fitted = None
+                if fitted is None:
+                    fitted = narrowed_line(fitting_box, text.strip(), region_font, font_policy)
+                    if fitted:
+                        record['horizontal_scale'] = round(fitted[0][3], 3)
+                        fitted = [fitted[0][:3]]
             elif needs_shaping(text):
                 # Arabic, Hebrew and Indic text is laid out shaped (complex_script.fit_shaped); the
                 # per-glyph CJK font below can neither shape nor cover these scripts.
@@ -506,6 +634,15 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 if any(not region_font.has_glyph(ord(c)) for c in text if not c.isspace()):
                     reason = reason or 'Output font lacks required characters; preserve original text.'
             if fitted is None:
+                if not reason:
+                    from transformation.llm.policy import expected_unchanged
+                    # A line that is only a removed value ("Olivia Grant" -> "[REDACTED]") keeps its
+                    # masked pixels, and an unchanged amount or code its own: both are right as they
+                    # are (combined PII and translation of scans, 2026-11-23).
+                    if (not re.sub(r'\[REDACTED\]|[\s.,:;()\-]', '', text)
+                            or (text.strip() == region['text'].strip() and expected_unchanged(text.strip()))):
+                        record['expected_preservation'] = True
+                        record['preservation_basis'] = 'removed_value_or_unchanged_literal'
                 reason = reason or f"Translation cannot fit inside the available region at minimum {font_policy['minimum']:.2f} pt; preserve original text."
             else:
                 best_size = fitted[0][2]
@@ -541,12 +678,18 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 else:
                     planned.append({'record': record, 'box': fitting_box, 'text': text.strip(), 'fitted': fitted,
                                     'ink': ink, 'policy': font_policy, 'size': best_size,
-                                    'font': region_font, 'fontname': font_name, 'wrapped': bool(wrapped)})
+                                    'font': region_font, 'fontname': font_name, 'wrapped': bool(wrapped),
+                                    'scale': record.get('horizontal_scale', 1.0)})
             if shaped: shaped[0].close()
             records.append(record)
         harmonize_sizes(planned, font)
         for item in planned:
-            placements.extend((baseline, line, size, item['ink'], item.get('fontname', 'scanfont')) for baseline, line, size in item['fitted'])
+            name = item.get('fontname', 'scanfont')
+            if name in native_fonts:
+                from transformation.pdf.native_text import drawing_order
+                placements.extend((baseline, drawing_order(line), size, item['ink'], name, item['scale']) for baseline, line, size in item['fitted'])
+                continue
+            placements.extend((baseline, line, size, item['ink'], name, item['scale']) for baseline, line, size in item['fitted'])
         pixels[rules] = original_pixels[rules]
         erase_mask[rules]=False
         with pymupdf.open() as result:
@@ -562,13 +705,20 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 p.insert_image(p.rect, pixmap=cleaned)
             p.insert_font(fontname='scanfont', fontbuffer=font.buffer)
             from transformation.pdf.scan_style import EMBEDDED, font as style_font
-            for name in sorted({fontname for *_, fontname in placements if fontname in EMBEDDED}):
+            for name in sorted({fontname for *_, fontname, _ in placements if fontname in EMBEDDED}):
                 p.insert_font(fontname=EMBEDDED[name], fontbuffer=style_font(name).buffer)
-            for baseline, text, size, ink, fontname in placements:
-                p.insert_text(baseline, text, fontname=EMBEDDED.get(fontname, fontname), fontsize=size, color=ink)
+            for name in sorted({fontname for *_, fontname, _ in placements if fontname in native_fonts}):
+                p.insert_font(fontname=name, fontbuffer=native_fonts[name].buffer)
+            for baseline, text, size, ink, fontname, scale in placements:
+                # A narrowed line (narrowed_line) keeps its font size and is squeezed horizontally.
+                morph = (pymupdf.Point(baseline), pymupdf.Matrix(scale, 1)) if scale < 1 else None
+                p.insert_text(baseline, text, fontname=EMBEDDED.get(fontname, fontname), fontsize=size, color=ink, morph=morph)
             for rect, outlines in shaped_placements:
                 with outlines:
                     p.show_pdf_page(rect, outlines, 0)
+            if force_native:
+                for x, top, bottom in vertical_rule_segments(scanned_rules):
+                    p.draw_line((x, top), (x, bottom), color=(0, 0, 0), width=0.5, stroke_opacity=0)
             output = run / 'output' / ('scan-corrected.pdf' if corrections_path else 'scan-reconstructed.pdf')
             from transformation.pdf.complex_script import subset
             subset(result)  # the CJK font is inserted whole (3.5 MB per rebuilt page)

@@ -45,9 +45,14 @@ def _engine_review_warnings(acceptance):
 
 
 def _overlaps(a,b):
-    """Two final-check areas (page fractions) on the same page share some area."""
-    return (a['page']==b['page'] and a['x']<b['x']+b['width'] and b['x']<a['x']+a['width']
-            and a['y']<b['y']+b['height'] and b['y']<a['y']+a['height'])
+    """At least half of final-check area a (page fractions) lies inside area b on the same page: text
+    read under a mask, so the mask did not hide it. Any shared area was counted before, and OCR noise
+    on an equipment photo touching an earlier mask by 0.35 pt failed a whole Cisco manual
+    (2026-11-23)."""
+    if a['page']!=b['page']:return False
+    width=min(a['x']+a['width'],b['x']+b['width'])-max(a['x'],b['x'])
+    height=min(a['y']+a['height'],b['y']+b['height'])-max(a['y'],b['y'])
+    return width>0 and height>0 and width*height>=.5*a['width']*a['height']
 
 
 def _document_glossary(options,ir,run,info):
@@ -152,6 +157,11 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
     nativeized_ir_mode=options.pop('nativeized_ir_mode','reextract')
     if nativeized_ir_mode not in {'reextract','reuse'}:
         raise ValueError('nativeized_ir_mode must be reextract or reuse.')
+    from transformation.office.office import LEGACY,modernize
+    if Path(filename).suffix.lower() in LEGACY:
+        # A .doc or .ppt is processed as the .docx or .pptx LibreOffice converts it to.
+        data,filename=modernize(data,filename)
+        output_kind={'doc':'docx','ppt':'pptx'}.get(output_kind,output_kind)
     kind=Path(filename).suffix.lower().lstrip('.')
     if kind not in {'pdf','docx','pptx'} or output_kind not in {'pdf','docx','pptx'}:
         raise ValueError('Choose PDF, DOCX or PPTX.')
@@ -341,7 +351,39 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 save_json(run/'pii-detection-evidence.json',evidence)
                 save_json(run/'source-ir.json',ir)
             else:
-                findings=detect(text_regions(ir),pii_categories,pii_endpoint,pii_model,pii_assist)
+                # Word and PowerPoint: tracked changes accepted and author fields cleared first, then the
+                # PDF detector reads the document as LibreOffice draws it, notes and comments included.
+                from transformation.office import native as office_native
+                safe_data,revisions=office_native.accept_revisions(safe_data,kind)
+                if revisions:
+                    info['warnings'].append(f'{revisions} tracked change(s) were accepted before masking, so deleted text cannot keep a removed value.')
+                safe_data=office_native.scrub_properties(safe_data,kind)
+                detection=office_native.detection_pdf(safe_data,kind)
+                detection_path=run/'office-detection.pdf'; detection_path.write_bytes(detection)
+                from transformation.validation.pii_document import detect_document
+                (run/'office-detection').mkdir(exist_ok=True)
+                detection_ir=content_ir(extract_pdf(detection_path,run/'office-detection','native',
+                                                   analyze_pdf(detection,pii_endpoint,pii_model,False),defer_figures=True))
+                findings,_,evidence=detect_document(detection,detection_ir,pii_categories,pii_endpoint,pii_model,pii_assist,
+                                                    workers=pii_workers,known_values=known_values)
+                # Addresses, phone numbers and bank accounts have a fixed form: they are also found in
+                # the package's own text, which no rendering changes. In the preview a narrow table
+                # cell drew the underscore of "mathis_benoit@..." on a line of its own, the address
+                # read there did not match the package and it stayed unmasked (Word and PowerPoint
+                # mass test, 2026-11-24).
+                from transformation.validation.privacy import detect as pattern_detect
+                formats=[c for c in pii_categories if c in ('Email addresses','Phone numbers','Bank accounts')]
+                if formats:
+                    package_regions=[r for r in text_regions(extract_package(safe_data,filename)) if r.get('text','').strip()]
+                    findings+=[dict(f,method='package_pattern') for f in
+                               pattern_detect(package_regions,formats,pii_endpoint,pii_model,assist=False)]
+                analyzed_texts=evidence.pop('analyzed_texts',[])
+                if pii_keep:
+                    from transformation.validation.pii_document import split_kept
+                    findings,kept=split_kept(findings,pii_keep)
+                    if kept:
+                        info['warnings'].append(f"{len(kept)} detected value(s) were left visible because they match the job's keep-visible list.")
+                save_json(run/'pii-detection-evidence.json',evidence)
             save_json(run/'pii-findings.json',findings)
             if stop_after_pii:
                 info.update(status='pii_detected'); yield emit('pii_detection'); return
@@ -363,13 +405,23 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 info['redaction_map']=redaction_map(data,findings,drawn)
                 save_json(run/'redaction-map.json',info['redaction_map'])
                 save_json(run/'review-items.json',info['review_items'])
+                collateral=[a for a in redaction_audit if a.get('method')=='collateral_glyph_check']
+                if collateral:
+                    info['redaction_collateral_pages']=[a['page'] for a in collateral]
+                    info['warnings'].append(f"Masks on {len(collateral)} page(s) also removed some nearby characters ({sum(a['removed_unselected_characters'] for a in collateral)} in all); review them.")
                 fallbacks=sum(1 for a in redaction_audit if a.get('localization')=='whole_line_fallback')
                 if fallbacks:
                     info['redaction_whole_line_fallbacks']=fallbacks
                     info['warnings'].append(f'{fallbacks} scanned/image text line(s) were masked as a whole because the sensitive value could not be separated from its label.')
             else:
-                updates={r['id']:mask(r['text'],values) for r in text_regions(ir)}
-                safe_data,notes=write_package(safe_data,kind,updates,values); info['warnings'].extend(notes)
+                from transformation.validation.value_redaction import replacement_labels
+                label=office_native.mask_label(pii_style,replacement_labels(findings,pii_style))
+                office_regions=text_regions(extract_package(safe_data,filename))
+                office_masks=office_native.office_values(values,[r['text'] for r in office_regions])
+                updates=office_native.mask_updates(office_regions,office_masks,label)
+                safe_data,notes=write_package(safe_data,kind,updates,office_masks); info['warnings'].extend(notes)
+                info['office_masked_paragraphs']=len(updates)
+                values=list(dict.fromkeys(values+office_masks))
             info['warnings'].append('PII detection is provisional. Image text, OCR errors, embedded objects and detector omissions require review.')
         safe_source=run/('processing-source.'+kind); safe_source.write_bytes(safe_data)
         purposes=[p['purpose'] for p in analysis.get('visual_pages',[])]
@@ -454,6 +506,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 from transformation.pdf.ir_bridge import collect_translations
                 save_json(run/'ir-translations.json',collect_translations(context_ir,engine_runs))
                 info['translation_errors']=sum(len(json.loads((p/'region-errors.json').read_text(encoding='utf-8'))) for p in engine_runs if (p/'region-errors.json').exists())
+                # Paragraphs the engine kept in the source language, or left with a third script, are
+                # untranslated passages too: a Japanese paragraph kept as it was showed "Checks passed"
+                # apart from the scan's own flags (2026-11-23).
+                engine_acceptance=event.get('acceptance') or {}
+                info['translation_errors']+=sum(engine_acceptance.get(k) for k in ('untranslated_paragraphs','mixed_script_paragraphs')
+                                                if isinstance(engine_acceptance.get(k),int) and engine_acceptance.get(k)>0)
                 info['warnings'].append('PDF translation uses native BabelDOC geometry with shared-IR context and a page/spatial association report. Ambiguous associations remain unassigned; external boxes do not overwrite native glyph geometry.')
             else: processed=safe_data
             if any(r['kind']=='figure' for u in ir['units'] if not u.get('ocr_folder') for r in u['regions']):
@@ -487,46 +545,55 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
         else:
             final_ir=extract_package(safe_data,filename); updates={}; errors=[]
             yield emit('translation' if translate else 'reconstruction')
-            from transformation.llm.ollama_native import translate_paragraph
-            from transformation.llm.translation_guard import validate_candidate,audit_candidate
-            language=next((name for name,code in LANGUAGES.items() if code==options.get('target','ko')),options.get('target','ko'))
-            terms=options.get('terminology',{})
-            for region in text_regions(final_ir):
-                transformed=region['text']; styled=None
-                if translate:
-                    try:
-                        context=safe_context+('\nPreferred terminology: '+json.dumps(terms,ensure_ascii=False) if terms else '')
-                        run_texts=region.get('metadata',{}).get('run_texts',[])
-                        styled=None
-                        for attempt in range(2):
-                            if len(run_texts)>1:
-                                from transformation.office.styled_translation import translate_runs
-                                styled=translate_runs(endpoint,model,run_texts,language,list(options.get('protected_values',[]))+['[REDACTED]'],context,source_language=options.get('source','en'),terminology=terms)
-                                transformed=''.join(styled); stats={}
-                            else:
-                                transformed,stats=translate_paragraph(endpoint,model,region['text'],language,
-                                    list(options.get('protected_values',[]))+['[REDACTED]'],context,structured=len(region['text'])<=200,source_language=options.get('source','en'),terminology=terms)
-                            validate_candidate(region['text'],transformed,list(options.get('protected_values',[]))+['[REDACTED]'])
-                            if stats.get('skipped_model'): break
-                            if __import__('transformation.llm.endpoints',fromlist=['is_translategemma']).is_translategemma(model): break
-                            audit=audit_candidate(pii_endpoint,pii_model,region['text'],transformed,language,safe_context,list(options.get('protected_values',[]))+['[REDACTED]'])
-                            if audit['faithful']: break
-                            context+='\nPrior translation failed review: '+'; '.join(audit['issues'])
-                        else: raise ValueError('Semantic review rejected this paragraph.')
-                    except (ValueError,OSError,TimeoutError) as exc:
-                        transformed=region['text']; styled=None; errors.append({'region_id':region['id'],'reason':str(exc)})
-                updates[region['id']]=styled if styled is not None else transformed
-                region['transformed_text']=transformed
-                save_json(run/'transformed-ir.json',final_ir)
-                info['translation_progress']={'requests_completed':len(updates)}; yield emit('translation')
-            save_json(run/'region-errors.json',errors)
-            if errors:
-                info['warnings'].append(f'{len(errors)} paragraphs failed translation validation and retain their processing-source text.')
-                if len(errors)==len(updates): raise RuntimeError('Every paragraph failed translation. See region-errors.json; no translated output was accepted.')
-            from transformation.office.package_ir import refresh_tables
-            refresh_tables(final_ir)
-            yield emit('reconstruction')
-            native,notes=write_package(safe_data,kind,updates,[f['value'] for f in findings]); info['warnings'].extend(notes)
+            native=safe_data
+            if translate:
+                # Paragraph pieces translated concurrently through the same checked path as PDF text
+                # (translate_paragraph), formatting carried as **...** markers; see office/native.py.
+                from transformation.office import native as office_native
+                from transformation.llm.ollama_native import translate_paragraph
+                language=next((name for name,code in LANGUAGES.items() if code==options.get('target','ko')),options.get('target','ko'))
+                terms=options.get('terminology',{})
+                protected=list(options.get('protected_values',[]))+['[REDACTED]',office_native.BOX_MASK]
+                if redact:
+                    from transformation.validation.value_redaction import replacement_labels
+                    protected+=[v for v in replacement_labels(findings,pii_style).values() if v not in protected]
+                def translate_one(text):
+                    result,stats=translate_paragraph(endpoint,model,text,language,protected,safe_context,
+                        structured=len(text)<=200,source_language=options.get('source','en'),terminology=terms)
+                    if stats.get('kept_source_requires_review'):
+                        raise ValueError('Every translation attempt failed its checks; the source text is kept.')
+                    return result
+                outcome=None
+                for event in office_native.translate_regions(text_regions(final_ir),translate_one,
+                                                             workers=int(options.get('office_workers',16))):
+                    if 'updates' in event: outcome=event
+                    else: info['translation_progress']=event; yield emit('translation')
+                updates,errors=outcome['updates'],outcome['errors']
+                info['office_translation']=outcome['notes']
+                save_json(run/'office-translation.json',{'notes':outcome['notes'],
+                    'pairs':[{'src':a,'mt':b} for a,b in outcome['pairs']]})
+                for region in text_regions(final_ir):
+                    if region['id'] in updates: region['transformed_text']=''.join(updates[region['id']])
+                save_json(run/'region-errors.json',errors)
+                if errors:
+                    info['warnings'].append(f'{len(errors)} paragraph(s) failed translation validation and keep their source text.')
+                    if not updates: raise RuntimeError('Every paragraph failed translation. See region-errors.json; no translated output was accepted.')
+                from transformation.office.package_ir import refresh_tables
+                refresh_tables(final_ir)
+                yield emit('reconstruction')
+                native,notes=write_package(safe_data,kind,updates,[]); info['warnings'].extend(notes)
+                native,chart_pairs,chart_failed=office_native.translate_chart_labels(native,translate_one,
+                    workers=int(options.get('office_workers',16)))
+                if chart_pairs or chart_failed:
+                    info['office_chart_labels']={'translated':len(chart_pairs),'kept':len(chart_failed)}
+                    save_json(run/'office-translation.json',{'notes':outcome['notes'],
+                        'pairs':[{'src':a,'mt':b} for a,b in outcome['pairs']+chart_pairs]})
+                if chart_failed:
+                    info['warnings'].append(f'{len(chart_failed)} chart label(s) failed translation validation and keep their source text.')
+                source_rtl=options.get('source','en') in office_native.RTL_LANGUAGES
+                target_rtl=options.get('target','ko') in office_native.RTL_LANGUAGES
+                if source_rtl!=target_rtl:
+                    native=office_native.set_direction(native,kind,list(updates),target_rtl)
             (run/'output'/('transformed.'+kind)).write_bytes(native)
             if output_kind==kind: artifact=native
             else:
@@ -542,13 +609,16 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 info['warnings'].append('Office cross-format conversion uses the rendered pagination. Artwork becomes a raster background; native same-format output retains original package objects.')
             info['translation_errors']=len(errors)
         yield emit('validation')
-        if output_kind=='pptx':
+        if output_kind=='pptx' and translate:
+            # Translated text measured in LibreOffice's drawing; boxes it outgrew get a smaller font.
             try:
-                from transformation.office.office import fit_pptx
-                artifact,fitted_preview,fit_report=fit_pptx(artifact)
-                (run/'output'/'office-preview.pdf').write_bytes(fitted_preview)
+                from transformation.office.native import fit_slides
+                artifact,fit_report=fit_slides(artifact,baseline=safe_data)
                 save_json(run/'office-fitting.json',fit_report)
-            except (ValueError,RuntimeError,TimeoutError) as exc:
+                info['office_fitting']={'boxes_shrunk':len({(c['slide'],c['shape_id']) for c in fit_report['changes']}),
+                                        'still_overflowing':len(fit_report['still_overflowing'])}
+            except (ValueError,RuntimeError,TimeoutError,OSError) as exc:
+                fit_report={'still_overflowing':[],'error':str(exc)}
                 info['warnings'].append('PowerPoint text fitting could not be measured: '+str(exc))
         destination=run/'output'/('result.'+output_kind); destination.write_bytes(artifact)
         if output_kind=='pdf':
@@ -572,7 +642,15 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if kind=='pdf' and output_kind=='pdf' and translate and any(u.get('ocr_folder') for u in ir['units']):
                 font_regions=[{'page':u['number'],'bbox':r['slot_bbox'],'minimum':r['font_policy']['minimum']}
                               for u in native_ir['units'] for r in u.get('locked_regions',[]) if r.get('font_policy')]
-                independent=inspect_output(artifact,output_kind,all_values,min_font_size=8.0,font_regions=font_regions,intended_overlays=intended_overlays)
+                # The scan's rebuilt text layer (ocr-nativeized.pdf) holds the source text sizes.
+                source_text={}
+                with pymupdf.open(native_path) as rebuilt:
+                    for number,source_page in enumerate(rebuilt,1):
+                        source_text[number]=[(pymupdf.Rect(span['bbox']),span['size'])
+                                             for block in source_page.get_text('dict')['blocks'] for line in block.get('lines',[])
+                                             for span in line['spans'] if span['text'].strip()]
+                independent=inspect_output(artifact,output_kind,all_values,min_font_size=8.0,font_regions=font_regions,
+                                           intended_overlays=intended_overlays,source_text=source_text)
             else:
                 independent=inspect_output(artifact,output_kind,all_values,intended_overlays=intended_overlays)
         if redact and kind=='pdf' and output_kind=='pdf' and not translate:
@@ -581,6 +659,19 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             independent['partial_name_residuals']=partial_name_residuals(data,artifact,names)
             if independent['partial_name_residuals']:
                 info['warnings'].append('Part of a selected name remains in the output; review the highlighted names.')
+        if independent['known_sensitive_residuals'] and redact and kind=='pdf' and output_kind=='pdf':
+            # Values masked where they were detected but still standing elsewhere: masked here and
+            # checked again; only what is still readable then blocks the result.
+            from transformation.validation.value_redaction import redact_remaining
+            save_json(run/'independent-validation-before-repair.json',independent)
+            artifact,repaired=redact_remaining(artifact,independent['known_sensitive_residuals'])
+            if repaired:
+                destination.write_bytes(artifact)
+                info['residual_masks']=repaired
+                info['warnings'].append(f'{repaired} further occurrence(s) of removed values were masked by the final check; review them.')
+                residual_check=inspect_output(artifact,output_kind,all_values)
+                independent['known_sensitive_residuals']=residual_check['known_sensitive_residuals']
+                independent['residual_repair']=repaired
         save_json(run/'independent-validation.json',independent)
         if independent['known_sensitive_residuals']:
             info['failure_code']='PRIVACY_CHECK_BLOCKED'
@@ -591,7 +682,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 preview,layout=render(artifact,'result.'+output_kind)
                 (run/'output'/'office-preview.pdf').write_bytes(preview)
                 save_json(run/'office-layout.json',layout)
-                independent['office_overflow']=layout['overflow']
+                independent['office_overflow']=(fit_report['still_overflowing'] if output_kind=='pptx' and translate else [])+list(layout['overflow'])
                 independent['rendered_layout']=inspect_output(preview,'pdf')
             except (ValueError,RuntimeError,TimeoutError) as exc:
                 independent['office_render_error']=str(exc)
@@ -601,7 +692,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             from transformation.validation.value_redaction import replacement_labels
             output_language=options.get('target','ko') if translate else options.get('source','en')
             for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,language=output_language,analyzed_texts=analyzed_texts,
-                                       ignore=set(replacement_labels(findings,pii_style).values()),
+                                       ignore=set(replacement_labels(findings,pii_style).values()),source_language=options.get('source','en') if translate else None,
                                        pages=({c['page'] for c in independent['uninspected_content'] if c.get('page')} if kind=='pdf' and output_kind=='pdf' else None)):
                 if 'reports' in verification: independent['rendered_privacy']=verification
                 else: info['privacy_verification_page']=verification['page']; yield emit('privacy_verification')
@@ -632,22 +723,36 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 info['final_check_masked']=info.get('final_check_masked',0)+len(found)
                 for verification in verify(artifact,output_kind,run/f'final-check-recheck{suffix}',all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,
                                            language=output_language,analyzed_texts=analyzed_texts,
-                                           ignore=set(replacement_labels(findings,pii_style).values()),pages={f['region']['page'] for f in found}):
+                                           ignore=set(replacement_labels(findings,pii_style).values()),pages={f['region']['page'] for f in found},
+                                           source_language=options.get('source','en') if translate else None):
                     if 'reports' in verification: independent['rendered_privacy']=verification
                 save_json(run/f'privacy-verification-after-masking{suffix}.json',verification)
                 found=final_check_regions(verification['reports'],pii_keep)
                 if (any(p['known_residual_values'] for p in verification['reports'])
                         or unlocated_findings(verification['reports'],pii_keep)
-                        or any(_overlaps(f['region'],area) for f in found for area in masked_areas)
-                        or (found and round_number==FINAL_CHECK_ROUNDS)):
+                        or any(_overlaps(f['region'],area) for f in found for area in masked_areas)):
                     info['failure_code']='PRIVACY_CHECK_BLOCKED'
                     raise ValueError('Personal data was still readable after final-check masking; the result is blocked.')
+                if found and round_number==FINAL_CHECK_ROUNDS:
+                    # Lines still found after the last round are mostly the model's readings of OCR
+                    # noise in photos, a new one each round. They are masked too and listed for
+                    # review instead of failing the document (Cisco manual, 2026-11-23).
+                    masked=run/'output'/'result-final-check-last.pdf'
+                    redact_regions(destination,masked,[f['region'] for f in found],hashlib.sha256(artifact).hexdigest())
+                    artifact=masked.read_bytes();destination.write_bytes(artifact)
+                    info.setdefault('review_items',[]).extend(f['item'] for f in found)
+                    info.setdefault('redaction_map',[]).extend(f['box'] for f in found)
+                    info['final_check_masked']=info.get('final_check_masked',0)+len(found)
+                    info['final_check_unverified']=len(found)
+                    info['warnings'].append(f"{len(found)} line(s) found by the last privacy check round were masked without a further check; review them.")
             if info.get('final_check_masked'):
                 info['warnings'].append(f"{info['final_check_masked']} line(s) with personal data found by the final privacy check were masked before release; review them.")
             if verification['passed']:
                 independent['ocr_checked_content']=[c for c in independent['uninspected_content'] if c['kind'] in {'image','raster'}]
                 independent['uninspected_content']=[c for c in independent['uninspected_content'] if c['kind'] not in {'image','raster'}]
-        independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'] or independent.get('partial_name_residuals'))
+        from transformation.validation.output_validation import set_aside_expected
+        set_aside_expected(independent,redact)
+        independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'] or independent.get('partial_name_residuals') or info.get('redaction_collateral_pages'))
         save_json(run/'independent-validation.json',independent)
         info['warnings']=list(dict.fromkeys(ir['warnings']+info['warnings']))
         info.update(status='generated',output_file=str(destination),

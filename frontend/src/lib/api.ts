@@ -42,7 +42,19 @@ export type Job = {
   assigned_worker_id?: string;
   artifacts: Artifact[];
   error_code?: string;
+  /** Set on a new version made from another job's original (e.g. with values kept visible). */
+  parent_job_id?: string | null;
 };
+/** A value a PII job removed, read on the server from the job's own files. */
+export type RedactedValue = {
+  value: string;
+  category: string;
+  occurrences: number;
+  pages: number[];
+  /** Pieces of this value found separately, e.g. where a line break cut it. */
+  parts: string[];
+};
+export type RedactedValues = { values: RedactedValue[]; kept: string[]; truncated: boolean };
 /** A place in the redacted PDF a person should look at; a box only, never text. */
 export type ReviewItem = {
   page: number;
@@ -97,7 +109,7 @@ export function reviewSummary(items?: ReviewItem[]) {
 /** Counts of automated-check findings reported by the worker; no document content. */
 export type JobChecks = {
   acceptable: boolean;
-  privacy_verification: "passed" | "failed" | "not_run";
+  privacy_verification: "passed" | "failed" | "not_run" | "not_needed";
   known_sensitive_residuals: number;
   partial_name_residuals?: number;
   geometry_blockers: number;
@@ -125,6 +137,8 @@ const FAILURES: Record<string, string> = {
     "The selected areas could not be removed and verified, so no redacted copy was released.",
   TRANSLATION_MODEL_UNAVAILABLE:
     "The chosen translation model is no longer set up on this server. Choose another model and start again.",
+  PII_MODEL_UNAVAILABLE:
+    "The chosen PII model is no longer set up on this server. Choose another model and start again.",
 };
 export function failureMessage(code?: string) {
   return (
@@ -141,6 +155,10 @@ const CHECK_LABELS: [keyof JobChecks, string][] = [
   ["scan_acceptance_blockers", "scanned regions needing review"],
   ["translation_errors", "untranslated passages"],
 ];
+/** True when every automated check passed and found nothing, with no review queue left. */
+export function passedChecks(checks?: JobChecks) {
+  return Boolean(checks?.acceptable) && checkFindings(checks).length === 0 && checks?.privacy_verification !== "failed";
+}
 export function checkFindings(checks?: JobChecks) {
   if (!checks) return [];
   return CHECK_LABELS.filter(([k]) => Number(checks[k]) > 0).map(
@@ -159,6 +177,10 @@ export type Worker = {
     note?: string;
     /** Translation models this server offers (its settings file); "default" is its own. */
     translation_models?: TranslationModel[];
+    /** Largest upload and longest document this server accepts. */
+    limits?: { max_pages: number; max_mb: number };
+    /** PII models this server offers (its settings file); "default" is its own. */
+    pii_models?: TranslationModel[];
   };
 };
 export type TranslationModel = {
@@ -177,7 +199,7 @@ export type TransformOptions = {
   operation: Operation;
   source_language: string;
   target_language: string;
-  output_format: "pdf";
+  output_format: "pdf" | "docx" | "pptx";
   protected_values: string[];
   document_context: string;
   pii_categories: string[];
@@ -188,6 +210,8 @@ export type TransformOptions = {
   pii_keep?: string[];
   /** One of the chosen server's translation models; omitted for its default. */
   translation_model?: string;
+  /** One of the server's PII models; omitted for its default. */
+  pii_model?: string;
 };
 export type PiiStyle = "box" | "label" | "pseudonym";
 export const PII_CATEGORIES = [
@@ -215,8 +239,12 @@ const MESSAGES: Record<string, string> = {
     "The service needs administrator configuration. Please try again later.",
   DATABASE_OR_STORAGE_REQUEST_FAILED:
     "The document service is unavailable. Try again without changing your document.",
-  REQUEST_TOO_LARGE: "The file is too large. Choose a PDF under 50 MB.",
+  REQUEST_TOO_LARGE: "The file is larger than this server accepts. Choose a smaller document.",
   INVALID_PDF: "Choose a valid PDF document.",
+  INVALID_DOCUMENT:
+    "This file could not be opened. Choose a PDF, Word (.docx, .doc) or PowerPoint (.pptx, .ppt) file that is not password-protected.",
+  MANUAL_REDACTION_PDF_ONLY:
+    "Areas can be drawn on PDF results only. Open this Word or PowerPoint result in Office to change it.",
   CSRF_INVALID:
     "Your session needs refreshing. Reload this page and sign in again.",
   ONLY_QUEUED_CANCELLATION_SUPPORTED:
@@ -227,6 +255,13 @@ const MESSAGES: Record<string, string> = {
     "Every glossary term needs a translation, on one line, of at most 200 characters (100 terms at most).",
   DUPLICATE_GLOSSARY_TERM: "A term appears twice in this glossary.",
   INVALID_LANGUAGE: "Choose two different languages.",
+  TRANSLATION_MODEL_NOT_OFFERED: "That translation model is not available on this server right now. Reload the page.",
+  KEEP_LIST_UNCHANGED: "Choose at least one value to keep visible or to hide again.",
+  NOT_A_REDACTION_JOB: "Only redaction results have a list of removed values.",
+  ORIGINAL_UNAVAILABLE:
+    "The original document of this result is no longer on the server. Upload it again with the values under “Keep visible”.",
+  RESULT_NOT_READY: "This result is not ready yet. Try again when the job has finished.",
+  PII_MODEL_NOT_OFFERED: "That PII model is not available on this server right now. Reload the page.",
 };
 export class ApiError extends Error {
   constructor(
@@ -306,6 +341,23 @@ export class ApiClient {
       body: data,
     });
   }
+  redactedValues(id: string, signal?: AbortSignal) {
+    return this.request<RedactedValues>(
+      `/v1/jobs/${encodeURIComponent(id)}/redacted-values`,
+      { signal },
+    );
+  }
+  /** A new version of a PII job from the same original, with these values left visible. */
+  keepVisible(id: string, keep: string[], key: string) {
+    return this.request<{ job_id: string }>(
+      `/v1/jobs/${encodeURIComponent(id)}/keep-visible`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Idempotency-Key": key },
+        body: JSON.stringify({ keep }),
+      },
+    );
+  }
   cancel(id: string) {
     return this.request(`/v1/jobs/${encodeURIComponent(id)}/cancel`, {
       method: "POST",
@@ -349,10 +401,14 @@ export class ApiClient {
     });
   }
 }
-export async function validatePdf(file: File, facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts) {
+export async function validatePdf(
+  file: File,
+  facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts,
+  limits: { max_pages: number; max_mb: number } = { max_pages: MAX_PAGES, max_mb: MAX_MB },
+) {
   if (!/\.pdf$/i.test(file.name) || file.size < 5)
     return "Choose a PDF document.";
-  if (file.size > 50_000_000) return "Choose a PDF smaller than 50 MB.";
+  if (file.size > limits.max_mb * 1_000_000) return `Choose a PDF smaller than ${limits.max_mb} MB.`;
   try {
     if (
       new TextDecoder().decode(await file.slice(0, 5).arrayBuffer()) !== "%PDF-"
@@ -364,11 +420,55 @@ export async function validatePdf(file: File, facts: (file: File) => Promise<{ p
   const { pages, encrypted } = await facts(file);
   if (encrypted)
     return "This PDF is password-protected. Remove the password, then upload it again.";
-  if (pages !== undefined && pages > MAX_PAGES)
-    return `This PDF has ${pages} pages; the limit is ${MAX_PAGES}. Split it into parts of up to ${MAX_PAGES} pages.`;
+  if (pages !== undefined && pages > limits.max_pages)
+    return `This PDF has ${pages} pages; the limit is ${limits.max_pages}. Split it into parts of up to ${limits.max_pages} pages.`;
   return null;
 }
-export const MAX_PAGES = 200;
+export type DocumentKind = "pdf" | "docx" | "pptx" | "doc" | "ppt";
+/** The document kind from a file name, or "" for any other file. */
+export function documentKind(name: string): DocumentKind | "" {
+  const match = /\.(pdf|docx|pptx|doc|ppt)$/i.exec(name);
+  return match ? (match[1].toLowerCase() as DocumentKind) : "";
+}
+/** Word and PowerPoint 97-2003 files come back as .docx and .pptx. */
+export function resultFormat(kind: DocumentKind): "pdf" | "docx" | "pptx" {
+  return kind === "doc" ? "docx" : kind === "ppt" ? "pptx" : kind;
+}
+export const DOCUMENT_LABEL = {
+  pdf: "PDF document", docx: "Word document", pptx: "PowerPoint presentation",
+  doc: "Word 97-2003 document", ppt: "PowerPoint 97-2003 presentation",
+};
+/**
+ * A PDF is checked as before (validatePdf); a Word or PowerPoint file by size and its package
+ * signature. Its pages are counted by the server, which draws it once at upload.
+ */
+export async function validateDocument(
+  file: File,
+  facts: (file: File) => Promise<{ pages?: number; encrypted?: boolean }> = pdfFacts,
+  limits: { max_pages: number; max_mb: number } = { max_pages: MAX_PAGES, max_mb: MAX_MB },
+) {
+  const kind = documentKind(file.name);
+  if (!kind) return "Choose a PDF, Word (.docx, .doc) or PowerPoint (.pptx, .ppt) file.";
+  if (kind === "pdf") return validatePdf(file, facts, limits);
+  if (file.size < 4) return "This file is empty. Choose it again.";
+  if (file.size > limits.max_mb * 1_000_000) return `Choose a file smaller than ${limits.max_mb} MB.`;
+  try {
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    // .docx/.pptx are zip packages ("PK"); .doc/.ppt are compound files (D0 CF 11 E0).
+    const valid = kind === "doc" || kind === "ppt"
+      ? head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0
+      : head[0] === 0x50 && head[1] === 0x4b;
+    if (!valid)
+      return kind === "docx" || kind === "doc"
+        ? "This file doesn’t appear to be a Word document. Password-protected files are not supported."
+        : "This file doesn’t appear to be a PowerPoint presentation. Password-protected files are not supported.";
+  } catch {
+    return "We couldn’t read that file. Please choose it again.";
+  }
+  return null;
+}
+export const MAX_PAGES = 250;
+export const MAX_MB = 100;
 type PdfJs = {
   GlobalWorkerOptions: { workerSrc: string };
   getDocument: (src: { data: ArrayBuffer; isEvalSupported: boolean }) => {

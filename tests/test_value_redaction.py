@@ -75,6 +75,22 @@ class ValueRedactionTests(unittest.TestCase):
             units=[{'number':i+1,'regions':[]} for i in range(len(pdf))]
         return redact_pdf(data,{'units':units,'pii_source_regions':regions},[finding])[0]
 
+    def test_a_letter_drawn_over_a_removed_value_goes_with_it_instead_of_failing(self):
+        # An email longer than its cell runs under the next column's one-letter value (a roster).
+        value='user373@larkspursy.example'
+        with pymupdf.open() as pdf:
+            p=pdf.new_page(width=400,height=250)
+            p.insert_text((40,40),value,fontsize=11,fontname='cour')
+            hit=p.search_for(value)[0]
+            p.insert_text((hit.x1-20,40),'A',fontsize=11,fontname='cour')
+            p.insert_text((40,80),'Keep this line',fontsize=11)
+            data=pdf.tobytes()
+        output=self.apply(data,value)
+        with pymupdf.open(stream=output,filetype='pdf') as pdf:
+            text=pdf[0].get_text()
+        self.assertNotIn('larkspursy',text)
+        self.assertIn('Keep this line',text)
+
     def test_table_cell_clipping_an_overflowing_value_is_covered_by_the_whole_value(self):
         value='kim.lee@harbor-post.example'
         data=self.source([(30,40,'Owner'),(120,40,value),(30,80,'Keep this line')])

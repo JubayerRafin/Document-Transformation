@@ -16,7 +16,7 @@ from collections import Counter
 import re
 import unicodedata
 
-CID = re.compile(r'\(cid:\d+\)')
+CID = re.compile(r'\(cid:\d+\)|\x00')  # an unread glyph: "(cid:12)", or a NUL character (Chromium PDFs)
 # Brahmic scripts (Devanagari to Sinhala) and Thai/Lao: clusters written with ActualText report boxes
 # narrower than the drawn glyphs, so pieces of one word on a line seem to be separated by a gap.
 _JOINED_SCRIPTS = re.compile(r'[ऀ-෿฀-໿]')
@@ -35,16 +35,18 @@ def _alnum(text):
     return Counter(c for c in fold(text) if c.isalnum())
 
 
-def join_pieces(pieces):
+def join_pieces(pieces, rtl=False):
     """Text of (baseline, x0, x1, text, size) pieces in reading order. Pieces on the same baseline
-    are joined without a space when they touch, or when both sides are Indic letters (see above)."""
+    are joined without a space when they touch, or when both sides are Indic letters (see above).
+    rtl: the pieces read from the right, so the gap is from a piece's right end to the previous one's
+    left end."""
     out, previous = '', None
     for base, x0, x1, text, size in pieces:
         if previous is None:
             out = text
         else:
             same_line = abs(base - previous[0]) < 0.3 * size
-            gap = x0 - previous[2]
+            gap = previous[1] - x1 if rtl else x0 - previous[2]
             glued = (same_line and -0.5 * size < gap < 0.15 * size) or (
                 same_line and -0.5 * size < gap < 1.2 * size and out[-1:] and text[:1]
                 and _JOINED_SCRIPTS.match(out[-1]) and _JOINED_SCRIPTS.match(text[0]))
@@ -53,18 +55,111 @@ def join_pieces(pieces):
     return ' '.join(out.split())
 
 
-def read_area(page, rect):
-    """MuPDF's text inside rect (MuPDF coordinates), horizontal lines only, or ''."""
-    pieces = []
-    for block in page.get_text('dict', clip=rect, sort=True)['blocks']:
-        for line in block.get('lines', []):
-            if tuple(round(v) for v in line['dir']) != (1, 0) or not line['spans']:
+_LTR_CLASSES = {'L', 'EN', 'AN'}
+_RUN_JOINERS = {'WS', 'CS', 'ES', 'ET', 'ON'}
+
+
+def _bidi(text):
+    return unicodedata.bidirectional(text[0]) if text else ''
+
+
+def visual_to_logical(clusters):
+    """Reading order of one right-to-left line from its clusters (x0, text), drawn left to right.
+
+    MuPDF orders a line's text runs as they are drawn, left to right, and some PDFs (Chromium's) store
+    a run mixing Arabic and digits in drawing order too: "يجب ... بين 5 و30 درجة." came back as
+    "30 و5 ... بين" and the numbers landed in another sentence ("contact 30 and 5"; Arabic report,
+    2026-11-21). In a right-to-left line the reading order is right to left, except that runs of
+    left-to-right characters (digits, Latin letters, and the separators and spaces between them, as
+    in "12,500", "12%" or "USD 50") read left to right inside it."""
+    order = [text for _, text in sorted(clusters, key=lambda c: -c[0])]
+    out, i = [], 0
+    while i < len(order):
+        if _bidi(order[i]) not in _LTR_CLASSES:
+            out.append(order[i])
+            i += 1
+            continue
+        j = i + 1
+        while j < len(order):
+            kind = _bidi(order[j])
+            if kind in _LTR_CLASSES:
+                j += 1
                 continue
-            text = ''.join(span['text'] for span in line['spans'])
-            if text.strip():
-                size = max(span['size'] for span in line['spans']) or 1
-                pieces.append((line['spans'][0]['origin'][1], line['bbox'][0], line['bbox'][2], text, size))
-    return fold(join_pieces(pieces))
+            if kind in _RUN_JOINERS:
+                # Separators continue the run only up to another left-to-right character.
+                k = j
+                while k < len(order) and _bidi(order[k]) in _RUN_JOINERS:
+                    k += 1
+                if k < len(order) and _bidi(order[k]) in _LTR_CLASSES:
+                    j = k
+                    continue
+            break
+        out.extend(reversed(order[i:j]))
+        i = j
+    return ''.join(out)
+
+
+def _clusters(line):
+    """(x0, text) per drawn letter, each combining mark (Arabic vowel signs, shadda) attached to its
+    letter. Chromium writes a letter with a mark as the mark first, holding the cluster's box, then
+    the letter with no width inside that box ("ع ّ و" for "عوّ"); such a pair is put back in
+    reading order, letter then mark, at the cluster's position."""
+    chars = [[c['bbox'][0], c['bbox'][2], c['c']] for span in line['spans'] for c in span.get('chars', [])]
+    # PyMuPDF 1.28 gives such a mark no width as well, and fills the cluster's place with a space of its
+    # own ("مح وّل" for "محوّل"; the model read "وّل" as "أوّل", first: "First network", Arabic report,
+    # 2026-11-23). A space that starts exactly where a zero-width character after it sits, and touches
+    # the letter before it, is that filler; a real word space ends where the next cluster's box does.
+    chars = [c for k, c in enumerate(chars)
+             if not (c[2] == ' ' and 0 < k < len(chars) - 1 and chars[k + 1][1] - chars[k + 1][0] < 0.5
+                     and abs(chars[k + 1][0] - c[0]) <= 0.5 and abs(chars[k - 1][0] - c[1]) <= 0.5
+                     and RTL.search(chars[k - 1][2]) and RTL.search(chars[k + 1][2]))]
+    i = 0
+    while i < len(chars) - 1:
+        mark, letter = chars[i], chars[i + 1]
+        if (unicodedata.combining(mark[2]) and not unicodedata.combining(letter[2])
+                and letter[1] - letter[0] < 0.5 and mark[0] - 0.5 <= letter[0] <= mark[1] + 0.5):
+            chars[i], chars[i + 1] = [mark[0], mark[1], letter[2]], [mark[0], mark[1], mark[2]]
+            i += 2
+            continue
+        i += 1
+    clusters = []
+    for x0, _, c in chars:
+        if clusters and unicodedata.combining(c):
+            clusters[-1] = (clusters[-1][0], clusters[-1][1] + c)
+        else:
+            clusters.append((x0, c))
+    return clusters
+
+
+def read_area(page, rect):
+    """MuPDF's text inside rect (MuPDF coordinates), horizontal lines only, or ''. Lines with
+    right-to-left letters are put into reading order from their characters' positions."""
+    lines = [line for block in page.get_text('rawdict', clip=rect, sort=True)['blocks']
+             for line in block.get('lines', [])
+             if tuple(round(v) for v in line['dir']) == (1, 0) and line['spans']]
+    raw = [''.join(char['c'] for span in line['spans'] for char in span.get('chars', [])) for line in lines]
+    rtl = any(RTL.search(text) for text in raw)
+    pieces = []
+    for line, text in zip(lines, raw):
+        # In a right-to-left area a piece without letters is read right to left too: an Arabic list's
+        # "1." is a line of its own, drawn ".1", and came back as ".1 The main production line ..."
+        # (Arabic manual, 2026-11-23).
+        if RTL.search(text) or (rtl and not any(ch.isalpha() for ch in text)):
+            text = visual_to_logical(_clusters(line))
+        if text.strip():
+            size = max(span['size'] for span in line['spans']) or 1
+            pieces.append((line['spans'][0]['origin'][1], line['bbox'][0], line['bbox'][2], text, size))
+    if rtl:
+        # Pieces on one baseline read from the right.
+        rows = []
+        for piece in pieces:
+            row = next((r for r in rows if abs(r[0][0] - piece[0]) < 0.3 * piece[4]), None)
+            if row is None:
+                rows.append([piece])
+            else:
+                row.append(piece)
+        pieces = [p for row in rows for p in sorted(row, key=lambda p: -p[1])]
+    return fold(join_pieces(pieces, rtl))
 
 
 # Parts of a garbled paragraph that BabelDOC still reads reliably: Latin words and longer numbers,
@@ -110,13 +205,18 @@ def repair_page(page, source):
     for paragraph in page.pdf_paragraph:
         text = paragraph.unicode or ''
         unread, reversed_order = bool(CID.search(text)), bool(RTL.search(text))
-        if not paragraph.box or not (unread or reversed_order):
+        # Indic text BabelDOC reads with each vowel sign where it is drawn, before its consonant
+        # ("िशपम" for "शिपम"), and the model translated it into invented sentences (Hindi report,
+        # 2026-11-21). MuPDF reads these clusters in order, so every such paragraph is read again.
+        shaped = bool(_JOINED_SCRIPTS.search(text))
+        if not paragraph.box or not (unread or reversed_order or shaped):
             continue
         box = paragraph.box
         rect = pymupdf.Rect(box.x - 1, height - box.y2 - 1, box.x2 + 1, height - box.y + 1)
         replacement = read_area(source, rect)
         record = {'page': page.page_number + 1, 'paragraph_id': paragraph.debug_id,
-                  'unread_characters': len(CID.findall(text)), 'right_to_left': reversed_order}
+                  'unread_characters': len(CID.findall(text)), 'right_to_left': reversed_order,
+                  'shaped_script': shaped}
         if acceptable(text, replacement):
             paragraph.unicode = replacement
             overrides[id(paragraph)] = replacement
@@ -125,3 +225,52 @@ def repair_page(page, source):
             records.append({**record, 'status': 'kept', 'reason': 'MuPDF text did not match the paragraph',
                             'babeldoc_text': text[:120], 'mupdf_text': replacement[:120]})
     return overrides, records
+
+
+def drop_reread_fragments(page):
+    """Remove one-to-three-letter Arabic or Indic paragraphs that are pieces of a word another paragraph
+    already holds, once both have been read again from the page (repair_page).
+
+    BabelDOC put the letters of "كرسي" in an Arabic newsletter's table cell into paragraphs of their
+    own ("ﺮ", "س", "ﻛ"); read again in their small boxes they became "كرس", "رسي" and "كر", were
+    translated alone ("Dedicated", "Resy", "Sure") and drawn over "Office Chair", the translation of
+    the cell's paragraph, read again as "كرسي مكتب" (2026-11-24). A piece is removed when its text is
+    part of that paragraph's text and its box lies (80% or more) inside the paragraph's box widened
+    by half its font size. Returns the ids removed."""
+    def characters(paragraph):
+        out = []
+        for c in paragraph.pdf_paragraph_composition or []:
+            for part in (getattr(c, 'pdf_line', None), getattr(c, 'pdf_formula', None),
+                         getattr(c, 'pdf_same_style_characters', None)):
+                if part is not None:
+                    out.extend(part.pdf_character or [])
+            if getattr(c, 'pdf_character', None) is not None:
+                out.append(c.pdf_character)
+        return out
+
+    def size(paragraph):
+        return next((getattr(getattr(ch, 'pdf_style', None), 'font_size', 0) or 0 for ch in characters(paragraph)
+                     if getattr(getattr(ch, 'pdf_style', None), 'font_size', 0)), 0)
+    squeeze = lambda text: ''.join((text or '').split())
+    shaped = lambda text: bool(_JOINED_SCRIPTS.search(text) or RTL.search(text))
+    removed = []
+    for piece in list(page.pdf_paragraph):
+        text, a = squeeze(piece.unicode), getattr(piece, 'box', None)
+        if a is None or not text or not shaped(text) or len([c for c in characters(piece) if (getattr(c, 'char_unicode', '') or '').strip()]) > 3:
+            continue
+        area = max((a.x2 - a.x) * (a.y2 - a.y), 1e-6)
+        for whole in page.pdf_paragraph:
+            b = getattr(whole, 'box', None)
+            if whole is piece or b is None or getattr(whole, 'xobj_id', None) != getattr(piece, 'xobj_id', None):
+                continue
+            container = squeeze(whole.unicode)
+            if len(container) <= len(text) or text not in container:
+                continue
+            m = 0.5 * size(whole)
+            inside = (max(0.0, min(a.x2, b.x2 + m) - max(a.x, b.x - m))
+                      * max(0.0, min(a.y2, b.y2 + m) - max(a.y, b.y - m)))
+            if inside >= 0.8 * area:
+                page.pdf_paragraph.remove(piece)
+                removed.append(piece.debug_id)
+                break
+    return removed

@@ -3,6 +3,8 @@ from collections import Counter
 import re
 import pymupdf
 
+from transformation.validation.scripts import changes as script_changes
+
 
 class RedactionLocalizationError(ValueError):
     def __init__(self, regions):
@@ -47,7 +49,8 @@ def literal_spans(text, value):
         # ("정시우에게", "田中さん"), so a following character in those scripts does not
         # extend the value. Han/Kana text has no spaces at all, so the same holds before.
         if trailing and _NO_SPACE_SCRIPT.match(needle[-1]) and _NO_SPACE_SCRIPT.match(text[b]): trailing=False
-        leading = a and re.match(token_chars,text[a-1]) and not (_HAN_KANA.match(needle[0]) and _HAN_KANA.match(text[a-1]))
+        if trailing and script_changes(needle[-1], text[b]): trailing=False
+        leading = a and re.match(token_chars,text[a-1]) and not (_HAN_KANA.match(needle[0]) and _HAN_KANA.match(text[a-1]))             and not script_changes(text[a-1], needle[0])
         if needle[0].isalnum() and leading: continue
         if needle[-1].isalnum() and trailing: continue
         result.append((a,b))
@@ -134,7 +137,31 @@ def verified_ocr_words(line, text, bbox):
     return result
 
 
-def pixel_word_boxes(page, bbox, text, cache=None):
+def visual_length(token):
+    """Width of a word in ordinary letters: combining marks and format characters take no width of
+    their own (a Bengali or Hindi word has many), wide CJK characters take two."""
+    import unicodedata
+    return sum(0 if unicodedata.category(c) in ('Mn', 'Me', 'Cf') else 2 if unicodedata.east_asian_width(c) in 'WF' else 1
+               for c in token)
+
+
+def space_tokens(text):
+    return [(m.start(), m.end()) for m in re.finditer(r'\S+', text)]
+
+
+def script_tokens(text):
+    """Words of an OCR line, also split where the writing system changes ("請求書INV-2022-75013")."""
+    spans = []
+    for a, b in space_tokens(text):
+        start = a
+        for i in range(a + 1, b):
+            if script_changes(text[i - 1], text[i]):
+                spans.append((start, i)); start = i
+        spans.append((start, b))
+    return spans
+
+
+def pixel_word_boxes(page, bbox, text, cache=None, tokens=None):
     """Split one OCR line into its whitespace-separated words using ink gaps.
 
     Works on the rendered pixels inside the line box, so it needs no second OCR
@@ -145,7 +172,7 @@ def pixel_word_boxes(page, bbox, text, cache=None):
     None is returned. Returns one display-coordinate Rect per word, or None.
     """
     import numpy as np
-    tokens=list(re.finditer(r'\S+',text))
+    tokens=[text[a:b] for a,b in (tokens if tokens is not None else space_tokens(text))]
     rect=pymupdf.Rect(bbox)&page.rect
     if not tokens or rect.is_empty:return None
     # Render the page as displayed (rotation applied) once, then crop the line in
@@ -184,7 +211,10 @@ def pixel_word_boxes(page, bbox, text, cache=None):
     segments=[];first=0
     for i in cuts+[len(runs)-1]:
         segments.append((runs[first][0],runs[i][1]));first=i+1
-    widths=[b-a+1 for a,b in segments];lengths=[len(t.group()) for t in tokens]
+    # Word widths against their visual lengths: counted in code points, a Bengali word with its
+    # vowel signs looked twice as long as its ink, the split was refused and the whole line,
+    # label included, was masked (Bengali scan, 2026-11-23).
+    widths=[b-a+1 for a,b in segments];lengths=[max(1,visual_length(t)) for t in tokens]
     for width,length in zip(widths,lengths):
         actual=width/sum(widths);expected=length/sum(lengths)
         if length>=2 and not .5<=actual/expected<=2:return None
@@ -217,19 +247,30 @@ def _ocr_rectangles(region, values, page=None, localization=None, renders=None):
             if page is None:raise
     elif page is None:
         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
-    boxes=pixel_word_boxes(page,region['bbox'],text,renders)
-    if boxes:
-        tokens=list(re.finditer(r'\S+',text));result=[]
+    # Words split at spaces first. When a value starts or ends inside such a word, the split at
+    # changes of script is tried too: a label stored against its value ("請求書INV-2022-75013")
+    # was trimmed by character counts and the mask covered part of the label (2026-11-23).
+    fallback=None
+    for tokenizer in (space_tokens,script_tokens):
+        tokens=tokenizer(text)
+        boxes=pixel_word_boxes(page,region['bbox'],text,renders,tokens)
+        if not boxes:continue
+        result=[];aligned=True
         for a,b in matches:
-            chosen=[(token,box) for token,box in zip(tokens,boxes) if token.start()<b and token.end()>a]
+            chosen=[(span,box) for span,box in zip(tokens,boxes) if span[0]<b and span[1]>a]
             if chosen:
+                aligned=aligned and chosen[0][0][0]>=a and chosen[-1][0][1]<=b
                 union=None
-                for token,box in chosen:
-                    box=_trim_to_span(box,token,a,b)
+                for span,box in chosen:
+                    box=_trim_to_span(box,_Span(*span),a,b)
                     union=box if union is None else union|box
                 result.append(union+(-.75,-.5,.75,.5))
-        if len(result)==len(matches):
+        if len(result)!=len(matches):continue
+        if aligned:
             record['localization']='pixel_word_gaps';return result
+        fallback=fallback or result
+    if fallback:
+        record['localization']='pixel_word_gaps';return fallback
     if pixel_word_boxes(page,region['bbox'],'x',renders) is None:
         # Nothing visible in the line box: its geometry does not match the page.
         raise RedactionLocalizationError([{'region_id':region['id'],'reason':'missing_verified_word_geometry'}])
@@ -251,6 +292,12 @@ def _clip_padding(base,padded,neighbours):
         if n.y1<=base.y0+.25*base.height:padded.y0=max(padded.y0,min(base.y0,n.y1))
         elif n.y0>=base.y1-.25*base.height:padded.y1=min(padded.y1,max(base.y1,n.y0))
     return padded
+
+
+class _Span:
+    def __init__(self, start, end): self._start, self._end = start, end
+    def start(self): return self._start
+    def end(self): return self._end
 
 
 def _trim_to_span(box,token,a,b,margin=.75):
@@ -373,7 +420,7 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
         remove_hidden_values(pdf,values)
         for unit in ir['units']:
             index=unit['number']-1;page=pdf[index];blocks=native_blocks(page)
-            native_rects=[]; native_labels=[]; native_values=[]; boxes_by_value={v:[] for v in values}
+            native_rects=[]; native_labels=[]; native_values=[]; boxes_by_value={v:[] for v in values}; page_unselected=[]
             for block in blocks:
                 selected=set()
                 for value in values:
@@ -390,6 +437,21 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
                         boxes_by_value[value].extend(line_boxes.values())
                 unselected.setdefault(index,Counter()).update(_glyph_key(c) for i,c in enumerate(block['chars'])
                     if c is not None and not c['c'].isspace() and i not in selected)
+                page_unselected.extend(c for i,c in enumerate(block['chars'])
+                                       if c is not None and not c['c'].isspace() and i not in selected)
+            # A character drawn mostly on top of a removed value (a value overflowing its table cell
+            # under the next column's letter, Korean roster 2026-11-23) cannot stay without the value
+            # under it showing around it; it is removed with the value and reported for review,
+            # instead of failing the whole document.
+            covered=Counter()
+            for char in page_unselected:
+                box=pymupdf.Rect(char['bbox'])
+                if box.get_area()>0 and any((box&rect).get_area()>.5*box.get_area() for rect in native_rects):
+                    covered[_glyph_key(char)]+=1
+            if covered:
+                unselected[index]=unselected.get(index,Counter())-covered
+                audit.append({'page':index+1,'method':'covered_by_removed_value','glyphs_removed_with_value':sum(covered.values()),
+                              'review_required':True})
             for rect,label,value in zip(native_rects,native_labels,native_values):
                 page.add_redact_annot(rect,fill=(0,0,0),**_label_annotation(label,rect))
                 if boxes is not None:boxes.append((index+1,pymupdf.Rect(rect)*page.rotation_matrix,value))
@@ -456,6 +518,63 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
             if any(literal_spans(b['text'],v) for b in blocks for v in values):
                 raise RedactionVerificationError('Selected sensitive text remains searchable after redaction.','PRIVACY_CHECK_BLOCKED')
             remaining=Counter(_glyph_key(c) for b in blocks for c in b['chars'] if c is not None and not c['c'].isspace())
-            if _missing_glyphs(unselected.get(index,Counter()),remaining):
-                raise RedactionVerificationError('Precise redaction would remove surrounding text; review is required.','REDACTION_REVIEW_REQUIRED')
+            missing=_missing_glyphs(unselected.get(index,Counter()),remaining)
+            if missing:
+                # A mask that also removes some neighbouring characters costs layout, not privacy: the
+                # page is delivered and listed for review. It failed the whole 302-page Samsung guide
+                # (2026-11-23), where glyphs of different lines overlap.
+                audit.append({'region_id':None,'method':'collateral_glyph_check','page':index+1,
+                              'removed_unselected_characters':sum(missing.values()),'review_required':True})
     return result,audit
+
+
+
+def redact_remaining(data, residuals):
+    """Mask selected values the output check still found (inspect_output's known_sensitive_residuals).
+
+    A value masked where it was detected can stand elsewhere in other words' company ("Adobe" and
+    "apache" in a Canon manual's licence pages), and the whole 235-page result was blocked
+    (2026-11-23). Each remaining occurrence on a reported page is matched as whole words in the
+    page's word list (never inside a longer word) and masked; values in the PDF metadata clear it and
+    links holding them are removed. Returns (pdf bytes, occurrences masked)."""
+    import pymupdf
+    from transformation.validation.output_validation import residual_in
+    masked = 0
+    word = lambda w: re.sub(r'^\W+|\W+$', '', w).casefold()
+    with pymupdf.open(stream=data, filetype='pdf') as pdf:
+        for item in residuals:
+            location, value = item.get('location', ''), item.get('value', '')
+            if location == 'PDF metadata':
+                pdf.set_metadata({}); pdf.del_xml_metadata(); continue
+            match = re.fullmatch(r'page (\d+)( link)?', location)
+            if not match or not 1 <= int(match[1]) <= len(pdf):
+                continue
+            page = pdf[int(match[1]) - 1]
+            if match[2]:
+                for link in page.get_links():
+                    if residual_in(value, ' '.join(str(link.get(k) or '') for k in ('uri', 'file'))):
+                        page.delete_link(link); masked += 1
+                continue
+            tokens = [word(t) for t in value.split() if word(t)]
+            if not tokens:
+                continue
+            words = page.get_text('words')
+            found = []
+            if len(tokens) == 1 and not re.search(r'[A-Za-z0-9]', value):
+                found = list(page.search_for(value))          # scripts without word spaces
+            else:
+                # The check's own rule decides (residual_in): "Adobe's" or "Adobe/PostScript" holds
+                # "Adobe" and the whole word is masked; "Format" does not hold "Mat".
+                for i in range(len(words) - len(tokens) + 1):
+                    window = words[i:i + len(tokens)]
+                    if residual_in(value, ' '.join(w[4] for w in window)):
+                        rect = pymupdf.Rect(window[0][:4])
+                        for w in window[1:]:
+                            rect |= pymupdf.Rect(w[:4])
+                        found.append(rect)
+            for rect in found:
+                page.add_redact_annot(rect, fill=(0, 0, 0)); masked += 1
+            if found:
+                page.apply_redactions(images=2, graphics=0, text=0)
+        result = pdf.tobytes(garbage=4, deflate=True, clean=True)
+    return result, masked

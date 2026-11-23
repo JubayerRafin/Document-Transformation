@@ -92,3 +92,57 @@ class RepairTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class RightToLeftOrderTests(unittest.TestCase):
+    def test_a_right_to_left_line_reads_right_to_left_with_numbers_left_to_right(self):
+        from transformation.pdf.unmapped_text import visual_to_logical
+        # "بين 5 و30 درجة." drawn left to right: ". ة ج ر د   3 0 و   5   ن ي ب"
+        drawn = list('.ةجرد') + [' '] + list('30و') + [' '] + ['5'] + [' '] + list('نيب')
+        clusters = [(float(x), c) for x, c in enumerate(drawn)]
+        self.assertEqual(visual_to_logical(clusters), 'بين 5 و30 درجة.')
+
+    def test_amounts_percentages_and_latin_runs_stay_in_their_own_order(self):
+        from transformation.pdf.unmapped_text import visual_to_logical
+        def logical(drawn):
+            return visual_to_logical([(float(x), c) for x, c in enumerate(drawn)])
+        self.assertEqual(logical(list('%12') + [' '] + list('ةبسنب')), 'بنسبة 12%')
+        self.assertEqual(logical(list('USD 1,250.50') + [' '] + list('غلبم')), 'مبلغ USD 1,250.50')
+
+    def test_a_mark_written_before_its_zero_width_letter_is_put_after_it(self):
+        from transformation.pdf.unmapped_text import _clusters
+        line = {'spans': [{'chars': [
+            {'c': 'ع', 'bbox': (67.2, 0, 73.3, 9)}, {'c': 'ّ', 'bbox': (61.9, 0, 67.2, 9)},
+            {'c': 'و', 'bbox': (62.9, 0, 62.9, 9)}, {'c': 'ض', 'bbox': (51.4, 0, 61.9, 9)}]}]}
+        self.assertEqual([t for _, t in _clusters(line)], ['ع', 'وّ', 'ض'])
+
+    def test_right_to_left_pieces_join_from_the_right(self):
+        """Arabic manual, 2026-11-23: an item's "1." is a line of its own, right of the text."""
+        from transformation.pdf.unmapped_text import join_pieces
+        pieces = [(50.0, 535.5, 546.3, '1.', 10.5), (50.0, 178.2, 535.5, 'من المقرر', 10.5)]
+        self.assertEqual(join_pieces(pieces, rtl=True), '1.من المقرر')          # touching: no space added
+        pieces = [(50.0, 535.5, 546.3, '1. ', 10.5), (50.0, 178.2, 533.0, 'من المقرر', 10.5)]
+        self.assertEqual(join_pieces(pieces, rtl=True), '1. من المقرر')
+
+    def test_the_space_pymupdf_1_28_puts_in_a_marks_place_is_dropped(self):
+        """"محوّل شبكة" as PyMuPDF 1.28 reads it on the pod: the shadda and its letter have no width
+        and a space fills their place, so the model read "مح وّل" ("First network", 2026-11-23)."""
+        from transformation.pdf.unmapped_text import _clusters, visual_to_logical
+        line = {'spans': [{'chars': [
+            {'c': 'م', 'bbox': (540.8, 0, 546.1, 9)}, {'c': 'ح', 'bbox': (535.6, 0, 540.8, 9)},
+            {'c': ' ', 'bbox': (531.9, 0, 535.6, 9)}, {'c': 'ّ', 'bbox': (531.9, 0, 531.9, 9)},
+            {'c': 'و', 'bbox': (531.9, 0, 531.9, 9)}, {'c': 'ل', 'bbox': (525.0, 0, 531.1, 9)},
+            {'c': ' ', 'bbox': (522.6, 0, 525.0, 9)}, {'c': 'ش', 'bbox': (515.1, 0, 522.6, 9)},
+            {'c': 'ب', 'bbox': (512.1, 0, 515.1, 9)}, {'c': 'ك', 'bbox': (507.5, 0, 512.1, 9)},
+            {'c': 'ة', 'bbox': (503.0, 0, 507.5, 9)}]}]}
+        self.assertEqual(visual_to_logical(_clusters(line)), 'محوّل شبكة')
+
+
+class IndicRereadTests(unittest.TestCase):
+    def test_nul_characters_count_as_unread_and_mupdf_order_is_accepted(self):
+        from transformation.pdf.unmapped_text import acceptable, CID
+        babeldoc = 'सभी िशपम\x00ट की प\x00ँचने पर जाँच की जानी चािहए।'
+        mupdf = 'सभी शिपमेंट की पहुँचने पर जाँच की जानी चाहिए।'
+        self.assertEqual(len(CID.findall(babeldoc)), 2)
+        self.assertTrue(acceptable(babeldoc, mupdf))
+        self.assertFalse(acceptable(babeldoc, ' '.join([mupdf] * 3)))   # neighbouring text pulled in

@@ -27,6 +27,11 @@ def needs_no_translation(text, protected_values=()):
     """Skip only entire protected literals, emails, or nonlinguistic numeric fragments."""
     from transformation.llm.protected_text import EMAIL_PATTERN
     stripped = text.strip()
+    # Nothing to translate: punctuation or symbols only, around formula placeholders at most (a lone
+    # "." left after an inline icon was answered "no text was given, please provide text" and printed
+    # in an HP manual, 2026-11-21).
+    if not any(c.isalnum() for c in re.sub(r'\{v\d+\}', '', stripped)):
+        return True
     return (not stripped or stripped in normalize_protected_values(protected_values)
             or re.fullmatch(r'[A-Z]{3}\s*\d[\d,]*(?:\.\d+)?',stripped) is not None
             or re.fullmatch(r'[A-Za-z]+\d[\w.-]*',stripped) is not None
@@ -156,9 +161,48 @@ def _openai_chat(endpoint, model, messages, max_output, response_format, purpose
     return content.strip(), {**result, **stats, "done": True}
 
 
+_REQUEST_LIMITER = None  # BabelDOC's request-rate limiter, applied to real model requests only
+
+
+class _LimitRequestsOnly:
+    """Stands in for BabelDOC's module-level rate limiter (babeldoc.translator.translator).
+
+    BabelDOC waits on it before every paragraph, also those answered without the model (numbers,
+    codes, cached text), and sleeps while holding its lock, so its 16 translation threads queued
+    behind about 100 waits per page for about 20 real requests: 1-2 s of every job (2026-11-21).
+    The same limit now applies in chat(), to each request actually sent."""
+    def __init__(self, limiter):
+        self.limiter = limiter
+
+    def wait(self, *args, **kwargs):
+        return None
+
+    def set_max_qps(self, max_qps):
+        return self.limiter.set_max_qps(max_qps)
+
+    def __getattr__(self, name):
+        return getattr(self.limiter, name)
+
+
+def limit_requests_only():
+    """Install _LimitRequestsOnly; returns whether it is installed."""
+    global _REQUEST_LIMITER
+    try:
+        import babeldoc.translator.translator as vendor
+    except ImportError:
+        return False
+    if isinstance(vendor._translate_rate_limiter, _LimitRequestsOnly):
+        return True
+    _REQUEST_LIMITER = vendor._translate_rate_limiter
+    vendor._translate_rate_limiter = _LimitRequestsOnly(_REQUEST_LIMITER)
+    return True
+
+
 def chat(endpoint, model, messages, max_output=4096, response_format=None, purpose=None):
     from transformation.llm import endpoints
     endpoints.check(endpoint)
+    if _REQUEST_LIMITER is not None:
+        _REQUEST_LIMITER.wait()
     parsed = urlparse(endpoint)
     base = f"{parsed.scheme}://{parsed.netloc}"
     # On a GPU shared by several model servers, the one about to be called gets it (see gpu_share;
@@ -474,7 +518,11 @@ def validation_failure(error):
                             # Content of one paragraph, not the server or the setup (2026-11-19):
                             'Email addresses do not match', 'Source has an indivisible',
                             'Source exceeds the bounded', 'Invalid field-value', 'Invalid scope',
-                            'Invalid translation audit', 'Invalid structured translation'))
+                            'Invalid translation audit', 'Invalid structured translation',
+                            # A long paragraph whose answer was cut off (a Cisco manual's contents
+                            # page failed a whole document, 2026-11-23); an unreachable server raises
+                            # connection errors instead.
+                            'Model server returned an empty, incomplete, or truncated answer'))
         or message == 'TranslateGemma failed validation.')
 
 def install(endpoint, paragraph_mode=False, protected_values=(), document_context="", external_context=None,terminology=None,glossary=None):
@@ -488,8 +536,12 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
         json.dumps([protected_values, document_context,external_context,terminology,glossary_key], ensure_ascii=False,sort_keys=True).encode("utf-8")
     ).hexdigest()
     from babeldoc.translator.translator import OpenAITranslator
+    limit_requests_only()
     original_init = OpenAITranslator.__init__
     policy_digest=translation_policy_digest()
+
+    import threading
+    last = threading.local()
 
     def initialize(self, *args, **kwargs):
         original_init(self, *args, **kwargs)
@@ -501,6 +553,23 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
                 else "v1-think-false-context8192-output4096"
             ),
         )
+        # A paragraph kept in its source language after every attempt failed its checks is not
+        # cached: the cache returned that failure on every later run of the same document, so a
+        # paragraph that the model translates most of the time stayed untranslated (Japanese scan,
+        # 32 such entries on one server, 2026-11-23). BabelDOC caches in the same thread right after
+        # do_translate returns.
+        cache = getattr(self, 'cache', None)
+        if cache is None or not hasattr(cache, 'set'):
+            return
+        cache_set = cache.set
+
+        def set_unless_failed(text, translation):
+            if getattr(last, 'kept_source', False):
+                last.kept_source = False
+                return None
+            return cache_set(text, translation)
+
+        cache.set = set_unless_failed
 
     def request(self, messages):
         text, stats = chat(endpoint, self.model, messages)
@@ -544,6 +613,7 @@ def install(endpoint, paragraph_mode=False, protected_values=(), document_contex
                 glossary=glossary,
             )
 
+            last.kept_source = bool(stats.get("kept_source_requires_review"))
             prompt_tokens = stats.get("prompt_eval_count", 0)
             output_tokens = stats.get("eval_count", 0)
 

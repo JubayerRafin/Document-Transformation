@@ -13,28 +13,25 @@ import {
   FilePlus2,
   Files,
   Loader2,
-  LogOut,
   Menu,
   Server,
   ShieldCheck,
   X,
 } from "lucide-react";
 import { useWorkspace } from "@/hooks/use-workspace";
-import { type Job, type Operation } from "@/lib/api";
+import { type Job, type Operation, type Worker } from "@/lib/api";
 import { Brand } from "./brand";
 import { Button } from "./ui/button";
-import { SignIn } from "./sign-in";
 import { UploadPanel } from "./upload-panel";
 import { HistoryPanel } from "./history-panel";
 import { ProgressPanel } from "./progress-panel";
 import { PreviewPanel } from "./preview-panel";
-import { WorkersPanel } from "./workers-panel";
 import { GlossaryPanel } from "./glossary-panel";
-type View = "new" | "history" | "progress" | "result" | "servers" | "glossary";
+type View = "new" | "history" | "progress" | "result" | "glossary";
 const titles: Record<View, [string, string]> = {
   new: [
     "Make your document work for you",
-    "Translate, redact and reconstruct your PDF in one focused workflow.",
+    "Translate, redact and reconstruct your PDF, Word or PowerPoint document in one focused workflow.",
   ],
   history: ["Your documents", "Find your recent jobs and review the results."],
   progress: [
@@ -45,15 +42,26 @@ const titles: Record<View, [string, string]> = {
     "Review your result",
     "Compare the original and transformed document, side by side.",
   ],
-  servers: [
-    "Your processing servers",
-    "Connect and manage the GPU servers you use for your documents.",
-  ],
   glossary: [
     "Your glossary",
     "Set how your own terms are translated, for each language pair.",
   ],
 };
+/** This server's GPU and whether its models are ready (the server checks itself every 45 s). */
+function ServerStatus({ server }: { server?: Worker }) {
+  if (!server) return null;
+  return (
+    <div className="flex min-w-0 items-center gap-2 text-xs" title={server.capabilities?.note || undefined}>
+      <Server className="size-4 text-muted-foreground" />
+      <span className="hidden max-w-56 truncate sm:inline">{server.name}</span>
+      <span
+        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${server.ready ? "bg-emerald-950 text-emerald-300" : "bg-amber-950 text-amber-300"}`}
+      >
+        {server.ready ? "Ready" : "Not ready"}
+      </span>
+    </div>
+  );
+}
 export function Workspace() {
   const s = useWorkspace(),
     [view, setView] = useState<View>("new"),
@@ -110,7 +118,6 @@ export function Workspace() {
             { id: "new", label: "New transformation", icon: FilePlus2 },
             { id: "history", label: "Your documents", icon: Files },
             { id: "glossary", label: "Glossary", icon: BookText },
-            { id: "servers", label: "GPU servers", icon: Server },
           ] as const
         ).map((n) => (
           <m.button
@@ -170,9 +177,7 @@ export function Workspace() {
                 <span className="text-foreground">
                   {view === "new"
                     ? "New transformation"
-                    : view === "servers"
-                      ? "GPU servers"
-                      : view === "glossary"
+                    : view === "glossary"
                         ? "Glossary"
                       : view === "history"
                         ? "Your documents"
@@ -180,30 +185,7 @@ export function Workspace() {
                 </span>
               </span>
             </div>
-            {s.account ? (
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="hidden min-w-0 text-right sm:block">
-                  <p className="mb-0 max-w-52 truncate text-xs font-medium">
-                    {s.account.name}
-                  </p>
-                  <p className="mb-0 mt-0.5 text-[10px] capitalize text-muted-foreground">
-                    {s.account.role}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Sign out"
-                  onClick={() => void s.logout()}
-                >
-                  <LogOut />
-                </Button>
-              </div>
-            ) : (
-              <Button size="sm" onClick={() => s.setSignIn(true)}>
-                Sign in
-              </Button>
-            )}
+            <ServerStatus server={s.workers[0]} />
           </header>
           {mobile && (
             <m.div
@@ -265,15 +247,13 @@ export function Workspace() {
               <section className="rounded-2xl border border-border bg-background px-6 py-20 text-center">
                 <Files className="mx-auto mb-5 size-10 text-primary" />
                 <h2 className="mb-3 text-xl font-semibold">
-                  Your next document starts here
+                  The TransformX server is not answering
                 </h2>
                 <p className="mx-auto mb-6 max-w-md text-sm leading-6 text-muted-foreground">
-                  Sign in to upload documents, choose your processing server and
-                  review your saved results.
+                  Check that TransformX is running on the GPU server and that this
+                  address still reaches it, then reload the page.
                 </p>
-                <Button onClick={() => s.setSignIn(true)}>
-                  Sign in to continue
-                </Button>
+                <Button onClick={() => location.reload()}>Reload</Button>
               </section>
             ) : (
               <AnimatePresence mode="wait" initial={false}>
@@ -291,7 +271,6 @@ export function Workspace() {
                       workers={s.workers}
                       initialMode={initialMode}
                       onSubmitted={submitted}
-                      onServers={() => navigate("servers")}
                       onError={s.handleError}
                       readOnly={readOnly}
                     />
@@ -301,15 +280,6 @@ export function Workspace() {
                       jobs={s.jobs}
                       onSelect={open}
                       onNew={() => navigate("new")}
-                      readOnly={readOnly}
-                    />
-                  )}
-                  {view === "servers" && (
-                    <WorkersPanel
-                      api={s.api}
-                      workers={s.workers}
-                      onRefresh={s.refresh}
-                      onError={s.handleError}
                       readOnly={readOnly}
                     />
                   )}
@@ -338,6 +308,7 @@ export function Workspace() {
                             api={s.api}
                             onError={s.handleError}
                             readOnly={readOnly}
+                            onCreated={submitted}
                           />
                         ) : (
                           <ProgressPanel
@@ -359,17 +330,11 @@ export function Workspace() {
             <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5 text-[11px] text-muted-foreground">
               <span>TransformX · Document transformation with context</span>
               <a href="/" className="hover:text-primary">
-                Back to the website
+                About TransformX
               </a>
             </footer>
           </main>
         </div>
-        <SignIn
-          open={s.signIn}
-          onOpenChange={s.setSignIn}
-          api={s.api}
-          onAccount={s.setAccount}
-        />
       </div>
     </LazyMotion>
   );

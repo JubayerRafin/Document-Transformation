@@ -15,10 +15,18 @@ class SourceAtomsTests(unittest.TestCase):
         return p,page,entries[(1,'a')]
 
     def test_notation_and_structured_identifiers_only(self):
-        for text in ['64 × 64','PQ50','PQ{v1}','Encoder-ResNet-v3 [12]']:
+        for text in ['64 × 64','PQ50','PQ{v1}','Encoder-ResNet-v3 [12]','2026-07-12']:
             self.assertTrue(is_source_atom(text),text)
         for text in ['Accuracy of the model','Forward to section 4','A Summary','Résumé','']:
             self.assertFalse(is_source_atom(text),text)
+
+    def test_any_paragraph_left_unchanged_is_captured(self):
+        # Samsung manual, 2026-11-23: a codec column the translation left as it was was re-typeset.
+        char=NS(char_unicode='D',pdf_character_id=1,pdf_style=NS(font_size=8),box=box(),visual_bbox=NS(box=box()))
+        item=NS(pdf_character=char,pdf_line=None,pdf_same_style_characters=None,pdf_formula=None)
+        p=NS(debug_id='c',unicode='Dolby Digital+',vertical=False,box=box(),pdf_paragraph_composition=[item])
+        page=NS(page_number=0,pdf_paragraph=[p],cropbox=NS(box=box(0,0,100,100)))
+        self.assertIn((1,'c'),capture_source_atoms(NS(page=[page])))
 
     def test_exact_unchanged_source_can_be_copied(self):
         p,page,entry=self.fixture();result=preserved_source_characters(entry,p,page)
@@ -57,6 +65,19 @@ class SourceAtomsTests(unittest.TestCase):
         p.pdf_paragraph_composition=[NS(pdf_character=None,pdf_line=None,pdf_same_style_characters=None,
             pdf_formula=NS(pdf_curve=[object()],pdf_form=[],pdf_character=[]))]
         self.assertFalse(capture_source_atoms(NS(page=[page])))
+
+    def test_restored_characters_are_drawn_line_by_line_left_to_right(self):
+        from transformation.layout.source_atoms import reading_order
+        def ch(c,x,y):
+            b=box(x,y,x+5,y+9);return NS(char_unicode=c,box=b,visual_bbox=NS(box=b))
+        # "2025-" over "07-13", stored with "5-" after the second line
+        stored=[ch('2',0,20),ch('0',5,20),ch('2',10,20),ch('0',0,8),ch('7',5,8),ch('-',10,8),
+                ch('1',15,8),ch('3',20,8),ch('5',15,20.5),ch('-',20,20)]
+        self.assertEqual(''.join(c.char_unicode for c in reading_order(stored)),'2025-07-13')
+        # Commas sit low and small, at the baseline of their digits: still one line.
+        amount=[ch('5',0,20),ch('6',5,20),ch('3',10,20),ch('9',17,20),ch('8',22,20),ch('2',27,20)]
+        comma=NS(char_unicode=',',box=box(15,18.5,16.5,21),visual_bbox=NS(box=box(15,18.5,16.5,21)))
+        self.assertEqual(''.join(c.char_unicode for c in reading_order(amount+[comma])),'563,982')
 
     def test_inferred_space_does_not_require_a_printed_glyph_id(self):
         p,page,entry=self.fixture()

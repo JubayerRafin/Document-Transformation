@@ -249,6 +249,16 @@ class DetectDocumentTests(unittest.TestCase):
         findings, _, _ = self.run_detect(data, ir, ['Names'], stub(labels={'Field': 'none', 'Holder': 'Names', 'Branch': 'none'}))
         self.assertEqual({f['value'] for f in findings}, {'Ann Moor'})
 
+    def test_a_box_round_a_commented_value_is_not_a_table_header(self):
+        """Word letters, 2026-11-24: LibreOffice's box round a commented customer number was read as a
+        one-cell table; as its "header" the number was never masked."""
+        ir = {'units': [{'number': 1, 'regions': [{'id': 't', 'kind': 'table', 'text': '', 'bbox': [140, 30, 230, 45],
+                                                   'cells': [['AH-7032088']]}]}]}
+        data = pdf([(20, 40, 'Customer number: AH-7032088'), (20, 60, 'Product code: HK-1-10')])
+        findings, _, _ = self.run_detect(data, ir, ['Identifiers'],
+                                         stub(labels={'Customer number': 'Identifiers', 'Product code': 'none'}))
+        self.assertIn('AH-7032088', {f['value'] for f in findings})
+
     def test_honorific_is_not_part_of_the_masked_name(self):
         data = pdf([(20, 40, 'Signed by Mr. Thomas Becker')])
         region = lambda text: [{'value': 'Mr. Thomas Becker', 'category': 'Names'}] if 'Becker' in text else []
@@ -340,6 +350,33 @@ class OcrColumnPairTests(unittest.TestCase):
         self.assertIn(('20-947', 'Identifiers'), found)
         self.assertNotIn('Finance', {f['value'] for f in findings})
 
+    def invoice(self):
+        rows = [('Item', 'Code', 'Quantity'), ('Office chair', 'QZT-2024-81101', '12'),
+                ('Thermal labels', 'KMH-2022-18381', '40'), ('Office chair', 'RBZ-2022-11110', '7')]
+        return [self.line(f'{r}{c}', 50 + 120 * c, 100 + 18 * r, t) for r, row in enumerate(rows) for c, t in enumerate(row)]
+
+    def detect_scan(self, lines, model_guesses, names=()):
+        from transformation.validation import pii_document
+        ir = {'units': [{'number': 1, 'ocr_folder': 'x', 'regions': lines}]}
+        guess = lambda text: [g for g in model_guesses if g['value'] in text]
+        with patch('extraction.coordinator.text_regions', side_effect=lambda ir: ir['units'][0]['regions']),              patch.object(pii_document, 'native_pattern_regions', return_value=[]),              patch('transformation.llm.ollama_native.chat', side_effect=stub(names=names, region=guess)):
+            findings, _, evidence = pii_document.detect_document(b'', ir, ['Names', 'Identifiers'], 'e', 'm')
+        return {(f['value'], f['category']) for f in findings}, evidence
+
+    def test_scanned_item_and_code_columns_overrule_model_guesses(self):
+        """Hindi scan, 2026-11-23: product codes were masked as identifiers and item names as names."""
+        guesses = [{'value': 'KMH-2022-18381', 'category': 'Identifiers'}, {'value': 'Thermal labels', 'category': 'Names'}]
+        found, evidence = self.detect_scan(self.invoice(), guesses)
+        self.assertEqual(found, set())
+        self.assertEqual({s['value'] for s in evidence['suppressed']}, {'KMH-2022-18381', 'Thermal labels'})   # for review
+
+    def test_a_form_row_read_as_a_header_overrules_nothing(self):
+        rows = [('Full name', 'Priya Verma', 'Team'), ('Office', 'EMP-2026-79755', 'Ops'), ('Desk', 'EMP-2026-11111', 'Ops'),
+                ('Floor', 'EMP-2026-22222', 'Ops')]
+        lines = [self.line(f'{r}{c}', 50 + 120 * c, 100 + 18 * r, t) for r, row in enumerate(rows) for c, t in enumerate(row)]
+        found, _ = self.detect_scan(lines, [{'value': 'EMP-2026-79755', 'category': 'Identifiers'}], names=('Priya Verma',))
+        self.assertIn(('EMP-2026-79755', 'Identifiers'), found)
+
     def test_label_value_form_and_side_by_side_titles_are_not_tables(self):
         from transformation.validation.pii_document import ocr_column_pairs
         form = [('Full name', 'Isaac Okonkwo'), ('Employee ID', 'GOY-531250'), ('Date of birth', '1992-03-01'), ('Email', 'i.o@x.example')]
@@ -368,3 +405,23 @@ class NameSweepWrapTests(unittest.TestCase):
         with patch('transformation.llm.ollama_native.chat', side_effect=chat):
             self.assertEqual(name_sweep(units, 'e', 'm'), {'Witkoff'})
         self.assertEqual(seen[0], 'Witkoff insisted progress had  been made.\nFull name: Ann\nEmail: a@b.example')
+
+
+class RightToLeftFormTests(unittest.TestCase):
+    def test_a_right_to_left_form_pairs_each_label_with_the_value_on_its_left(self):
+        """Arabic invoice, 2026-11-23: "value | label" rows were read as "label | value", the first row
+        became column headers and an employee number was never selected."""
+        name, full_name = '\u064a\u0648\u0633\u0641 \u0627\u0644\u062e\u0637\u064a\u0628', '\u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0643\u0627\u0645\u0644'
+        number, department, ops = '\u0631\u0642\u0645 \u0627\u0644\u0645\u0648\u0638\u0641', '\u0627\u0644\u0642\u0633\u0645', '\u0627\u0644\u0639\u0645\u0644\u064a\u0627\u062a'
+        rows = [[name, full_name], ['EMP-2020-36418', number], [ops, department]]
+        cells = [{'id': f't:cell-{r}-{c}', 'text': rows[r][c], 'metadata': {'table_parent': 't', 'row': r, 'column': c,
+                  'column_header': rows[0][c], 'row_values': rows[r]}} for r in range(3) for c in range(2)]
+        pairs = {(p['label'], p['value']) for p in field_pairs([], cells, [])}
+        self.assertEqual(pairs, {(full_name, name), (number, 'EMP-2020-36418'), (department, ops)})
+
+    def test_a_left_to_right_form_is_unchanged(self):
+        rows = [['Full name', 'Ann Moor'], ['Employee number', 'EMP-1'], ['Team', 'Ops']]
+        cells = [{'id': f't:cell-{r}-{c}', 'text': rows[r][c], 'metadata': {'table_parent': 't', 'row': r, 'column': c,
+                  'column_header': rows[0][c], 'row_values': rows[r]}} for r in range(3) for c in range(2)]
+        pairs = {(p['label'], p['value']) for p in field_pairs([], cells, [])}
+        self.assertEqual(pairs, {('Full name', 'Ann Moor'), ('Employee number', 'EMP-1'), ('Team', 'Ops')})

@@ -89,6 +89,7 @@ SCHEMA = {
                                 'Upper limit on translation requests per second'),
     },
     'pii': {
+        'label': (str, None, [], 'Standard (this server)', 'Name shown on the website for the default model'),
         'endpoint': (str, _url, [('env', 'TRANSFORMX_PII_ENDPOINT')], 'local vLLM or Ollama',
                      'Base URL of the PII model server'),
         'model': (str, None, [('env', 'TRANSFORMX_PII_MODEL')], 'qwen3.5:9b', 'Model name as the server knows it'),
@@ -181,9 +182,11 @@ def _type_name(kind):
     return {str: 'text', int: 'a whole number', float: 'a number', bool: 'true or false', list: 'a list'}[kind]
 
 
-# Other translation models users may pick on the website or per engine-service job:
-# [translation_models.<id>] tables. The [translation] section stays the default ("default").
+# Other models users may pick on the website or per engine-service job: [translation_models.<id>]
+# and [pii_models.<id>] tables. The [translation] and [pii] sections stay the default ("default").
 CHOICES_SECTION = 'translation_models'
+PII_CHOICES_SECTION = 'pii_models'
+CHOICE_SECTIONS = {'translation': CHOICES_SECTION, 'pii': PII_CHOICES_SECTION}
 CHOICE_ID = re.compile(r'^[a-z0-9][a-z0-9_-]{0,31}$')
 CHOICE_KEYS = {
     'label': (str, None, 'Name shown on the website'),
@@ -195,14 +198,14 @@ CHOICE_KEYS = {
 MAX_CHOICES = 8
 
 
-def _validate_choices(values, clean):
+def _validate_choices(values, clean, section=CHOICES_SECTION):
     problems = []
     if not isinstance(values, dict):
-        return [f'[{CHOICES_SECTION}] must hold [{CHOICES_SECTION}.<name>] sections']
+        return [f'[{section}] must hold [{section}.<name>] sections']
     if len(values) > MAX_CHOICES:
-        problems.append(f'[{CHOICES_SECTION}]: at most {MAX_CHOICES} models')
+        problems.append(f'[{section}]: at most {MAX_CHOICES} models')
     for choice, table in values.items():
-        name = f'{CHOICES_SECTION}.{choice}'
+        name = f'{section}.{choice}'
         if not CHOICE_ID.match(choice) or choice == 'default':
             problems.append(f'[{name}]: the name must be lower-case letters, digits, - or _ (up to 32), not "default"')
             continue
@@ -233,7 +236,7 @@ def _validate_choices(values, clean):
                 problems.append(f'{name}: {required} is required')
                 ok = False
         if ok:
-            clean.setdefault(CHOICES_SECTION, {})[choice] = entry
+            clean.setdefault(section, {})[choice] = entry
     return problems
 
 
@@ -241,8 +244,8 @@ def validate(data):
     """Check parsed TOML against SCHEMA; return (clean settings, list of problems)."""
     clean, problems = {}, []
     for section, values in data.items():
-        if section == CHOICES_SECTION:
-            problems += _validate_choices(values, clean)
+        if section in CHOICE_SECTIONS.values():
+            problems += _validate_choices(values, clean, section)
             continue
         if section == RAW_SECTION:
             if not isinstance(values, dict):
@@ -255,7 +258,7 @@ def validate(data):
                 clean.setdefault(RAW_SECTION, {})[key] = value
             continue
         if section not in SCHEMA:
-            problems.append(f'[{section}]: unknown section (known: {", ".join(list(SCHEMA) + [CHOICES_SECTION, RAW_SECTION])})')
+            problems.append(f'[{section}]: unknown section (known: {", ".join(list(SCHEMA) + list(CHOICE_SECTIONS.values()) + [RAW_SECTION])})')
             continue
         if not isinstance(values, dict):
             problems.append(f'[{section}] must be a section, not a single value')
@@ -311,16 +314,17 @@ def read(path):
         for key, value in values.items():
             if section != RAW_SECTION and key in PATH_KEYS and value and not Path(value).is_absolute():
                 values[key] = str(APP / value)
-    for entry in clean.get(CHOICES_SECTION, {}).values():
-        if entry.get('key_file') and not Path(entry['key_file']).is_absolute():
-            entry['key_file'] = str(APP / entry['key_file'])
+    for section in CHOICE_SECTIONS.values():
+        for entry in clean.get(section, {}).values():
+            if entry.get('key_file') and not Path(entry['key_file']).is_absolute():
+                entry['key_file'] = str(APP / entry['key_file'])
     return clean
 
 
 def _targets(clean):
     """Yield (section, key, value, kind, name, converted value) for every setting in the file."""
     for section, values in clean.items():
-        if section == CHOICES_SECTION:
+        if section in CHOICE_SECTIONS.values():
             continue
         if section == RAW_SECTION:
             for key, value in values.items():
@@ -380,11 +384,12 @@ def report(path=None, environ=None):
             if key.endswith('key_file') and value and source != 'default':
                 value = f'{value} ({"readable" if Path(str(value)).is_file() else "MISSING"})'
             rows.append((name, value, source))
-    for choice, entry in clean.get(CHOICES_SECTION, {}).items():
-        for key, value in entry.items():
-            if key == 'key_file':
-                value = f'{value} ({"readable" if Path(value).is_file() else "MISSING"})'
-            rows.append((f'{CHOICES_SECTION}.{choice}.{key}', value, 'file'))
+    for section in CHOICE_SECTIONS.values():
+        for choice, entry in clean.get(section, {}).items():
+            for key, value in entry.items():
+                if key == 'key_file':
+                    value = f'{value} ({"readable" if Path(value).is_file() else "MISSING"})'
+                rows.append((f'{section}.{choice}.{key}', value, 'file'))
     for key, value in clean.get(RAW_SECTION, {}).items():
         rows.append((f'{RAW_SECTION}.{key}', value, 'file'))
     for name in ('TRANSFORMX_TRANSLATION_API_KEY', 'TRANSFORMX_PII_API_KEY', 'TRANSFORMX_MODEL_API_KEY',
@@ -427,9 +432,10 @@ def check(path=None, probe=True):
         value = clean.get(section, {}).get(key)
         if value and not Path(value).is_file():
             problems.append(f'{section}.{key}: file not found: {value}')
-    for choice in translation_choices(used, environ)[1:]:
-        if choice.get('key_file') and not Path(choice['key_file']).is_file():
-            problems.append(f'{CHOICES_SECTION}.{choice["id"]}.key_file: file not found: {choice["key_file"]}')
+    for role, section in CHOICE_SECTIONS.items():
+        for choice in model_choices(role, used, environ)[1:]:
+            if choice.get('key_file') and not Path(choice['key_file']).is_file():
+                problems.append(f'{section}.{choice["id"]}.key_file: file not found: {choice["key_file"]}')
     if not probe:
         return problems
     saved = dict(os.environ)
@@ -449,27 +455,29 @@ def check(path=None, probe=True):
             problem = _probe(endpoints, endpoint, model)
             if problem:
                 problems.append(f'{role}: {problem}')
-        for choice in translation_choices(used, environ)[1:]:
-            os.environ.clear(); os.environ.update(choice_environment(choice, environ))
-            problem = _probe(endpoints, choice['endpoint'], choice['model'])
-            if problem:
-                problems.append(f'{CHOICES_SECTION}.{choice["id"]}: {problem}')
+        for role, section in CHOICE_SECTIONS.items():
+            for choice in model_choices(role, used, environ)[1:]:
+                os.environ.clear(); os.environ.update(choice_environment(choice, environ, role))
+                problem = _probe(endpoints, choice['endpoint'], choice['model'])
+                if problem:
+                    problems.append(f'{section}.{choice["id"]}: {problem}')
     finally:
         os.environ.clear(); os.environ.update(saved)
     return problems
 
 
-def translation_choices(path=None, environ=None):
-    """Translation models a job may choose: 'default' (the [translation] settings) first, then each
-    [translation_models.<id>]. Entries hold id, label, and for named models endpoint, model, key_file
-    and requests_per_second. Keys themselves are never read here."""
+def model_choices(role, path=None, environ=None):
+    """Models a job may choose for role ('translation' or 'pii'): 'default' (the [translation] or
+    [pii] settings) first, then each [translation_models.<id>] or [pii_models.<id>]. Entries hold id,
+    label, and for named models endpoint, model, key_file and requests_per_second. Keys themselves
+    are never read here."""
     environ = os.environ if environ is None else environ
     used = find(path)
     clean = read(used) if used else {}
-    label = (clean.get('translation', {}).get('label') or environ.get('TRANSFORMX_TRANSLATION_LABEL')
+    label = (clean.get(role, {}).get('label') or environ.get(f'TRANSFORMX_{role.upper()}_LABEL')
              or 'Standard (this server)')
     choices = [{'id': 'default', 'label': label[:80]}]
-    for choice, entry in clean.get(CHOICES_SECTION, {}).items():
+    for choice, entry in clean.get(CHOICE_SECTIONS[role], {}).items():
         choices.append({'id': choice, 'label': (entry.get('label') or entry['model'])[:80],
                         'endpoint': entry['endpoint'], 'model': entry['model'],
                         'key_file': entry.get('key_file', ''),
@@ -477,19 +485,30 @@ def translation_choices(path=None, environ=None):
     return choices
 
 
-def choice_environment(choice, environ=None):
-    """The environment for a job that uses a named translation model: that server, model and key
-    file only. The default translation key is removed, so it can never be sent to that server."""
+def translation_choices(path=None, environ=None):
+    """Translation models a job may choose (model_choices('translation'))."""
+    return model_choices('translation', path, environ)
+
+
+def pii_choices(path=None, environ=None):
+    """PII models a job may choose (model_choices('pii'))."""
+    return model_choices('pii', path, environ)
+
+
+def choice_environment(choice, environ=None, role='translation'):
+    """The environment for a job that uses a named model for role: that server, model and key file
+    only. The role's default key is removed, so it can never be sent to that server."""
     env = dict(os.environ if environ is None else environ)
     if choice['id'] == 'default':
         return env
-    env['TRANSFORMX_TRANSLATION_ENDPOINT'] = choice['endpoint']
-    env['TRANSFORMX_TRANSLATION_MODEL'] = choice['model']
-    env.pop('TRANSFORMX_TRANSLATION_API_KEY', None)
-    env.pop('TRANSFORMX_TRANSLATION_API_KEY_FILE', None)
+    prefix = f'TRANSFORMX_{role.upper()}'
+    env[prefix + '_ENDPOINT'] = choice['endpoint']
+    env[prefix + '_MODEL'] = choice['model']
+    env.pop(prefix + '_API_KEY', None)
+    env.pop(prefix + '_API_KEY_FILE', None)
     if choice.get('key_file'):
-        env['TRANSFORMX_TRANSLATION_API_KEY_FILE'] = choice['key_file']
-    if choice.get('requests_per_second'):
+        env[prefix + '_API_KEY_FILE'] = choice['key_file']
+    if choice.get('requests_per_second') and role == 'translation':
         env['TRANSFORMX_TRANSLATION_QPS'] = str(choice['requests_per_second'])
     # Naming a server in the settings file is the operator's decision to use it: it is listed as an
     # OpenAI-compatible server for this job.
@@ -501,14 +520,14 @@ def choice_environment(choice, environ=None):
     return env
 
 
-def choice_profile(choice, profile):
-    """The engine profile for a job that uses `choice` (a copy; the worker's profile is unchanged)."""
+def choice_profile(choice, profile, role='translation'):
+    """The engine profile for a job that uses `choice` for role (a copy; the worker's profile is unchanged)."""
     profile = json.loads(json.dumps(profile))
     if choice['id'] == 'default':
         return profile
-    profile['translation_endpoint'] = choice['endpoint']
-    profile['translation_model'] = choice['model']
-    if choice.get('requests_per_second'):
+    profile[role + '_endpoint'] = choice['endpoint']
+    profile[role + '_model'] = choice['model']
+    if choice.get('requests_per_second') and role == 'translation':
         profile.setdefault('engine_options', {})['translation_qps'] = choice['requests_per_second']
     return profile
 

@@ -22,6 +22,65 @@ def detector_polygons(value):
     return polygons
 
 
+def recover_missed_text(image, polygons):
+    """Boxes for text the detector left out of a line it found: (polygons, number added).
+
+    The detector stopped short of words on a light box background ("Advertencia: Desconecte" |
+    "alimentación ...", missing "la"; "seco, a una temperatura" missing "de entre 5 y 30 grados.",
+    Spanish scan, 2026-11-24). Beside each detected box, on its own rows, columns with text ink are
+    followed outward until a gap wider than the line is tall (a column gutter) or another box; ink
+    that runs the whole height (a border) or along one row (a rule) is not text. A stretch at least
+    0.4 line heights wide becomes a new box, read like the others; one that reads as nothing is
+    dropped."""
+    import cv2
+    import numpy as np
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
+    height, width = gray.shape
+    boxes = [cv2.boundingRect(np.asarray(p, dtype=np.float32).astype(np.int32)) for p in polygons]
+    covered = np.zeros((height, width), dtype=bool)
+    for x, y, w, h in boxes:
+        covered[y:y + h, x:x + w] = True
+    added = []
+    for x, y, w, h in boxes:
+        if h < 10 or w < h or y < 0 or y + h > height:
+            continue
+        top, bottom = y + int(h * .15), y + h - int(h * .15)
+        band = gray[top:bottom].astype(np.int16)
+        if band.size == 0:
+            continue
+        background = np.percentile(gray[y:y + h], 90)
+        ink = band < background - 60
+        rows = bottom - top
+        counts = ink.sum(axis=0)
+        text_columns = (counts > 0) & (counts < .9 * rows)
+        middle = y + h // 2
+        for direction in (1, -1):
+            start = x + w if direction == 1 else x - 1
+            position, last, gap = start, None, 0
+            while 0 <= position < width and not covered[middle, position]:
+                if text_columns[position]:
+                    last, gap = position, 0
+                else:
+                    gap += 1
+                    if gap > 1.2 * h:
+                        break
+                position += direction
+            if last is None or abs(last - start) < .4 * h:
+                continue
+            left, right = sorted((start, last))
+            left, right = max(0, left - 2), min(width - 1, right + 2)
+            span = ink[:, left:right + 1]
+            if text_columns[left:right + 1].sum() < .25 * (right - left + 1):
+                continue
+            if span.sum() and span.sum(axis=1).max() > .8 * (right - left + 1):
+                continue   # one row inked across the stretch: a rule, not text
+            added.append(np.array([[left, y], [right, y], [right, y + h], [left, y + h]], dtype=np.float32))
+            covered[y:y + h, left:right + 1] = True
+    if not added:
+        return polygons, 0
+    return np.concatenate([np.asarray(polygons, dtype=np.float32), np.stack(added)]), len(added)
+
+
 def select_candidate(candidates):
     """Whitespace-insensitive consensus; never normalize identifier characters."""
     if not candidates:
@@ -46,6 +105,241 @@ def select_candidate(candidates):
         best = next((c for c in group if c['variant'] == 'original'), max(group, key=lambda c:c['score']))
         return best, False, 'character_consensus'
     return best, best['score'] < .95 or len(groups) > 1, 'confidence_or_disagreement'
+
+
+def voted_spacing(best, candidates):
+    """The chosen reading with the word spaces most views of the same characters agree on.
+
+    Views of one line often read the same characters and differ only in spaces, and the view that
+    drops spaces tends to score highest: a Korean line became "주생산라인의정기점검은매월첫째주말로",
+    which the translator then misread (2026-11-23). Characters never change and no space is removed.
+    A space is added where at least half of the agreeing views have one, but not inside a number
+    ("5, 657") or an address or identifier ("a@b", "sk_")."""
+    text = best.get('text') or ''
+    if not text.strip() or '@' in text or re.search(r'\bsk_', text):
+        return best
+    squeeze = lambda value: re.sub(r'\s+', '', value or '')
+    key = squeeze(text)
+    views = {}
+    for c in candidates:
+        if isinstance(c, dict) and squeeze(c.get('text')) == key:
+            views.setdefault(c.get('variant'), c.get('text'))
+    if len(views) < 2:
+        return best
+    def gaps(value):
+        found, position = set(), 0
+        for ch in value.strip():
+            if ch.isspace(): found.add(position)
+            else: position += 1
+        return found
+    votes = {}
+    for value in views.values():
+        for gap in gaps(value): votes[gap] = votes.get(gap, 0) + 1
+    number = lambda ch: ch.isdigit() or ch in '.,:/-'
+    # Between two Hangul syllables a tie is not enough: half of four views put spaces inside words
+    # ("정 기 점검은", "있습니 다", Korean scan, 2026-11-23); Korean word gaps come from the image
+    # (gap_spacing).
+    hangul = lambda ch: '가' <= ch <= '힣'
+    wanted = gaps(text) | {gap for gap, count in votes.items()
+                           if (2 * count > len(views) or (2 * count == len(views) and not (hangul(key[gap - 1]) and hangul(key[gap]))))
+                           and 0 < gap < len(key) and not (number(key[gap - 1]) and number(key[gap]))}
+    spaced = ''.join((' ' if i in wanted else '') + ch for i, ch in enumerate(key))
+    if squeeze(spaced) != key or spaced == ' '.join(text.split()):
+        return best
+    return dict(best, text=spaced, spacing='voted')
+
+
+CJK_LATIN_GLUE = re.compile(r'[A-Za-z][0-9]|[A-Za-z0-9][^\x00-\x7f]|[^\x00-\x7f][A-Za-z0-9]|[:：][A-Za-z0-9]')
+
+
+def gap_spacing(crop, best, model, language='ko', views=()):
+    """The chosen Korean reading with a space at each word gap the line image shows.
+
+    PaddleOCR's Korean model drops most word spaces, in every view: "장치는5도에서30도사이의" and
+    "지역 사무소세 곳으로" ("office tax" for "office, three places") were translated as "between
+    figures 5 and 30" and "several offices" (Korean scan, 2026-11-23). Korean separates words with a
+    visible gap, wider than the gap between syllables. A line with a word of four or more syllables
+    (or a word glued after a colon) is cut at those gaps (split_word_crops) and the pieces are read; when the pieces
+    give exactly the line's characters, a space is added at each cut. Characters never change and no
+    space is removed; a number is never split.
+
+    views: other readings of the line. A cut is not made inside a word that a reading with the same
+    characters shows on its own between spaces, two or three syllables long, unless another reading
+    has a space there: on scans whose syllables stand further apart the cuts fell inside words ("서 면으로", "합니 다", "계 약의") although a view
+    read "합니다.", "계약의" whole (Korean held-out scans, 2026-11-24). Four syllables or more can be
+    glued words ("사무소세": "사무소 세") and are still cut."""
+    text = best.get('text') or ''
+    # Four syllables or more (Korean words are mostly two or three: "컨설팅시간", "감열라벨" in table
+    # cells kept no space at six), or a word glued to what follows its colon ("소계:KRW").
+    long_words = [w for w in text.split() if len(re.findall(r'[가-힣]', w)) >= 4 or re.search(r'[가-힣][:：]\S', w)]
+    if language != 'ko':
+        # Japanese and Chinese have no word spaces, but a currency code, amount or Latin word set
+        # beside them does: "KRW 676,188,000" and "小計: USD 879,754.63" were read "KRW676,188,000"
+        # and "小計:USD879,754.63" (Japanese scans, 2026-11-24). Only such boundaries get a space.
+        long_words = [w for w in text.split() if CJK_LATIN_GLUE.search(w)]
+    if not long_words or '@' in text:
+        return best
+    pieces = split_word_crops(crop)
+    if len(pieces) < 2:
+        return best
+    reads = [str(r['rec_text']).strip() for r in model.predict(pieces)]
+    import unicodedata
+    squeeze = lambda value: re.sub(r'\s+', '', value)
+    punct = lambda ch: unicodedata.category(ch).startswith('P')
+    key = squeeze(text)
+    # Letters and digits must match; a piece read can drop a period ("차단하십시오" for "차단하십시오."),
+    # and a space goes after the punctuation at a cut.
+    letters = [i for i, ch in enumerate(key) if not punct(ch)]
+    pieces_letters = [''.join(ch for ch in squeeze(read) if not punct(ch)) for read in reads]
+    if (len(reads) != len(pieces) or not all(pieces_letters)
+            or ''.join(pieces_letters) != ''.join(key[i] for i in letters)):
+        return best
+    cuts, count = set(), 0
+    for piece in pieces_letters[:-1]:
+        count += len(piece)
+        position = letters[count - 1] + 1
+        while position < len(key) and punct(key[position]):
+            position += 1
+        cuts.add(position)
+    if language == 'ko':
+        inside, seen = set(), set()
+        for view in views:
+            other = view.get('text') if isinstance(view, dict) else None
+            if not isinstance(other, str) or squeeze(other) != key:
+                continue
+            start, words = 0, other.split()
+            for n, word in enumerate(words):
+                if start:
+                    seen.add(start)
+                # A sentence ends a word too: "합니다.장치는" is "합니다." and "장치는".
+                tokens = re.findall(r'[^.!?;:,]+[.!?;:,]*|[.!?;:,]+', word)
+                for t, token in enumerate(tokens):
+                    # The line's last word is often a word and the start of one the line break cut
+                    # ("사상최" for "사상 최|고치를", "첫째주" for "첫째 주|말로"): it is still cut.
+                    last = n == len(words) - 1 and t == len(tokens) - 1
+                    if not last and 2 <= len(re.findall(r'[가-힣]', token)) <= 3:
+                        inside |= set(range(start + 1, start + len(token)))
+                    start += len(token)
+        cuts -= inside - seen
+    own, position = set(), 0                   # the reading's own spaces, kept
+    for ch in text.strip():
+        if ch.isspace(): own.add(position)
+        else: position += 1
+    number = lambda ch: ch.isdigit() or ch in '.,:/-'
+    latin = lambda ch: ch.isascii() and ch.isalnum()
+    allowed = (lambda a, b: True) if language == 'ko' else (lambda a, b: latin(a) or latin(b))
+    out = []
+    for position, ch in enumerate(key):
+        if position and (position in own or (position in cuts and not (number(key[position - 1]) and number(ch))
+                                             and allowed(key[position - 1], ch))):
+            out.append(' ')
+        out.append(ch)
+    result = ''.join(out)
+    return best if result == text.strip() else dict(best, text=result, spacing='image_gaps')
+
+
+KATAKANA_LOOKALIKES = {'一': 'ー', '口': 'ロ', '力': 'カ', '工': 'エ', '二': 'ニ', '八': 'ハ', '夕': 'タ', '卜': 'ト'}
+
+
+def _katakana(ch):
+    return '\u30a1' <= ch <= '\u30ff'
+
+
+def katakana_lookalikes(text):
+    """Kanji that look like katakana, read inside a katakana word, as the katakana they are.
+
+    The recognizer reads the long-vowel mark and some katakana as kanji of the same shape:
+    "ネットワ一ク" (一 for ー), "力バ一" (力 for カ), "プ口グラム" (口 for ロ) in Japanese scans
+    (2026-11-24). A look-alike before a katakana is that katakana unless a kanji precedes it; 一 right
+    after a katakana and not followed by a kanji is the long-vowel mark. Kanji next to kanji are never
+    changed ("第一", "統一")."""
+    if not any(c in KATAKANA_LOOKALIKES for c in text):
+        return text
+    out = list(text)
+    for i, ch in enumerate(text):
+        if ch not in KATAKANA_LOOKALIKES:
+            continue
+        before = text[i - 1] if i else ''
+        after = text[i + 1] if i + 1 < len(text) else ''
+        kanji = lambda c: '一' <= c <= '鿿'
+        if (after and _katakana(after) and (_katakana(before) or not kanji(before))) if before else (after and _katakana(after)):
+            out[i] = KATAKANA_LOOKALIKES[ch]
+        elif ch == '一' and before and _katakana(before) and not ('\u4e00' <= after <= '\u9fff'):
+            out[i] = 'ー'
+    return ''.join(out)
+
+
+def punctuation_from_reader(crop, best, reader):
+    """Arabic sentence punctuation and spaces from a second reading that has exactly the same letters
+    and digits. PaddleOCR's Arabic model drops the full stop and the space after it ("أخرىيجب" for
+    "أخرى. يجب", Arabic development scans, 2026-11-24); Tesseract's Arabic model reads the same
+    letters with them. Letters and digits never change; diacritics follow the second reading."""
+    import unicodedata
+    try:
+        other = reader.predict(crop)[0]
+    except Exception:
+        return best
+    text, found = best.get('text') or '', (other.get('rec_text') or '').strip()
+    if not found or found == text.strip() or other.get('rec_score', 0) < .75:
+        return best
+    core = lambda t: ''.join(c for c in t if unicodedata.category(c)[0] in 'LN')
+    if core(text) != core(found):
+        return best
+    return dict(best, text=found, spacing='second_model_punctuation')
+
+
+SCRIPT_LETTERS = {'bn': ('ঀ', '৿'), 'hi': ('ऀ', 'ॿ'), 'ar': ('؀', 'ۿ'),
+                  'ko': ('가', '힣')}
+
+
+def script_islands(best, candidates, language):
+    """A word of the line's own script read as Latin letters between words of that script: Tesseract's
+    Bengali model read "সেবা ডেস্কে যোগাযোগ" as "সেবা COCS যোগাযোগ" in four of seven views, and
+    the second Bengali model agreed (Bengali development scan, 2026-11-24). Such a word is replaced
+    only when other views of the line read every other word the same and give one word of the
+    script in its place, scoring within 0.05 of the chosen view. A Latin word no view reads in the
+    script (a currency, a code, a product name) stays."""
+    letters = SCRIPT_LETTERS.get(language)
+    text = best.get('text') or ''
+    if not letters or not re.search(r'[A-Za-z]', text):
+        return best
+    native = lambda word: any(letters[0] <= ch <= letters[1] for ch in word)
+    latin = lambda word: bool(re.fullmatch(r'[A-Za-z]+', word))
+    words = text.split()
+    islands = [i for i, w in enumerate(words) if latin(w)
+               and (i == 0 or native(words[i - 1])) and (i == len(words) - 1 or native(words[i + 1]))
+               and any(native(words[j]) for j in (i - 1, i + 1) if 0 <= j < len(words))]
+    if not islands:
+        return best
+    for i in islands:
+        found = {}
+        for c in candidates:
+            other = (c.get('text') or '').split() if isinstance(c, dict) else []
+            if (len(other) == len(words) and c.get('score', 0) >= best.get('score', 0) - .05
+                    and all(a == b for j, (a, b) in enumerate(zip(words, other)) if j != i)
+                    and native(other[i]) and not re.search(r'[A-Za-z]', other[i])):
+                found[other[i]] = found.get(other[i], 0) + 1
+        if len(found) == 1:
+            words[i] = next(iter(found))
+    replaced = ' '.join(words)
+    return best if replaced == ' '.join(text.split()) else dict(best, text=replaced, script_island='replaced')
+
+
+INDIC_DIGITS = {'hi': '०१२३४५६७८९', 'bn': '০১২৩৪৫৬৭৮৯'}
+
+
+def western_digits(text, language):
+    """Devanagari or Bengali digits read in a number written with Western digits: "३0" for 30,
+    "५ से ३0" for "5 से 30" (Hindi development scan, 2026-11-24). A number never mixes digit scripts,
+    so a mixed number is Western, and a line holding Western digits has its other digits Western too.
+    A line written entirely in the script's own digits is left as it is."""
+    native = INDIC_DIGITS.get(language)
+    if not native or not any(c in native for c in text):
+        return text
+    to_western = str.maketrans(native, '0123456789')
+    if re.search(r'[0-9]', text):
+        return text.translate(to_western)
+    return text
 
 
 def consensus_key(text):
@@ -164,16 +458,33 @@ def redaction_word_candidates(crop, record, primary, secondary_factory, language
 
 # Recognition model per source language. PP-OCRv5_server_rec reads Chinese, Japanese and English
 # but not Hangul, so scanned Korean pages were not read before korean_PP-OCRv5_mobile_rec (2026-11-19).
-# A language without its own model here uses PP-OCRv5_server_rec.
-RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec'}
+# Arabic, Devanagari and accented Latin letters are not in it either; their own PP-OCRv5 models read
+# them (2026-11-21). A language without its own model here (Chinese, Japanese; Bengali, for which
+# PaddleOCR has no model) uses PP-OCRv5_server_rec. tools/gpu/setup_transformx.sh installs them all.
+LATIN_RECOGNIZER = 'latin_PP-OCRv5_mobile_rec'
+RECOGNIZERS = {'en': 'en_PP-OCRv5_mobile_rec', 'ko': 'korean_PP-OCRv5_mobile_rec', 'ar': 'arabic_PP-OCRv5_mobile_rec',
+               'hi': 'devanagari_PP-OCRv5_mobile_rec', 'fr': LATIN_RECOGNIZER, 'de': LATIN_RECOGNIZER,
+               'es': LATIN_RECOGNIZER, 'pt': LATIN_RECOGNIZER}
 GENERAL_RECOGNIZER = 'PP-OCRv5_server_rec'
+# Languages whose pages need their own model: the general one cannot read their letters.
+OWN_SCRIPT = {language for language in RECOGNIZERS if language != 'en'} | {'bn'}
 # For a language read by one model, a second installed model that reads digits (it need not read the
 # language) confirms the numbers of a line. Chinese and Japanese lines with a number had none, so
 # every such line kept its source pixels and scanned contracts stayed half untranslated (2026-11-19).
-DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
+DIGIT_CHECKERS = {'korean_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, 'arabic_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER,
+                  'devanagari_PP-OCRv5_mobile_rec': GENERAL_RECOGNIZER, LATIN_RECOGNIZER: GENERAL_RECOGNIZER,
+                  GENERAL_RECOGNIZER: 'en_PP-OCRv5_mobile_rec'}
+
+
+TESSERACT_RECOGNIZER = 'tesseract_ben'   # tools/ocr/tesseract_line.py: Bengali, which PaddleOCR cannot read
+DIGIT_CHECKERS[TESSERACT_RECOGNIZER] = GENERAL_RECOGNIZER
 
 
 def recognition_model_name(language):
+    if language == 'bn':
+        from tools.ocr.tesseract_line import available
+        if available('bn'):
+            return TESSERACT_RECOGNIZER
     return RECOGNIZERS.get(language, GENERAL_RECOGNIZER)
 
 
@@ -191,7 +502,7 @@ def independent_literal_evidence(candidates,text):
         return False
     allowed={'en_PP-OCRv5_mobile_rec','PP-OCRv5_server_rec'}
     key=consensus_key(text)
-    if any(c.get('score',0)>=.95 and consensus_key(c.get('text',''))!=key for c in candidates):return False
+    if any(c.get('score',0)>=.95 and consensus_key(c.get('text',''))!=key for c in line_views(candidates)):return False
     groups={model:[c for c in candidates if c.get('model')==model and
                    consensus_key(c.get('text',''))==key] for model in allowed}
     if any(not views for views in groups.values()):return False
@@ -214,6 +525,128 @@ SINGLE_MODEL_VIEWS = 3
 
 def digits(text):
     return ''.join(re.findall(r'\d', text or ''))
+
+
+# Arabic lines mixing letters and numbers ("شروط الدفع: 30 يومًا", "المجموع الفرعي: 70,802.19"): the
+# Arabic model read the letters but dropped the digits and colon (about 50 digits of one invoice,
+# evaluation/ocr/bench.py, 2026-11-23), so the line stayed unresolved and kept its source pixels.
+# Tesseract's Arabic model reads such lines whole but misreads more letters on plain lines. Its read
+# replaces an unresolved line only when its digits equal those of the independent digit model and its
+# letters match the Arabic model's (spaces and marks aside, at least 60% alike: the same line, where
+# the Arabic model's own letters were also misread, "المبلاق" for "المبلغ المستحق").
+DIGIT_RESCUE = {'ar'}
+
+
+def second_model_agreement(crops, candidates, language, reader):
+    """A reading from a second, separately trained model (tesseract_line.SECOND_MODELS) that gives
+    exactly the characters of a reading of the first, spaces and letter case aside: that reading,
+    recorded as the second model's, else None. reader() returns the second model.
+
+    Two independently trained models giving the same characters is the evidence; each must still be
+    fairly sure (0.7 and 0.75). Small katakana in Japanese scans are read at 0.7-0.85 by the first
+    model, and those lines stayed untranslated (9.8% of a Japanese development scan, 2026-11-24)."""
+    from transformation.ocr.read_alike import characters
+    same = (lambda t: characters(katakana_lookalikes(t))) if language == 'ja' else characters
+    confident = [c for c in line_views(candidates) if isinstance(c.get('text'), str) and c['text'].strip()
+                 and isinstance(c.get('score'), (int, float)) and c['score'] >= .7]
+    if not confident:
+        return None
+    try:
+        model = reader()
+        readings = [model.predict(crop)[0] for crop in crops]
+    except Exception:
+        return None
+    for other in readings:
+        if other['rec_score'] < .75 or not other['rec_text'].strip():
+            continue
+        match = [c for c in confident if same(c['text']) == same(other['rec_text'])]
+        if match:
+            best = max(match, key=lambda c: c['score'])
+            return {'text': best['text'], 'score': min(best['score'], other['rec_score']), 'variant': 'second_model',
+                    'model': 'tesseract_' + model.code.split('+')[0].lower()}
+    return None
+DIGITS_DROPPED = 'digits_dropped_by_language_model'   # never rebuilt from this reading
+
+
+def digit_rescue(crop, best, digit_model, language):
+    import difflib
+    import unicodedata
+    from tools.ocr.tesseract_line import TesseractRecognizer, available
+    if not available(language):
+        return None
+    try:
+        checker = digit_model()
+        general = str(list(checker.predict(crop))[0]['rec_text'])
+        other = TesseractRecognizer(language).predict(crop)[0]
+    except Exception:
+        return None
+    wanted = digits(general)
+    if not wanted or digits(other['rec_text']) != wanted or digits(best['text']) == wanted:
+        return None
+    letters = lambda t: ''.join(c for c in t if unicodedata.category(c).startswith('L') and not c.isascii())
+    a, b = letters(best['text']), letters(other['rec_text'])
+    if not a or difflib.SequenceMatcher(None, a, b).ratio() < 0.6:
+        return None
+    return {'text': other['rec_text'], 'score': max(other['rec_score'], best.get('score', 0)),
+            'variant': 'digit_rescue', 'model': 'tesseract_' + language}
+
+
+def dropped_digits(crop, best, recognizer):
+    """(read with the numbers, numbers dropped) for a line the language model read confidently.
+
+    PaddleOCR's Arabic model drops Western digits written inside Arabic text and reads the rest of
+    the line with full confidence: "تتراوح بين 5 و30 درجة" came back as "تتراوح بين و درجة" in every
+    view, and the translation said "between and degrees" (Arabic scan, 2026-11-23). Tesseract's
+    Arabic model reads those lines whole. When it finds digits the line lacks, its read replaces the
+    line if a second view gives the same digits and its letters match the language model's (spaces,
+    marks and punctuation aside, at least 75% alike); otherwise the digits are known to be missing
+    and the line keeps its source pixels."""
+    import cv2
+    import difflib
+    import unicodedata
+    # Digits are dropped only inside the language's own words: a date or code line ("2025-07-16")
+    # has nothing for the language model to drop, and Tesseract misreading it flagged 8 of 9 dates of
+    # an Arabic invoice (2026-11-23).
+    if not re.search(r'[^\W\d_]', best.get('text', '')) or all(c.isascii() for c in best.get('text', '') if c.isalpha()):
+        return None, False
+    first = recognizer.predict(crop)[0]
+    wanted = digits(first['rec_text'])
+    if not wanted or wanted == digits(best['text']):
+        return None, False
+    second = recognizer.predict(cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))[0]
+    letters = lambda t: ''.join(c for c in t if unicodedata.category(c).startswith('L') and not c.isascii())
+    a, b = letters(best['text']), letters(first['rec_text'])
+    if digits(second['rec_text']) != wanted or not a or difflib.SequenceMatcher(None, a, b).ratio() < .75:
+        return None, True
+    text = re.sub(r'[\u200e\u200f\u202a-\u202e\u2066-\u2069]', '', first['rec_text']).strip()   # direction marks
+    return {'text': text, 'score': min(first['rec_score'], second['rec_score']),
+            'variant': 'tesseract_digits', 'model': 'tesseract_' + recognizer.code}, True
+
+
+def latin_line_reread(crop, reads, english, general):
+    """(reading, True) for a line without letters of the page's own script, read alike by the English
+    and the general model, else (None, False).
+
+    A Bengali or Arabic page's codes, amounts, dates and addresses ("APC-2019-37861", "88") were read
+    by the page's own model (Tesseract for Bengali) with confidence just under the bar and kept their
+    source pixels: 16 of 111 lines of a Bengali invoice (2026-11-23). Two Latin models are better
+    readers of Latin letters and digits, and independent: the line is accepted when their four
+    readings (the crop and twice its size) give the same text, each with confidence 0.90 or more."""
+    import cv2
+    texts = [r['text'] for r in reads if r.get('text', '').strip()]
+    if not texts or any(c.isalpha() and not c.isascii() for t in texts for c in t):
+        return None, False
+    found = []
+    for name, model in (('en_PP-OCRv5_mobile_rec', english()), (GENERAL_RECOGNIZER, general())):
+        for variant, view in (('latin_reread', crop), ('latin_reread_2x', cv2.resize(crop, None, fx=2, fy=2, interpolation=cv2.INTER_CUBIC))):
+            output = list(model.predict(view))
+            if len(output) != 1:
+                return None, False
+            found.append({'text': str(output[0]['rec_text']), 'score': float(output[0]['rec_score']), 'variant': variant, 'model': name})
+    reads.extend(found)
+    if all(f['text'].strip() and f['score'] >= .90 for f in found) and len({consensus_key(f['text']) for f in found}) == 1:
+        return max(found, key=lambda f: f['score']), True
+    return None, False
 
 
 def bounded_recognition(crop,primary,secondary_factory,language,padded=None,digit_checker=None):
@@ -317,7 +750,15 @@ def single_model_consensus(reads,crop,digit_checker,sensitive,primary=None,check
     """(reading, decision) when the views of a one-model language agree well enough, else None.
     Values other than digits (emails, currency, underscores) always stay for review."""
     import cv2
-    strong=[r for r in reads if r['text'].strip() and r['score']>=SINGLE_MODEL_SCORE]
+    # Tesseract's confidences run lower than PaddleOCR's for the same certainty: six identical
+    # readings of "চালান INV-2020-26701" scored 0.86-0.90 and the line kept its pixels (Bengali
+    # invoice, 2026-11-23). When every Tesseract view reads the same text, 0.85 is the bar.
+    threshold=SINGLE_MODEL_SCORE
+    texts=[r['text'] for r in reads if r['text'].strip()]
+    if (reads and all(str(r.get('model','')).startswith('tesseract') for r in reads)
+            and len(texts)==len(reads) and len(set(texts))==1):
+        threshold=.85
+    strong=[r for r in reads if r['text'].strip() and r['score']>=threshold]
     if not strong: return None
     best=max(strong,key=lambda r:r['score'])
     # Spacing is ignored entirely here: the Korean model often drops a space, which joins a number to
@@ -400,6 +841,14 @@ def source_word_segments(crop,max_segments=4):
     return [crop[:,a:b] for a,b in zip(cuts,cuts[1:])]
 
 
+def line_views(candidates):
+    """Readings of the whole line: the digit checker's readings of pieces of a line (a number, one
+    letter) are not. A Korean held-out line became "L", a piece read at 0.98, although five readings
+    of the line agreed at 0.90-0.92 (2026-11-24); the piece also counted as a strong reading that
+    contradicted them."""
+    return [c for c in candidates if not str(c.get('variant', '')).startswith('digit_check_piece_')]
+
+
 def refine_recognition(crop,primary,secondary_factory,language,previous):
     """A bounded second stage for unresolved small text, without text correction."""
     import cv2
@@ -434,6 +883,7 @@ def refine_recognition(crop,primary,secondary_factory,language,previous):
         strong_views=[r for r in reads if r['score']>=.95]
         if len(keys)==1 and len(strong_views)>=2:
             confirmed=max(strong_views,key=lambda r:r['score'])
+    previous=line_views(previous)
     strong={consensus_key(r['text']) for r in previous if r['score']>=.95 and r['text'].strip()}
     if confirmed and (not strong or strong=={consensus_key(confirmed['text'])}):
         return confirmed,False,'targeted_source_model_agreement',reads
@@ -502,6 +952,12 @@ def main(argv=None, model_factory=None):
         rect = pdf[0].rect
         page_width, page_height = rect.width, rect.height
     polygons = detector_polygons(detection['dt_polys'])
+    recovered = 0
+    if len(polygons) and args.profile == 'bounded':
+        found = len(polygons)
+        polygons, recovered = recover_missed_text(image, polygons)
+        if recovered:
+            print(f'Recovered {recovered} stretch(es) of text the detector left out.', flush=True)
     if len(polygons)==0 and not args.prepare_only:
         from importlib.metadata import version
         out.mkdir()
@@ -536,7 +992,7 @@ def main(argv=None, model_factory=None):
         if not ok:
             raise ValueError(f'Cannot encode crop {i+1}')
         path.write_bytes(encoded.tobytes())
-        records.append({'id': f'p1_line{i+1}', 'detector_index': i,
+        records.append({'id': f'p1_line{i+1}', 'detector_index': i, **({'recovered': True} if recovered and i >= found else {}),
                         'polygon_pixels': poly.tolist(), 'crop': str(path),
                         'crop_polygon_pixels': crop_polygons[i].tolist(),
                         'bbox': [float(poly[:,0].min()*page_width/width), float(poly[:,1].min()*page_height/height),
@@ -549,11 +1005,14 @@ def main(argv=None, model_factory=None):
         faulthandler.enable(file=crash)
         from paddleocr import TextRecognition
         from importlib.metadata import version
-        # A Korean page always needs the Korean model: the general one cannot read Hangul.
-        model_name = recognition_model_name(args.source_language) if args.profile=='bounded' or args.source_language=='ko' else GENERAL_RECOGNIZER
+        # A Korean, Arabic, Hindi or accented Latin page always needs its own model: the general one
+        # cannot read its letters.
+        model_name = recognition_model_name(args.source_language) if args.profile=='bounded' or args.source_language in OWN_SCRIPT else GENERAL_RECOGNIZER
+        if args.source_language == 'bn':
+            model_name = recognition_model_name('bn')
         secondary_model = None
         cache = Path.home() / '.paddlex/official_models' / model_name
-        if not cache.is_dir():
+        if model_name != TESSERACT_RECOGNIZER and not cache.is_dir():
             raise ValueError(f'Existing recognition model not found: {cache}')
         metadata = {'status': 'processing', 'model': model_name, 'device': args.device, 'cpu_threads': 10,'profile':args.profile,
                     'targeted_retry':'source-density-tight-word-gaps-v1' if args.profile=='bounded' else None,
@@ -574,7 +1033,11 @@ def main(argv=None, model_factory=None):
         started = time.monotonic()
         try:
             print(f'Loading existing recognition model on {args.device}...', flush=True)
-            model = (model_factory or TextRecognition)(model_name=model_name, model_dir=str(cache), device=args.device, enable_mkldnn=False, cpu_threads=10)
+            if model_name == TESSERACT_RECOGNIZER:
+                from tools.ocr.tesseract_line import TesseractRecognizer
+                model = TesseractRecognizer('bn')
+            else:
+                model = (model_factory or TextRecognition)(model_name=model_name, model_dir=str(cache), device=args.device, enable_mkldnn=False, cpu_threads=10)
             general_model=None
             def digit_model():
                 # A second opinion on a line's numbers only (DIGIT_CHECKERS): the general model reads
@@ -585,11 +1048,55 @@ def main(argv=None, model_factory=None):
                 return general_model
             def verification_model():
                 nonlocal secondary_model
-                if (args.profile=='bounded' or args.source_language=='ko') and args.source_language!='en': return model
+                if (args.profile=='bounded' or args.source_language in OWN_SCRIPT) and args.source_language!='en': return model
                 if secondary_model is None:
                     name='PP-OCRv5_server_rec' if model_name=='en_PP-OCRv5_mobile_rec' else 'en_PP-OCRv5_mobile_rec'
                     secondary_model=(model_factory or TextRecognition)(model_name=name,device=args.device,enable_mkldnn=False,cpu_threads=10)
                 return secondary_model
+            if model_name == TESSERACT_RECOGNIZER:
+                import cv2
+                import numpy as np
+                def contrast(crop):   # the same view bounded_recognition builds
+                    gray=cv2.cvtColor(crop,cv2.COLOR_BGR2GRAY)
+                    if float(np.median(np.concatenate([gray[0],gray[-1]])))<128: gray=255-gray
+                    return cv2.cvtColor(cv2.resize(gray,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC),cv2.COLOR_GRAY2BGR)
+                double=lambda c:cv2.resize(c,None,fx=2,fy=2,interpolation=cv2.INTER_CUBIC)
+                model.prefetch([v for c,p in zip(unpadded_crops,crops) for v in (c,double(c),contrast(c),p,double(p))])
+            english = general_extra = None
+            def english_model():
+                nonlocal english
+                if english is None:
+                    english = (model_factory or TextRecognition)(model_name='en_PP-OCRv5_mobile_rec', device=args.device, enable_mkldnn=False, cpu_threads=10)
+                return english
+            def general_reader():
+                # The general model itself: the page's model when it is the general one (Chinese,
+                # Japanese), else the digit checker when that is the general model, else loaded here.
+                if model_name == GENERAL_RECOGNIZER:
+                    return model
+                if DIGIT_CHECKERS.get(model_name) == GENERAL_RECOGNIZER:
+                    return digit_model()
+                nonlocal general_extra
+                if general_extra is None:
+                    general_extra = (model_factory or TextRecognition)(model_name=GENERAL_RECOGNIZER, device=args.device, enable_mkldnn=False, cpu_threads=10)
+                return general_extra
+            from tools.ocr.tesseract_line import SECOND_MODELS   # imported here, as the other OCR helpers are
+            second = None
+            def second_reader():
+                nonlocal second
+                if second is None:
+                    from tools.ocr.tesseract_line import TesseractRecognizer, available
+                    if not available(args.source_language, SECOND_MODELS[args.source_language]):
+                        raise RuntimeError('Second recognition model not installed.')
+                    second = TesseractRecognizer(args.source_language, SECOND_MODELS[args.source_language])
+                return second
+            digit_reader = None
+            if args.profile == 'bounded' and args.source_language in DIGIT_RESCUE:
+                # Checks every confidently read line for dropped digits (dropped_digits); all crops
+                # are read at once, a few seconds per page.
+                from tools.ocr.tesseract_line import TesseractRecognizer, available
+                if available(args.source_language):
+                    digit_reader = TesseractRecognizer(args.source_language)
+                    digit_reader.prefetch(unpadded_crops)
             with (out / 'lines.jsonl').open('w', encoding='utf-8') as evidence:
                 for i, record in enumerate(records):
                     if args.profile=='bounded':
@@ -599,6 +1106,49 @@ def main(argv=None, model_factory=None):
                             detail=source_detail_crop(report['source'],record['bbox'],crops[i])
                             best,review,decision,retries=refine_recognition(detail,model,verification_model,args.source_language,candidates)
                             candidates.extend(retries)
+                        if review and args.source_language in DIGIT_RESCUE:
+                            rescued=digit_rescue(unpadded_crops[i],best,digit_model,args.source_language)
+                            if rescued:
+                                candidates.append(rescued)
+                                best,review,decision=rescued,False,'second_engine_digits_verified'
+                        if review and args.source_language in SECOND_MODELS:
+                            agreed=second_model_agreement((unpadded_crops[i],crops[i]),candidates,args.source_language,second_reader)
+                            if agreed:
+                                candidates.append(agreed)
+                                best,review,decision=agreed,False,'second_model_agrees'
+                        if review and args.source_language in OWN_SCRIPT and args.source_language != 'en':
+                            reread,accepted=latin_line_reread(unpadded_crops[i],candidates,english_model,general_reader)
+                            if accepted:
+                                best,review,decision=reread,False,'latin_models_agree'
+                        if not review and digit_reader is not None:
+                            rescued,dropped=dropped_digits(unpadded_crops[i],best,digit_reader)
+                            if rescued:
+                                candidates.append(rescued)
+                                best,decision=rescued,'tesseract_digits_verified'
+                            elif dropped:
+                                review,decision=True,DIGITS_DROPPED
+                        best=voted_spacing(best,candidates)
+                        if args.source_language=='ar' and digit_reader is not None:
+                            best=punctuation_from_reader(unpadded_crops[i],best,digit_reader)
+                        if args.source_language in INDIC_DIGITS:
+                            best=dict(best,text=western_digits(best['text'],args.source_language))
+                        if args.source_language in SCRIPT_LETTERS:
+                            best=script_islands(best,candidates,args.source_language)
+                        if args.source_language in ('ko','ja','zh') and model_name!=TESSERACT_RECOGNIZER:
+                            best=gap_spacing(crops[i],best,model,args.source_language,candidates)   # padded: the tight crop has no background rows
+                        if args.source_language=='ja':
+                            for c in candidates:
+                                if isinstance(c.get('text'),str): c['text']=katakana_lookalikes(c['text'])
+                            best=dict(best,text=katakana_lookalikes(best['text']))
+                        import unicodedata as _ud
+                        if record.get('recovered') and (review or best['score']<.6
+                                                        or sum(c.isalnum() for c in best['text'])<2
+                                                        or _ud.category(best['text'].strip()[:1] or ' ').startswith('M')):
+                            # A recovered stretch kept only when read clearly: a piece of a rule ("一",
+                            # 0.53) or a cut through a syllable (a line starting with a vowel sign) is not a line.
+                            print(f'Recovered box {i+1} dropped: nothing read clearly.',flush=True)
+                            record['dropped']=True
+                            continue
                         record.update(text=best['text'],recognition_score=best['score'],candidates=candidates,
                                       requires_review=review,recognition_decision=decision)
                         # Localization evidence supplements the transcription. It
@@ -733,6 +1283,7 @@ def main(argv=None, model_factory=None):
                     evidence.write(json.dumps(record, ensure_ascii=False) + '\n')
                     evidence.flush()
                     print(f'Recognized {i+1}/{len(records)}', flush=True)
+            records = [r for r in records if not r.get('dropped')]   # recovered boxes that read as nothing
             (out / 'review.txt').write_text('\n'.join(f"{r['id']} | {r['recognition_score']:.3f} | {r['text']}" for r in records), encoding='utf-8')
             ordered = sorted(records, key=lambda r: (r['bbox'][1], r['bbox'][0]))
             (out / 'review-top-to-bottom.txt').write_text(

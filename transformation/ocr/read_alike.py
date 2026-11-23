@@ -12,8 +12,18 @@ times (crops with different padding), and one of those readings can drop a separ
 or more models give exactly its characters and outnumber the confident readings that differ;
 otherwise its source pixels are kept, as before.
 
-Both ignore spaces and letter case. A single model or no recorded readings keep a line uncertain.
+Both ignore spaces and letter case. No recorded readings keep a line uncertain. A single model keeps a
+line uncertain too, except in reads_consistently for a line of words only (below).
+
+Korean, Japanese, Chinese, Arabic and Hindi are read by one recognition model. With the two-model rule
+alone every uncertain line of those scans kept its source pixels, so a Korean page translated into
+English kept Korean sentences whose five readings differed only in a final period or a comma
+(2026-11-23). A line without digits or "@" whose readings all come from that one model is rebuilt
+when three or more confident readings give the same letters, punctuation aside, and outnumber the
+readings that differ. Lines with numbers, e-mail addresses and codes keep the two-model rule.
 """
+import re
+import unicodedata
 
 
 def characters(text):
@@ -41,10 +51,54 @@ def read_alike(region):
     return _models(confident) >= 2
 
 
+def letters(text):
+    """The text's characters without spaces, letter case or punctuation (words only)."""
+    return ''.join(c for c in characters(text) if not unicodedata.category(c).startswith('P'))
+
+
+def _one_model(region):
+    """True when every recorded reading names the same single model (the language has one recognizer)."""
+    names = {c.get('model') for c in region.get('metadata', {}).get('candidates', [])
+             if isinstance(c, dict) and c.get('purpose') != 'redaction_geometry_only'}
+    return len(names) == 1 and None not in names
+
+
 def reads_consistently(region):
     """True when confident readings from two or more models give the region's characters (ignoring
-    spaces and letter case) and outnumber the confident readings that differ."""
+    spaces and letter case) and outnumber the confident readings that differ; or, for a line of words
+    only that one model reads, when three or more confident readings give its letters and outnumber
+    the readings that differ."""
+    if region.get('metadata', {}).get('recognition_decision') == 'digits_dropped_by_language_model':
+        return False      # the readings agree, but all lack the line's numbers (recognize_paddle_boxes.dropped_digits)
     key, confident = _readings(region)
+    # A line whose digits the language model dropped and Tesseract read in two views, its letters
+    # matching (recognize_paddle_boxes.dropped_digits, digit_rescue): "تتراوح بين 5 و30 درجة". The
+    # numbers have no second recognizer, so the PII review queue (read_alike) still lists the line.
+    if any(c.get('variant') in ('tesseract_digits', 'digit_rescue') and characters(c['text']) == key for c in confident):
+        return True
+    # Two separately trained models gave the line's characters (recognize_paddle_boxes.second_model_agreement).
+    readings = region.get('metadata', {}).get('candidates', [])
+    if any(isinstance(c, dict) and c.get('variant') == 'second_model' and isinstance(c.get('text'), str)
+           and characters(c['text']) == key for c in readings):
+        return True
     agree = [c for c in confident if characters(c['text']) == key]
-    if not agree or len(agree) <= len(confident) - len(agree): return False
-    return _models(agree) >= 2
+    if agree and len(agree) > len(confident) - len(agree) and _models(agree) >= 2:
+        return True
+    text = region.get('text', '')
+    if not confident or re.search(r'[\d@]', text) or any(re.search(r'[\d@]', c['text']) for c in confident):
+        return False
+    if not _one_model(region) or not letters(text):
+        return False
+    same = [c for c in confident if letters(c['text']) == letters(text)]
+    return len(same) >= 3 and len(same) > len(confident) - len(same)
+
+
+def literal_line(region):
+    """True when the line and two or more confident readings of it are each a literal that needs no
+    translation (an e-mail address, code, number or date): a scan keeps such a line's source pixels
+    without asking for a review of the reading."""
+    from transformation.llm.policy import expected_unchanged
+    text = region.get('text', '').strip()
+    _, confident = _readings(region)
+    if not text or len(confident) < 2 or not expected_unchanged(text): return False
+    return all(expected_unchanged(c['text'].strip()) for c in confident)

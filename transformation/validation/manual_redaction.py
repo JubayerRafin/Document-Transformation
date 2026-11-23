@@ -62,7 +62,7 @@ def redact_regions(source, destination, regions, source_sha256):
     if hashlib.sha256(data).hexdigest() != source_sha256:
         raise ValueError('The reviewed PDF version has changed.')
     with pymupdf.open(stream=data, filetype='pdf') as doc:
-        if doc.needs_pass or not 1 <= len(doc) <= 200:
+        if doc.needs_pass or not 1 <= len(doc) <= 1000:
             raise ValueError('Unsupported encrypted PDF or page count.')
         regions = validate_regions(regions, len(doc))
         # Preserve visible form values as page content, then remove interactive

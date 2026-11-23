@@ -7,8 +7,10 @@ import pymupdf
 
 def location(data,language,device,root):
     repo=Path(__file__).resolve().parents[2]
-    profiles={name:hashlib.sha256((repo/'tools/ocr'/name).read_bytes()).hexdigest()
-              for name in ('diagnose_paddle_detector.py','recognize_paddle_boxes.py','run_gpu_ocr.py','raster_policy.py')}
+    # Every OCR source file is part of the key: with four named files, a change to the Tesseract
+    # recognizer (tools/ocr/tesseract_line.py) reused the old readings (2026-11-23).
+    profiles={path.name:hashlib.sha256(path.read_bytes()).hexdigest()
+              for path in sorted((repo/'tools/ocr').glob('*.py'))}
     with pymupdf.open(stream=data,filetype='pdf') as pdf:
         if len(pdf)!=1: raise ValueError('OCR cache requires a single page.')
         from tools.ocr.raster_policy import render_page

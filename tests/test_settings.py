@@ -191,6 +191,36 @@ class WorkerModelChoiceTests(unittest.TestCase):
         self.assertIs(pii, cfg['engine_profile'])
         self.assertEqual(caught.exception.code, 'TRANSLATION_MODEL_UNAVAILABLE')
 
+    def test_pii_models_are_offered_and_used_like_translation_models(self):
+        from tools.service import cloud_worker
+        pii_key = Path(self.temp.name) / 'pii-key'
+        pii_key.write_text('sk-pii-not-real', encoding='utf-8')
+        with self.path.open('a', encoding='utf-8') as f:
+            f.write('[pii]\nlabel = "Qwen local"\n'
+                    '[pii_models.openai]\nlabel = "GPT PII"\nendpoint = "https://api.example/v1"\n'
+                    f'model = "gpt-5-mini"\nkey_file = {json.dumps(str(pii_key))}\n')
+        served = lambda workflow, model, endpoint, base, names: workflow == 'PII only'
+        cfg = {'engine_profile': {'pii_endpoint': 'http://127.0.0.1:8000/v1', 'pii_model': 'qwen3.5-9b-fp8'}}
+        with self.env(TRANSFORMX_PII_API_KEY='local-pii-key'), patch.object(cloud_worker, '_served', side_effect=served):
+            offered = cloud_worker.pii_models(cfg['engine_profile'], True)
+            profile, env = cloud_worker.job_translation(cfg, {'operation': 'pii', 'pii_model': 'openai'})
+            both, both_env = cloud_worker.job_translation(
+                cfg, {'operation': 'combined', 'pii_model': 'openai', 'translation_model': 'gateway'})
+            translation_only, _ = cloud_worker.job_translation(cfg, {'operation': 'translation', 'pii_model': 'openai'})
+            with self.assertRaises(cloud_worker.JobFailure) as caught:
+                cloud_worker.job_translation(cfg, {'operation': 'pii', 'pii_model': 'removed'})
+        self.assertEqual(offered, [{'id': 'default', 'label': 'Qwen local', 'external': False},
+                                   {'id': 'openai', 'label': 'GPT PII', 'external': True}])
+        self.assertEqual((profile['pii_endpoint'], profile['pii_model']), ('https://api.example/v1', 'gpt-5-mini'))
+        self.assertEqual(cfg['engine_profile']['pii_model'], 'qwen3.5-9b-fp8')  # server profile unchanged
+        self.assertEqual(env['TRANSFORMX_PII_API_KEY_FILE'], str(pii_key))
+        self.assertNotIn('TRANSFORMX_PII_API_KEY', env)
+        self.assertIn('https://api.example/v1', env['TRANSFORMX_OPENAI_COMPATIBLE'])
+        self.assertEqual((both['pii_model'], both['translation_model']), ('gpt-5-mini', 'team-model'))
+        self.assertEqual(both_env['TRANSFORMX_TRANSLATION_ENDPOINT'], 'http://127.0.0.1:8020/v1')
+        self.assertIs(translation_only, cfg['engine_profile'])
+        self.assertEqual(caught.exception.code, 'PII_MODEL_UNAVAILABLE')
+
     def test_named_models_are_checked_in_the_file(self):
         bad = Path(self.temp.name) / 'bad.toml'
         bad.write_text('[translation_models.default]\nendpoint = "https://x/v1"\nmodel = "m"\n'
