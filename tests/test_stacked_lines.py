@@ -242,6 +242,36 @@ class OverlappingFragmentTests(unittest.TestCase):
         self.assertEqual(join_overlapping_fragments(page, lambda p: None), 2)
         self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['a', 'c'])
 
+    def test_short_arabic_pieces_beside_their_line_join_it(self):
+        """Arabic report, 2026-11-23: "ساعات استشا" | "ر" | "ة" in one table cell; "رة" became "Rate"."""
+        from transformation.layout.stacked_lines import join_overlapping_fragments
+        main = self.piece('m', 'ساعات استشا', 496.28, 329.58, 545.28, 338.68)
+        ra = self.piece('r', 'ر', 491.77, 327.43, 494.72, 332.34)
+        ta = self.piece('t', 'ة', 488.77, 329.58, 491.77, 335.71)
+        page = NS(pdf_paragraph=[main, ra, ta])
+        boxes = {id(p.pdf_paragraph_composition[0]): p.box for p in (main, ra, ta)}
+
+        def update(p):  # as BabelDOC: the joined paragraph's box covers all its pieces
+            parts = [boxes[id(comp)] for comp in p.pdf_paragraph_composition]
+            p.box = NS(x=min(q.x for q in parts), y=min(q.y for q in parts),
+                       x2=max(q.x2 for q in parts), y2=max(q.y2 for q in parts))
+        self.assertEqual(join_overlapping_fragments(page, update), 2)
+        self.assertEqual(len(page.pdf_paragraph), 1)
+        text = ''.join(c.char_unicode for comp in page.pdf_paragraph[0].pdf_paragraph_composition
+                       for c in comp.pdf_line.pdf_character)
+        self.assertEqual(text, 'ساعات استشارة')   # right piece first
+
+    def test_arabic_pieces_stay_apart_across_a_rule_or_a_wide_gap(self):
+        from transformation.layout.stacked_lines import join_overlapping_fragments
+        main = self.piece('m', 'ساعات استشا', 496.28, 329.58, 545.28, 338.68)
+        ra = self.piece('r', 'رة', 488.77, 329.58, 494.72, 338.0)
+        rule = NS(box=NS(x=495.0, y=320.0, x2=495.5, y2=345.0))
+        self.assertEqual(join_overlapping_fragments(NS(pdf_paragraph=[main, ra], pdf_curve=[rule]), lambda p: None), 0)
+        far = self.piece('f', 'رة', 480.0, 329.58, 492.0, 338.0)          # 4.3 pt away
+        long_word = self.piece('w', 'استشارات', 470.0, 329.58, 495.0, 338.0)  # both longer than 3 letters
+        self.assertEqual(join_overlapping_fragments(NS(pdf_paragraph=[main, far]), lambda p: None), 0)
+        self.assertEqual(join_overlapping_fragments(NS(pdf_paragraph=[main, long_word]), lambda p: None), 0)
+
     def test_touching_or_latin_pieces_stay_apart(self):
         from transformation.layout.stacked_lines import join_overlapping_fragments
         left = self.piece('l', 'परामर्श', 49.0, 507.3, 74.6, 512.9)

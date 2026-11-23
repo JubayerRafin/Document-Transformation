@@ -482,7 +482,15 @@ def join_overlapping_fragments(page, update):
     and drawn over the others (Hindi report, 2026-11-21). Pieces of these scripts whose boxes
     overlap horizontally and share most of their height are parts of one line: they are joined and
     the line is read again as a whole (unmapped_text.repair_page). Text of other scripts, and pieces
-    that only touch (0.1 pt or less), are left alone. Returns how many pieces were joined into others."""
+    that only touch (0.1 pt or less), are left alone, except a right-to-left piece of at most three
+    letters next to another one of the line: "ساعات استشا" | "ر" | "ة" (consulting hours, in an Arabic
+    report's table cell) came apart where "ر" dips below the line, 1.6 pt between them, and "رة" was
+    translated alone as "Rate" (2026-11-23). Such a short piece within a third of the font size is
+    part of the same line, even when it is a word of its own ("في"), and the joined line is read
+    again whole; it is not joined across a table rule.
+    Returns how many pieces were joined into others."""
+    from transformation.pdf.unmapped_text import RTL
+    rules = None
     joined = 0
     changed = True
     while changed:
@@ -503,8 +511,25 @@ def join_overlapping_fragments(page, update):
                 size = max(_size(a) or _char_size(a), _size(b) or _char_size(b), 1.0)
                 # Pieces overlapping by more than a hair are one word ("कु" | "ल" of "कुल": 0.3 pt).
                 if (a.box.y2 - a.box.y > 1.8 * size or b.box.y2 - b.box.y > 1.8 * size
-                        or min(a.box.y2, b.box.y2) - max(a.box.y, b.box.y) < 0.5 * height
-                        or min(a.box.x2, b.box.x2) - max(a.box.x, b.box.x) <= 0.1):
+                        or min(a.box.y2, b.box.y2) - max(a.box.y, b.box.y) < 0.5 * height):
+                    continue
+                overlap = min(a.box.x2, b.box.x2) - max(a.box.x, b.box.x)
+                if overlap <= 0.1:
+                    texts = [''.join(getattr(c, 'char_unicode', '') or '' for c in _characters(p)) for p in (a, b)]
+                    if not (overlap >= -0.3 * size and all(RTL.search(t) for t in texts)
+                            and min(sum(ch.isalpha() for ch in t) for t in texts) <= 3):
+                        continue
+                    if rules is None:
+                        rules = vertical_rules(page)
+                    if any(a.box.x2 - 0.5 <= (r.x + r.x2) / 2 <= b.box.x + 0.5 and r.y <= max(a.box.y, b.box.y) + 1
+                           and r.y2 >= min(a.box.y2, b.box.y2) - 1 for r in rules):
+                        continue
+                    # Right to left: the right piece is read first.
+                    a.pdf_paragraph_composition[:0] = b.pdf_paragraph_composition
+                    page.pdf_paragraph.remove(b)
+                    update(a)
+                    joined += 1
+                    changed = True
                     continue
                 a.pdf_paragraph_composition.extend(b.pdf_paragraph_composition)
                 page.pdf_paragraph.remove(b)
