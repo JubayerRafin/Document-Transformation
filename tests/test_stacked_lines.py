@@ -169,6 +169,24 @@ class ListMarkerTests(unittest.TestCase):
                        debug_id='list', vertical=False)
         self.assertEqual(self.run_split(paragraph, []), (2, ['1. من المقرر إجراء', '2. يجب', '3. من المقرر']))
 
+    def test_a_short_number_glyph_stays_on_its_line_and_right_edges_may_differ_a_little(self):
+        """Arabic manual on the pod, 2026-11-23: "1." drawn lower and smaller than the letters beside
+        it became a line of its own, and the items' right edges differed by 1.6 pt."""
+        from transformation.layout.stacked_lines import _visual_lines, _item_number
+        chars, y = [], 600.0
+        for n, text in enumerate(['1. من المقرر', '2. يجب', '3. من', '4. يجب']):
+            right = 300.0 + 0.55 * n
+            for i, c in enumerate(text):
+                low = c in '1234.'
+                box = NS(x=right - 5 * (i + 1), y=y - (1.5 if low else 0), x2=right - 5 * i, y2=y + (5 if low else 9))
+                chars.append(NS(char_unicode=c, visual_bbox=NS(box=box), pdf_style=NS(font_size=10.5)))
+            y -= 14
+        self.assertEqual(len(_visual_lines(chars)), 4)
+        self.assertEqual(_item_number('1.'), 1)
+        paragraph = NS(pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=chars, box=None))],
+                       debug_id='list', vertical=False)
+        self.assertEqual(self.run_split(paragraph, [])[0], 3)
+
     def test_lettered_sub_steps_become_paragraphs(self):
         paragraph = self.list_paragraph([['a. Click Add', 'on the page'], ['b. Open another'], ['c. Paste']])
         self.assertEqual(self.run_split(paragraph, []),

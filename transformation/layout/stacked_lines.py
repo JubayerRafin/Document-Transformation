@@ -337,11 +337,14 @@ def list_markers(page):
 
 def _visual_lines(chars):
     """Consecutive characters grouped into the lines they are drawn on (a new line where the text
-    moves down by more than half a character)."""
+    moves down by more than half the font size). The font size, not the drawn height: a period or an
+    Arabic letter's dot is a fraction of it, and an Arabic list's "1." became a line of its own apart
+    from its item's text (2026-11-23)."""
     lines = []
     for char in chars:
         box = char.visual_bbox.box
-        middle, size = (box.y + box.y2) / 2, max(box.y2 - box.y, 1.0)
+        font = getattr(getattr(char, 'pdf_style', None), 'font_size', 0) or 0
+        middle, size = (box.y + box.y2) / 2, max(box.y2 - box.y, font, 1.0)
         if lines and abs(middle - lines[-1]['middle']) <= 0.5 * size:
             lines[-1]['chars'].append(char)
             lines[-1]['x'] = min(lines[-1]['x'], box.x)
@@ -359,7 +362,7 @@ TEXT_BULLETS = set('•●○◦▪■□–—‣⁃∙')
 # manual, items stayed one paragraph, 2026-11-23). A digit after the dot is a decimal, not an item.
 # A gap before the period may read as a space when letters are set apart ("1 . Die Prüfung", German
 # manual, 2026-11-23), and the space after it may be missing ("1.Die").
-ITEM_NUMBER = re.compile(r'(\d{1,2}|[a-z]) ?[.)](?=\s|[^\W\d_])')
+ITEM_NUMBER = re.compile(r'(\d{1,2}|[a-z]) ?[.)](?=\s|[^\W\d_]|$)')
 
 
 def _item_number(text):
@@ -438,7 +441,8 @@ def split_at_list_markers(page, update, make_id):
             edge = 'x2' if RTL.search(first) else 'x'
             expected = number + 1
             for n, line in enumerate(lines[1:], 1):
-                if _item_number(_line_text(line)) == expected and abs(line[edge] - lines[0][edge]) <= 1.5:
+                if (_item_number(_line_text(line)) == expected
+                        and abs(line[edge] - lines[0][edge]) <= max(1.5, 0.25 * (lines[0]['y2'] - lines[0]['y']))):
                     starts.append(n)
                     expected += 1
         cuts = sorted(set(n for n in starts if n > 0))
