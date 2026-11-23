@@ -571,6 +571,14 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 refresh_tables(final_ir)
                 yield emit('reconstruction')
                 native,notes=write_package(safe_data,kind,updates,[]); info['warnings'].extend(notes)
+                native,chart_pairs,chart_failed=office_native.translate_chart_labels(native,translate_one,
+                    workers=int(options.get('office_workers',16)))
+                if chart_pairs or chart_failed:
+                    info['office_chart_labels']={'translated':len(chart_pairs),'kept':len(chart_failed)}
+                    save_json(run/'office-translation.json',{'notes':outcome['notes'],
+                        'pairs':[{'src':a,'mt':b} for a,b in outcome['pairs']+chart_pairs]})
+                if chart_failed:
+                    info['warnings'].append(f'{len(chart_failed)} chart label(s) failed translation validation and keep their source text.')
                 source_rtl=options.get('source','en') in office_native.RTL_LANGUAGES
                 target_rtl=options.get('target','ko') in office_native.RTL_LANGUAGES
                 if source_rtl!=target_rtl:

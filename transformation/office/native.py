@@ -654,3 +654,57 @@ def fit_slides(data, baseline=None, floor=0.6, minimum_pt=9, rounds=3):
                 **_beyond({k: (1 / r, s) for k, (r, s) in measure_tables(data).items()}, base_tables)}
         report['still_overflowing'] = [{'slide': s, 'shape_id': i} for (s, i) in left]
     return data, report
+
+
+_STR_CACHE = re.compile(r'<(?P<p>(?:\w+:)?)strCache\b[^>]*>.*?</(?P=p)strCache>', re.S)
+_CACHE_VALUE = re.compile(r'(<(?P<p>(?:\w+:)?)v>)(?P<text>[^<]*)(</(?P=p)v>)')
+
+
+def translate_chart_labels(data, translate_one, workers=8):
+    """Chart category and series names translated in the chart's text cache, which PowerPoint and Word
+    draw: in the Word and PowerPoint mass test every category ("Barcode scanner") and series name
+    ("Total due") stayed in English while titles were translated (2026-11-24). Each distinct name is
+    translated once through the same checked call as paragraphs; a name that fails its checks keeps
+    its text. Only the cached text changes (the part's other bytes stay as they are); the chart's
+    embedded workbook keeps the original names, so editing the data in Office shows those again.
+    Returns (package, [(name, translation)], [names that failed])."""
+    from html import escape, unescape
+    with zipfile.ZipFile(BytesIO(data)) as package:
+        charts = [n for n in package.namelist() if re.search(r'/charts/chart[^/]*\.xml$', n)]
+        parts = {n: package.read(n).decode('utf-8') for n in charts}
+    names = {}
+    for xml in parts.values():
+        for block in _STR_CACHE.finditer(xml):
+            for value in _CACHE_VALUE.finditer(block.group(0)):
+                text = unescape(value.group('text')).strip()
+                if text and re.search(r'[^\W\d_]', text):
+                    names.setdefault(text, None)
+    if not names:
+        return data, [], []
+    failed = []
+
+    def work(text):
+        try:
+            return text, translate_one(text)
+        except Exception:
+            failed.append(text)
+            return text, None
+    with ThreadPoolExecutor(max(1, min(workers, len(names)))) as pool:
+        done = {a: b for a, b in pool.map(work, list(names)) if b and b.strip()}
+    if not done:
+        return data, [], failed
+
+    def rewrite(block):
+        def one(value):
+            text = unescape(value.group('text'))
+            new = done.get(text.strip())
+            return value.group(1) + escape(new.strip(), quote=False) + value.group(4) if new else value.group(0)
+        return _CACHE_VALUE.sub(one, block.group(0))
+    out = BytesIO()
+    with zipfile.ZipFile(BytesIO(data)) as source, zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED) as target:
+        for item in source.infolist():
+            payload = source.read(item.filename)
+            if item.filename in parts:
+                payload = _STR_CACHE.sub(rewrite, parts[item.filename]).encode('utf-8')
+            target.writestr(item, payload)
+    return out.getvalue(), sorted(done.items()), failed
