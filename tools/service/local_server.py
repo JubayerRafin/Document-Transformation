@@ -48,14 +48,16 @@ KEY = re.compile(r'^[A-Za-z0-9_-]{8,120}$')
 JOB_ID = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 # Accepted uploads. A Word or PowerPoint file comes back in its own format; the website shows a PDF
 # preview of it (LibreOffice), made at upload for the source and by the engine for the result.
-FORMATS = ('pdf', 'docx', 'pptx')
-MEDIA = {'pdf': 'application/pdf',
+FORMATS = ('pdf', 'docx', 'pptx', 'doc', 'ppt')
+# Word and PowerPoint 97-2003 files come back in the current formats (LibreOffice converts them).
+RESULT_KIND = {'doc': 'docx', 'ppt': 'pptx'}
+MEDIA = {'pdf': 'application/pdf', 'doc': 'application/msword', 'ppt': 'application/vnd.ms-powerpoint',
          'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
          'pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
 
 
 def file_kind(filename):
-    """'pdf', 'docx' or 'pptx' from a file name, else ''."""
+    """'pdf', 'docx', 'pptx', 'doc' or 'ppt' from a file name, else ''."""
     suffix = Path(filename or '').suffix.lower().lstrip('.')
     return suffix if suffix in FORMATS else ''
 
@@ -142,6 +144,7 @@ def glossary_entries(raw):
 def result_name(filename, operation):
     stem = Path(filename).stem
     kind = file_kind(filename) or 'pdf'
+    kind = RESULT_KIND.get(kind, kind)
     suffix = {'translation': 'translated', 'pii': 'redacted', 'combined': 'translated-redacted',
               'manual_redaction': 'redacted'}[operation]
     return f'{stem}-{suffix}.{kind}'
@@ -335,7 +338,8 @@ class Engine:
             else:
                 output, metrics = (self.fake_job if self.fake else self.engine_job)(job)
             data = output.read_bytes()
-            result = self.store.root / job['id'] / ('result.' + (file_kind(job['filename']) or 'pdf'))
+            kind = file_kind(job['filename']) or 'pdf'
+            result = self.store.root / job['id'] / ('result.' + RESULT_KIND.get(kind, kind))
             if output.resolve() != result.resolve():
                 shutil.copyfile(output, result)
             job['artifacts'].append({'id': str(uuid.uuid4()), 'kind': 'result',
@@ -393,9 +397,10 @@ class Engine:
         try:
             if kind != 'pdf':
                 from transformation.office.package_ir import open_package
-                if output.suffix.lower() != '.' + kind:
+                expected = RESULT_KIND.get(kind, kind)
+                if output.suffix.lower() != '.' + expected:
                     raise ValueError('Result is not in the uploaded format.')
-                open_package(output.read_bytes(), kind).close()
+                open_package(output.read_bytes(), expected).close()
             with pymupdf.open(preview) as pdf:
                 if pdf.needs_pass or not len(pdf):
                     raise ValueError('Invalid generated PDF.')
@@ -538,13 +543,15 @@ def create_app(store, engine, site_dir, password=''):
         bad = 'INVALID_PDF' if kind == 'pdf' else 'INVALID_DOCUMENT'
         if kind == 'pdf' and (len(data) < 5 or data[:5] != b'%PDF-'):
             raise Fault(bad)
-        if kind != 'pdf' and data[:2] != b'PK':
+        if kind in ('docx', 'pptx') and data[:2] != b'PK':
+            raise Fault(bad)
+        if kind in RESULT_KIND and data[:4] != b'\xd0\xcf\x11\xe0':
             raise Fault(bad)
         try:
             options = check_options(json.loads(form.get('options') or '{}'))
         except ValueError:
             raise Fault('INVALID_OPTIONS')
-        options['output_format'] = kind  # a document comes back in its own format
+        options['output_format'] = RESULT_KIND.get(kind, kind)  # its own format (.doc and .ppt: the current one)
         offered = {m['id'] for m in engine.status.get('translation_models', [])}
         if options.get('translation_model') and options['translation_model'] not in offered:
             raise Fault('TRANSLATION_MODEL_NOT_OFFERED')
@@ -564,7 +571,8 @@ def create_app(store, engine, site_dir, password=''):
                 import asyncio
                 from transformation.office.package_ir import open_package
                 from transformation.office.office import render
-                open_package(data, kind).close()
+                if kind not in RESULT_KIND:
+                    open_package(data, kind).close()
                 preview = (await asyncio.to_thread(render, data, 'source.' + kind))[0]
                 with pymupdf.open(stream=preview, filetype='pdf') as pdf:
                     pages = len(pdf)

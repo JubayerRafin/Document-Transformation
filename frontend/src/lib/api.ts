@@ -230,7 +230,7 @@ const MESSAGES: Record<string, string> = {
   REQUEST_TOO_LARGE: "The file is larger than this server accepts. Choose a smaller document.",
   INVALID_PDF: "Choose a valid PDF document.",
   INVALID_DOCUMENT:
-    "This file could not be opened. Choose a PDF, Word (.docx) or PowerPoint (.pptx) file that is not password-protected.",
+    "This file could not be opened. Choose a PDF, Word (.docx, .doc) or PowerPoint (.pptx, .ppt) file that is not password-protected.",
   MANUAL_REDACTION_PDF_ONLY:
     "Areas can be drawn on PDF results only. Open this Word or PowerPoint result in Office to change it.",
   CSRF_INVALID:
@@ -390,12 +390,20 @@ export async function validatePdf(
     return `This PDF has ${pages} pages; the limit is ${limits.max_pages}. Split it into parts of up to ${limits.max_pages} pages.`;
   return null;
 }
-/** "pdf", "docx" or "pptx" from a file name, or "" for any other file. */
-export function documentKind(name: string): "pdf" | "docx" | "pptx" | "" {
-  const match = /\.(pdf|docx|pptx)$/i.exec(name);
-  return match ? (match[1].toLowerCase() as "pdf" | "docx" | "pptx") : "";
+export type DocumentKind = "pdf" | "docx" | "pptx" | "doc" | "ppt";
+/** The document kind from a file name, or "" for any other file. */
+export function documentKind(name: string): DocumentKind | "" {
+  const match = /\.(pdf|docx|pptx|doc|ppt)$/i.exec(name);
+  return match ? (match[1].toLowerCase() as DocumentKind) : "";
 }
-export const DOCUMENT_LABEL = { pdf: "PDF document", docx: "Word document", pptx: "PowerPoint presentation" };
+/** Word and PowerPoint 97-2003 files come back as .docx and .pptx. */
+export function resultFormat(kind: DocumentKind): "pdf" | "docx" | "pptx" {
+  return kind === "doc" ? "docx" : kind === "ppt" ? "pptx" : kind;
+}
+export const DOCUMENT_LABEL = {
+  pdf: "PDF document", docx: "Word document", pptx: "PowerPoint presentation",
+  doc: "Word 97-2003 document", ppt: "PowerPoint 97-2003 presentation",
+};
 /**
  * A PDF is checked as before (validatePdf); a Word or PowerPoint file by size and its package
  * signature. Its pages are counted by the server, which draws it once at upload.
@@ -406,14 +414,18 @@ export async function validateDocument(
   limits: { max_pages: number; max_mb: number } = { max_pages: MAX_PAGES, max_mb: MAX_MB },
 ) {
   const kind = documentKind(file.name);
-  if (!kind) return "Choose a PDF, Word (.docx) or PowerPoint (.pptx) file.";
+  if (!kind) return "Choose a PDF, Word (.docx, .doc) or PowerPoint (.pptx, .ppt) file.";
   if (kind === "pdf") return validatePdf(file, facts, limits);
   if (file.size < 4) return "This file is empty. Choose it again.";
   if (file.size > limits.max_mb * 1_000_000) return `Choose a file smaller than ${limits.max_mb} MB.`;
   try {
-    const head = new Uint8Array(await file.slice(0, 2).arrayBuffer());
-    if (head[0] !== 0x50 || head[1] !== 0x4b)
-      return kind === "docx"
+    const head = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+    // .docx/.pptx are zip packages ("PK"); .doc/.ppt are compound files (D0 CF 11 E0).
+    const valid = kind === "doc" || kind === "ppt"
+      ? head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0
+      : head[0] === 0x50 && head[1] === 0x4b;
+    if (!valid)
+      return kind === "docx" || kind === "doc"
         ? "This file doesn’t appear to be a Word document. Password-protected files are not supported."
         : "This file doesn’t appear to be a PowerPoint presentation. Password-protected files are not supported.";
   } catch {

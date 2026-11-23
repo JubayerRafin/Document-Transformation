@@ -129,6 +129,33 @@ class LocalServerTests(unittest.TestCase):
                                  headers={'Idempotency-Key': uuid.uuid4().hex})
         self.assertEqual(draft.json()['error'], 'MANUAL_REDACTION_PDF_ONLY')
 
+    def test_word_97_2003_upload_comes_back_as_docx(self):
+        import shutil
+        import subprocess
+        import tempfile
+        if not shutil.which('soffice'):
+            self.skipTest('LibreOffice converts .doc files')
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / 'letter.docx'
+            source.write_bytes(minimal_docx('Hello Alex Morgan'))
+            subprocess.run(['soffice', '-env:UserInstallation=' + (Path(folder) / 'profile').as_uri(), '--headless',
+                            '--convert-to', 'doc:MS Word 97', '--outdir', folder, str(source)], capture_output=True, timeout=120)
+            data = (Path(folder) / 'letter.doc').read_bytes()
+        self.assertEqual(data[:4], bytes.fromhex("d0cf11e0"))
+        r = self.submit(name='letter.doc', data=data)
+        self.assertEqual(r.status_code, 202, r.text)
+        job_id = r.json()['job_id']
+        self.assertEqual(self.store.get(job_id)['options']['output_format'], 'docx')
+        self.run_queue()
+        job = self.client.get(f'/v1/jobs/{job_id}').json()
+        self.assertEqual(job['status'], 'succeeded')
+        source, result = job['artifacts']
+        self.assertEqual((source['filename'], result['filename']), ('letter.doc', 'letter-translated.docx'))
+        self.assertIn('msword', self.client.get(f"/v1/jobs/{job_id}/artifacts/{source['id']}").headers['content-type'])
+        view = self.client.get(self.client.get(f"/v1/jobs/{job_id}/artifacts/{source['id']}/url").json()['url'])
+        self.assertTrue(view.content.startswith(b'%PDF-'))
+        self.assertEqual(self.submit(name='fake.doc', data=b'PK not a doc').json()['error'], 'INVALID_DOCUMENT')
+
     def test_pii_model_choice_is_offered_and_kept_only_for_pii_jobs(self):
         self.engine.status['pii_models'].append({'id': 'openai', 'label': 'GPT', 'external': True})
         workers = self.client.get('/v1/workers').json()

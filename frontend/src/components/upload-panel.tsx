@@ -20,6 +20,7 @@ import {
   type PiiStyle,
   validateDocument,
   documentKind,
+  resultFormat,
   DOCUMENT_LABEL,
   MAX_PAGES,
   MAX_MB,
@@ -132,7 +133,7 @@ export function UploadPanel({
       source_language: source,
       target_language: target,
       worker_id: worker.id,
-      output_format: documentKind(file.name) || "pdf",
+      output_format: resultFormat(documentKind(file.name) || "pdf"),
       protected_values: protectedValues
         .split("\n")
         .map((v) => v.trim())
@@ -222,7 +223,7 @@ export function UploadPanel({
               type="file"
               id="document-upload"
               className="sr-only"
-              accept=".pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+              accept=".pdf,.docx,.pptx,.doc,.ppt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/msword,application/vnd.ms-powerpoint"
               onChange={(e) => {
                 void select(e.target.files?.[0]);
                 e.target.value = "";
@@ -288,9 +289,9 @@ export function UploadPanel({
               id="upload-hint"
               className="mb-0 mt-3 text-xs leading-5 text-muted-foreground"
             >
-              One PDF, Word (.docx) or PowerPoint (.pptx) file per job. Maximum {limits.max_mb} MB and{" "}
-              {limits.max_pages} pages. Word and PowerPoint files come back in their own format.
-              Password-protected files are not supported.
+              One PDF, Word (.docx, .doc) or PowerPoint (.pptx, .ppt) file per job. Maximum {limits.max_mb} MB
+              and {limits.max_pages} pages. Word and PowerPoint files come back in their own format (.doc and
+              .ppt as .docx and .pptx). Password-protected files are not supported.
             </p>
             {fileError && (
               <p className="mb-0 mt-3 text-sm text-destructive" role="alert">

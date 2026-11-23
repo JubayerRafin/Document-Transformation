@@ -81,9 +81,14 @@ describe("existing API contract", () => {
     expect(await validateDocument(new File(["PK00030004rest"], "deck.pptx"))).toBeNull();
     expect(await validateDocument(new File(["not a package"], "report.docx"))).toContain("Word document");
     expect(await validateDocument(new File(["not a package"], "deck.pptx"))).toContain("PowerPoint");
-    expect(await validateDocument(new File(["text"], "notes.txt"))).toContain("Word (.docx)");
+    expect(await validateDocument(new File(["text"], "notes.txt"))).toContain("Word (.docx, .doc)");
     expect(await validateDocument({ name: "big.pptx", size: 100_000_001 } as File)).toContain("100 MB");
     expect(await validateDocument(new File(["%PDF-1.7\n"], "sample.pdf"))).toBeNull();
+    const ole = new Uint8Array([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1]);
+    expect(await validateDocument(new File([ole], "old.doc"))).toBeNull();
+    expect(await validateDocument(new File([ole], "old.ppt"))).toBeNull();
+    expect(await validateDocument(new File(["PK\u0003\u0004"], "old.doc"))).toContain("Word document");
+    expect(documentKind("Report.DOC")).toBe("doc");
   });
   it("retains cancellation authorization errors", async () => {
     const api = new ApiClient(

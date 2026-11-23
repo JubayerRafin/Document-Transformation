@@ -157,6 +157,11 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
     nativeized_ir_mode=options.pop('nativeized_ir_mode','reextract')
     if nativeized_ir_mode not in {'reextract','reuse'}:
         raise ValueError('nativeized_ir_mode must be reextract or reuse.')
+    from transformation.office.office import LEGACY,modernize
+    if Path(filename).suffix.lower() in LEGACY:
+        # A .doc or .ppt is processed as the .docx or .pptx LibreOffice converts it to.
+        data,filename=modernize(data,filename)
+        output_kind={'doc':'docx','ppt':'pptx'}.get(output_kind,output_kind)
     kind=Path(filename).suffix.lower().lstrip('.')
     if kind not in {'pdf','docx','pptx'} or output_kind not in {'pdf','docx','pptx'}:
         raise ValueError('Choose PDF, DOCX or PPTX.')
