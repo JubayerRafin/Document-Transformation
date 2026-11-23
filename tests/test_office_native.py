@@ -227,3 +227,13 @@ def test_piece_of_a_wrapped_address_masks_the_whole_address():
                                 ['mathis.chevalier', '@stonebridgemu'], lambda v: '[EMAIL]')
     assert masked == ['Mail: [EMAIL], then']
     assert native.masked_runs(['Format the drive'], ['Mat'], lambda v: '[X]') is None
+
+
+def test_comment_authors_are_cleared_when_masking():
+    d = docx.Document()
+    run = d.add_paragraph('Total due').runs[0]
+    d.add_comment(run, text='Check this', author='Olivia Grant', initials='OG')
+    data = io.BytesIO(); d.save(data)
+    out = native.scrub_properties(data.getvalue(), 'docx')
+    xml = zipfile.ZipFile(io.BytesIO(out)).read('word/comments.xml').decode()
+    assert 'Olivia Grant' not in xml and 'w:author="Reviewer"' in xml and 'w:initials="R"' in xml

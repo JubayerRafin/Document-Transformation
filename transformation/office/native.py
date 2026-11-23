@@ -324,8 +324,14 @@ def accept_revisions(data, kind):
     return out.getvalue(), count
 
 
+AUTHOR_ATTRIBUTES = {'author', 'initials', 'userId', 'providerId'}
+
+
 def scrub_properties(data, kind):
-    """Author, editor and company fields of the document properties emptied."""
+    """Author, editor and company fields of the document properties emptied, and the people who wrote
+    comments or tracked changes named "Reviewer": Word keeps each comment's author and initials
+    (word/comments.xml, people.xml) and PowerPoint its comment authors (commentAuthors.xml,
+    authors.xml) as attributes no page shows but anyone opening the file can read."""
     fields = {'{http://purl.org/dc/elements/1.1/}creator', '{http://schemas.openxmlformats.org/package/2006/metadata/core-properties}lastModifiedBy',
               '{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Company',
               '{http://schemas.openxmlformats.org/officeDocument/2006/extended-properties}Manager'}
@@ -339,6 +345,19 @@ def scrub_properties(data, kind):
                 for node in root.iter():
                     if node.tag in fields and (node.text or '').strip():
                         node.text = ''; changed = True
+                if changed:
+                    payload = serialize(root, payload)
+            elif item.filename.endswith('.xml') and (re.search(r'(^|/)(comments[^/]*|people|commentAuthors|authors)\.xml$', item.filename)
+                                                     or item.filename.startswith(('word/document', 'word/header', 'word/footer',
+                                                                                  'word/footnotes', 'word/endnotes'))):
+                root = ET.fromstring(payload)
+                changed = False
+                for node in root.iter():
+                    for name in list(node.attrib):
+                        local = name.split('}')[-1]
+                        if local in AUTHOR_ATTRIBUTES and node.attrib[name] not in ('', 'Reviewer', 'R'):
+                            node.set(name, 'R' if local == 'initials' else '' if local in ('userId', 'providerId') else 'Reviewer')
+                            changed = True
                 if changed:
                     payload = serialize(root, payload)
             target.writestr(item, payload)

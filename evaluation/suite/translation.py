@@ -33,7 +33,7 @@ def collect(results, ssh):
     results = Path(results)
     ids = ' '.join(s['job'] for _, s in summaries(results))
     command = (f'cd /workspace/transformx-app/runs/local && find {ids} \\( -path "*work/source/translate_tracking.json" '
-               f'-o -name office-translation.json \\) -print0 2>/dev/null | tar --null -czf - -T -')
+               f'-o -name office-translation.json -o -name office-fitting.json \\) -print0 2>/dev/null | tar --null -czf - -T -')
     archive = results / 'tracking.tgz'
     with open(archive, 'wb') as out:
         subprocess.run(['ssh', *ssh, command], stdout=out, check=True)
