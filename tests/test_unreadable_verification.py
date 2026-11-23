@@ -42,6 +42,39 @@ class UnreadableVerificationTests(unittest.TestCase):
             self.assertEqual(result['reports'][0]['uncertain_regions'],['unknown'])
             self.assertEqual(result['reports'][0]['known_residual_values'],['demo@example.invalid'])
 
+    def _translated(self, source_text, source_review=False):
+        """An English output keeping one line of source pixels the English reader leaves empty."""
+        import pymupdf
+        box=[300,100,400,120]
+        readings={'en':[{'id':'kept','text':'','bbox':box,'metadata':{'requires_review':True}},
+                        {'id':'other','text':'Total due','bbox':[50,50,150,70],'metadata':{}}],
+                  'ar':[{'id':'a1','text':source_text,'bbox':[305,101,395,119],'metadata':{'requires_review':source_review}}]}
+        with temporary_workspace() as root:
+            with pymupdf.open() as pdf:
+                pdf.new_page(); data=pdf.tobytes()
+            def run_ocr(pdf,output,python,timeout=None,source_language=None):
+                yield {'recognition_dir':source_language}
+            def prepare(data,recognition,output,name,*,allow_unreadable=False):
+                (Path(output)/'ocr-document.json').write_text(json.dumps({'pages':[{'regions':readings[recognition]}]}))
+            with patch('transformation.ocr.paddle_pipeline.run_ocr',side_effect=run_ocr), \
+                 patch('transformation.ocr.paddle_handoff.prepare',side_effect=prepare):
+                return list(verify(data,'pdf',root,['يوسف الخطيب'],['Names'],'','',False,{'ocr_python':'fixture'},
+                                   language='en',source_language='ar'))[-1]
+
+    def test_kept_source_line_is_read_in_the_source_language(self):
+        result=self._translated('اسم الموظف')
+        self.assertTrue(result['passed'])
+        self.assertEqual(result['reports'][0]['uncertain_regions'],[])
+
+    def test_kept_source_line_with_a_selected_value_stays_uncertain(self):
+        result=self._translated('اسم الموظف يوسف الخطيب')
+        self.assertFalse(result['passed'])
+        self.assertEqual(result['reports'][0]['uncertain_regions'],['kept'])
+
+    def test_kept_source_line_unreadable_in_both_languages_stays_uncertain(self):
+        result=self._translated('اسم',source_review=True)
+        self.assertFalse(result['passed'])
+
     def test_verified_zero_detection_is_not_clean_privacy_evidence(self):
         from transformation.ocr.paddle_handoff import prepare
         with temporary_workspace() as root:

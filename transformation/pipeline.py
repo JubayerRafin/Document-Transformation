@@ -601,7 +601,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             from transformation.validation.value_redaction import replacement_labels
             output_language=options.get('target','ko') if translate else options.get('source','en')
             for verification in verify(artifact,output_kind,run,all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,language=output_language,analyzed_texts=analyzed_texts,
-                                       ignore=set(replacement_labels(findings,pii_style).values()),
+                                       ignore=set(replacement_labels(findings,pii_style).values()),source_language=options.get('source','en') if translate else None,
                                        pages=({c['page'] for c in independent['uninspected_content'] if c.get('page')} if kind=='pdf' and output_kind=='pdf' else None)):
                 if 'reports' in verification: independent['rendered_privacy']=verification
                 else: info['privacy_verification_page']=verification['page']; yield emit('privacy_verification')
@@ -632,7 +632,8 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 info['final_check_masked']=info.get('final_check_masked',0)+len(found)
                 for verification in verify(artifact,output_kind,run/f'final-check-recheck{suffix}',all_values,pii_categories,pii_endpoint,pii_model,pii_assist,options,
                                            language=output_language,analyzed_texts=analyzed_texts,
-                                           ignore=set(replacement_labels(findings,pii_style).values()),pages={f['region']['page'] for f in found}):
+                                           ignore=set(replacement_labels(findings,pii_style).values()),pages={f['region']['page'] for f in found},
+                                           source_language=options.get('source','en') if translate else None):
                     if 'reports' in verification: independent['rendered_privacy']=verification
                 save_json(run/f'privacy-verification-after-masking{suffix}.json',verification)
                 found=final_check_regions(verification['reports'],pii_keep)
