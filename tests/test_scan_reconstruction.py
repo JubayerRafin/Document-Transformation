@@ -131,3 +131,22 @@ class NarrowedLineTests(unittest.TestCase):
             self.skipTest('needs a font covering Arabic')
         font = pymupdf.Font(fontfile=str(path))
         self.assertIsNone(narrowed_line(pymupdf.Rect(0, 0, 20, 12), 'قفازات السلامة', font, {'minimum': 8.0, 'maximum': 11.4}))
+
+
+class ScannedRuleTests(unittest.TestCase):
+    def test_vertical_cell_borders_become_one_line_each_and_horizontal_rules_none(self):
+        """Korean scan, 2026-11-23: "수량" and "단가" were joined across a scanned border."""
+        from transformation.pdf.scan_reconstruction import vertical_rule_segments
+        mask = np.zeros((100, 120), bool)
+        mask[10:90, 30:32] = True                      # a 2 px border
+        for y in range(10, 91, 10):
+            mask[y, 20:110] = True                     # the table's horizontal rules
+        mask[20:25, 60] = True                         # a short mark
+        self.assertEqual(vertical_rule_segments(mask), [(31.0, 10.0, 91.0)])
+
+    def test_a_light_grey_border_is_found_and_letters_are_not(self):
+        from transformation.pdf.scan_reconstruction import faint_vertical_rules, vertical_rule_segments
+        pixels = np.full((200, 100, 3), 236, np.uint8)
+        pixels[20:180, 50] = 220                       # 16 levels darker, 160 pt long
+        pixels[100:115, 20] = 0                        # a letter's stem
+        self.assertEqual(vertical_rule_segments(faint_vertical_rules(pixels)), [(50.5, 20.0, 180.0)])

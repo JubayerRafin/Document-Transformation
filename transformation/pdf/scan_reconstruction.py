@@ -267,6 +267,57 @@ def available_line_box(region, regions, pixels, rules):
     return pymupdf.Rect(box.x0, box.y0-above, box.x1, box.y1+below)
 
 
+def faint_vertical_rules(pixels, contrast=10, minimum=40):
+    """A mask of thin vertical lines at least `minimum` points long that are `contrast` grey levels
+    darker than the pixels two points to each side. Scanned table borders are often light grey: a
+    Korean invoice's column borders were 16 levels darker than the cells, under rule_pixels' 25, and
+    no border was found (2026-11-23). Used only for vertical_rule_segments, never to erase pixels."""
+    gray = pixels.astype(float).mean(axis=2)
+    dark = np.zeros(gray.shape, dtype=bool)
+    dark[:, 2:-2] = (gray[:, 2:-2] + contrast < gray[:, :-4]) & (gray[:, 2:-2] + contrast < gray[:, 4:])
+    mask = np.zeros(gray.shape, dtype=bool)
+    for x in np.flatnonzero(dark.sum(axis=0) >= minimum):
+        padded = np.r_[False, dark[:, x], False].astype(int)
+        starts, ends = np.flatnonzero(np.diff(padded) == 1), np.flatnonzero(np.diff(padded) == -1)
+        # Where the border crosses a row rule its contrast drops for a point or two: pieces up to 3
+        # points apart are one border (the shaded header row above a row rule, 2026-11-23).
+        runs = []
+        for a, b in zip(starts, ends):
+            if runs and a - runs[-1][1] <= 3:
+                runs[-1][1] = b
+            else:
+                runs.append([a, b])
+        for a, b in runs:
+            if b - a >= minimum:
+                mask[a:b, x] = True
+    return mask
+
+
+def vertical_rule_segments(rules, minimum=12):
+    """[(x, top, bottom)] of the vertical rules in a rule_pixels mask, in page points (the mask is
+    rendered at 72 dpi). A scan made native for translation gets each as an invisible line over the
+    scanned one: BabelDOC joined the header cells "수량" and "단가" across a scanned cell border and
+    drew "Qty Unit Price" in the first cell (Korean scan, 2026-11-23); with the line, the paragraph is
+    split at the border as on a digital page (stacked_lines.split_at_rules)."""
+    runs = {}
+    for x in np.flatnonzero(rules.any(axis=0)):
+        padded = np.r_[False, rules[:, x], False].astype(int)
+        starts, ends = np.flatnonzero(np.diff(padded) == 1), np.flatnonzero(np.diff(padded) == -1)
+        runs[int(x)] = [(int(a), int(b)) for a, b in zip(starts, ends) if b - a >= minimum]   # not a horizontal rule's pixel
+    segments, done = [], set()
+    for x in sorted(runs):
+        for run in runs[x]:
+            if (x, run) in done:
+                continue
+            group, top, bottom = [x], run[0], run[1]
+            while any(abs(a - top) <= 2 and abs(b - bottom) <= 2 for a, b in runs.get(group[-1] + 1, [])):
+                nxt = group[-1] + 1
+                match = next((a, b) for a, b in runs[nxt] if abs(a - top) <= 2 and abs(b - bottom) <= 2)
+                done.add((nxt, match)); group.append(nxt)
+            segments.append((sum(group) / len(group) + .5, float(top), float(bottom)))
+    return segments
+
+
 def rule_pixels(pixels):
     """Protect long thin dark rules, including a border crossing an OCR box."""
     gray = pixels.astype(float).mean(axis=2)
@@ -394,6 +445,7 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
         original_pixels = pixels.copy()
         erase_mask=np.zeros(pixels.shape[:2],dtype=bool)
         rules = rule_pixels(pixels)
+        scanned_rules = rules | faint_vertical_rules(pixels)
         if mapping is not None and not force_native:
             # Translations made for joined lines (scan_lines.py) are drawn over the lines they join.
             from transformation.pdf.scan_lines import regroup_for_translations
@@ -655,6 +707,9 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
             for rect, outlines in shaped_placements:
                 with outlines:
                     p.show_pdf_page(rect, outlines, 0)
+            if force_native:
+                for x, top, bottom in vertical_rule_segments(scanned_rules):
+                    p.draw_line((x, top), (x, bottom), color=(0, 0, 0), width=0.5, stroke_opacity=0)
             output = run / 'output' / ('scan-corrected.pdf' if corrections_path else 'scan-reconstructed.pdf')
             from transformation.pdf.complex_script import subset
             subset(result)  # the CJK font is inserted whole (3.5 MB per rebuilt page)
