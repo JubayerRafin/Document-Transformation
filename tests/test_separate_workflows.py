@@ -143,7 +143,8 @@ class WorkflowTests(unittest.TestCase):
     def test_gemma_rejects_missing_placeholders(self):
         # Every attempt (two, then the literal recovery) drops the email: the paragraph stays in the
         # source language and is flagged, instead of failing the whole document (2026-11-17).
-        with patch('transformation.llm.ollama_native.chat',return_value=('Translation without original identifier',{})) as call:
+        # Without a second model configured: on a server, servers.env names one (TranslateGemma's fallback).
+        with patch.dict('os.environ',{'TRANSFORMX_PII_ENDPOINT':'','TRANSFORMX_PII_MODEL':''}),patch('transformation.llm.ollama_native.chat',return_value=('Translation without original identifier',{})) as call:
             result,stats=translate_paragraph('unused','translategemma:12b','Contact maya@example.org','Korean')
             self.assertEqual(result,'Contact maya@example.org')
             self.assertTrue(stats['kept_source_requires_review'])

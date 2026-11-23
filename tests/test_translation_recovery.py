@@ -25,7 +25,8 @@ class TranslationRecoveryTests(unittest.TestCase):
 
     def test_failed_normal_attempts_recover_and_account_all_calls(self):
         replies=[('값 누락',{'eval_count':1})]*2+[('검사',{'eval_count':1})]
-        with patch('transformation.llm.ollama_native.chat',side_effect=replies) as calls:
+        # Without a second model configured: on a server, servers.env names one (TranslateGemma's fallback).
+        with patch.dict('os.environ',{'TRANSFORMX_PII_ENDPOINT':'','TRANSFORMX_PII_MODEL':''}),patch('transformation.llm.ollama_native.chat',side_effect=replies) as calls:
             result,stats=translate('unused','translategemma:12b','Inspect {v1}.','Korean')
         self.assertEqual(result,'검사 {v1}.')
         self.assertEqual(stats['eval_count'],3)
