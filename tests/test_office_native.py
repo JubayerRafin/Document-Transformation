@@ -237,3 +237,11 @@ def test_comment_authors_are_cleared_when_masking():
     out = native.scrub_properties(data.getvalue(), 'docx')
     xml = zipfile.ZipFile(io.BytesIO(out)).read('word/comments.xml').decode()
     assert 'Olivia Grant' not in xml and 'w:author="Reviewer"' in xml and 'w:initials="R"' in xml
+
+
+def test_a_wrapped_value_line_inside_a_longer_token_is_not_masked():
+    # Word and PowerPoint mass test, 2026-11-24: an ID cell read with the end of the next cell's date.
+    texts = ['P-870-1828', 'Datum: 2025-09-04', '119 Juniper Lane', 'Springfield, IL 62704']
+    assert native.office_values(['P-870-1828\n-09-04'], texts) == ['P-870-1828\n-09-04', 'P-870-1828']
+    assert native.office_values(['119 Juniper Lane\nSpringfield, IL 62704'], texts) == [
+        '119 Juniper Lane\nSpringfield, IL 62704', '119 Juniper Lane', 'Springfield, IL 62704']

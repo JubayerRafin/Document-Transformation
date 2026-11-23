@@ -216,7 +216,11 @@ def office_values(values, texts=()):
         out.append(whole)
         parts = [p.strip(' ,;') for p in whole.splitlines() if p.strip(' ,;')]
         if len(parts) > 1 and not any(literal_spans(t, whole) for t in texts):
-            out.extend(p for p in parts if len(p) >= 4)
+            # A line is masked only where it stands as a whole token: a table cell's ID read with the
+            # end of the next cell's date ("P-870-1828" / "-09-04") masked the date "2025-09-04"
+            # whole (Word and PowerPoint mass test, 2026-11-24). Hyphens join codes and dates.
+            alone = lambda part: any(re.search(r'(?<![\w-])' + re.escape(part) + r'(?![\w-])', t) for t in texts)
+            out.extend(p for p in parts if len(p) >= 4 and (alone(p) or not texts))
     return list(dict.fromkeys(out))
 
 
