@@ -42,6 +42,14 @@ set -a
 . "$servers_env"
 set +a
 
+# BabelDOC's fonts, layout model and character maps, downloaded and checked before any job runs:
+# BabelDOC writes a download straight to its final name, and on a new server two jobs side by side
+# read a font the other was still writing ("FT_New_Memory_Face: unknown file format", 2026-11-24).
+babeldoc_python="${TRANSFORMX_BABELDOC_PYTHON:-/workspace/transformx-babeldoc/bin/python}"
+if [ -x "$babeldoc_python" ]; then
+  "$babeldoc_python" -c 'from babeldoc.assets.assets import warmup; warmup()' >/dev/null 2>&1     || echo "BabelDOC assets could not be downloaded now; the first jobs will fetch them."
+fi
+
 # The website's server (FastAPI) in the GPU Python environment.
 if ! "$python" -c 'import fastapi, uvicorn, multipart' 2>/dev/null; then
   echo "Installing the website server (FastAPI)..."

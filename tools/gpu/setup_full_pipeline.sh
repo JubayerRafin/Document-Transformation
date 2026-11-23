@@ -36,6 +36,8 @@ fi
 uv pip install --python /workspace/transformx-engine/bin/python torch torchvision --index-url "$torch_index"
 uv pip install --python /workspace/transformx-engine/bin/python -r requirements-deep-doc.txt 'docling-core==2.85.0' 'pymupdf==1.27.2.2' 'Pillow>=11,<13' 'python-docx>=1.1,<2' 'python-pptx>=1,<2'
 uv pip install --python /workspace/transformx-babeldoc/bin/python -r requirements-transformation.txt 'pymupdf==1.28.2'
+# Fonts, layout model and character maps BabelDOC otherwise downloads during the first jobs.
+/workspace/transformx-babeldoc/bin/python -c 'from babeldoc.assets.assets import warmup; warmup()'
 uv pip check --python /workspace/transformx-engine/bin/python
 # BabelDOC's page-layout model runs on the GPU with ONNX Runtime's CUDA build (BabelDOC's own "cuda"
 # extra; transformation/pdf/layout_device.py). Both builds provide the same module, so the CPU build is
