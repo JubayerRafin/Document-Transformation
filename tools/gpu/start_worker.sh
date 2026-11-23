@@ -41,6 +41,7 @@ curl -fsS http://127.0.0.1:11434/api/version >/dev/null || { echo "Ollama did no
 
 # A dedicated GPU keeps the model loaded: every engine request sends this keep-alive, so the
 # default 30 minutes would unload it after a quiet period and the next job would wait ~90 s.
+TRANSFORMX_OLLAMA_KEEP_ALIVE_SET="${TRANSFORMX_OLLAMA_KEEP_ALIVE:-}"
 export TRANSFORMX_OLLAMA_KEEP_ALIVE="${TRANSFORMX_OLLAMA_KEEP_ALIVE:--1h}"
 
 # PII on vLLM when it is installed (tools/gpu/setup_vllm.sh): the same Qwen3.5-9B model in FP8,
@@ -126,6 +127,19 @@ if [ -n "$servers" ]; then
     export TRANSFORMX_GPU_SWAP="$servers"
     echo "Model servers share the GPU (${gpu_mib} MiB) and take turns on it."
   fi
+fi
+
+if [ -n "${TRANSFORMX_PII_ENDPOINT:-}" ] && [ -n "${TRANSFORMX_TRANSLATION_ENDPOINT:-}" ] \
+    && [ -z "${TRANSFORMX_OLLAMA_KEEP_ALIVE_SET:-}" ]; then
+  # Both models run on vLLM: a model Ollama loads anyway (a tool run without the vLLM settings)
+  # is unloaded after 5 minutes instead of holding GPU memory for good. A copy left loaded took
+  # 8 GB and six scanned pages failed with MemoryError (2026-11-24).
+  export TRANSFORMX_OLLAMA_KEEP_ALIVE=5m
+  curl -fsS http://127.0.0.1:11434/api/ps 2>/dev/null | python3 -c 'import json,sys
+for m in json.load(sys.stdin).get("models",[]): print(m["name"])' 2>/dev/null | while read -r loaded; do
+    curl -fsS http://127.0.0.1:11434/api/generate -d "{\"model\":\"$loaded\",\"keep_alive\":0}" >/dev/null 2>&1 \
+      && echo "Unloaded $loaded from Ollama (models are served by vLLM)."
+  done
 fi
 
 if [ -z "${TRANSFORMX_PII_ENDPOINT:-}" ]; then

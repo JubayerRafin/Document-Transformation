@@ -8,10 +8,36 @@ import time
 import pymupdf
 
 
+def gpu_out_of_memory(exc, folder):
+    """Whether a server GPU OCR failure was the GPU running out of memory."""
+    if 'MemoryError' in str(exc) or 'out of memory' in str(exc).lower():
+        return True
+    log = Path(folder)/'gpu-worker.log'
+    return log.is_file() and any(marker in log.read_text(encoding='utf-8', errors='replace')
+                                 for marker in ('MemoryError', 'Out of memory', 'ResourceExhaustedError'))
+
+
 def run_ocr(source, folder, python, timeout=1200, source_language='unknown'):
     if os.environ.get('TRANSFORMX_OCR_DEVICE')=='gpu:0':
-        yield from run_server_gpu_ocr(source,folder,python,timeout,source_language)
-        return
+        started = time.monotonic()
+        try:
+            yield from run_server_gpu_ocr(source,folder,python,timeout,source_language)
+            return
+        except (RuntimeError, MemoryError) as exc:
+            # The GPU is shared with the model servers. When it has no memory left even after the
+            # worker's own retries with a smaller detector, the page is read on the CPU instead:
+            # slower, the same models, and the job completes (six scanned pages failed with
+            # MemoryError on a full GPU, 2026-11-24).
+            if not gpu_out_of_memory(exc, folder) or not Path(python).is_file():
+                raise
+            remaining = max(60, int(timeout-(time.monotonic()-started)))
+            yield {'stage':'gpu_memory_fallback','device':'cpu'}
+            yield from run_ocr_cpu(source, Path(folder)/'cpu-fallback', python, remaining, source_language)
+            return
+    yield from run_ocr_cpu(source, folder, python, timeout, source_language)
+
+
+def run_ocr_cpu(source, folder, python, timeout=1200, source_language='unknown'):
     source, folder = Path(source).resolve(), Path(folder).resolve()
     if not Path(python).is_file():
         raise ValueError('Select the Python executable in the PaddleOCR environment.')

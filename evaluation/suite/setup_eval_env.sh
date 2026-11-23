@@ -8,7 +8,7 @@
 set -euo pipefail
 export HF_HOME="${HF_HOME:-/workspace/hf-cache}"
 test -x /workspace/eval-env/bin/python || uv venv -q -p 3.11 /workspace/eval-env
-uv pip install -q --python /workspace/eval-env/bin/python 'unbabel-comet==2.2.7' sacrebleu sentencepiece huggingface_hub
+uv pip install -q --python /workspace/eval-env/bin/python 'unbabel-comet==2.2.7' sacrebleu sentencepiece huggingface_hub 'setuptools<81'
 hf=/workspace/eval-env/bin/hf
 test -d /workspace/models/wmt22-comet-da || "$hf" download Unbabel/wmt22-comet-da --local-dir /workspace/models/wmt22-comet-da
 test -d /workspace/models/wmt20-comet-qe-da || "$hf" download Unbabel/wmt20-comet-qe-da --local-dir /workspace/models/wmt20-comet-qe-da
