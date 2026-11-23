@@ -81,11 +81,16 @@ def protect_values(text, values=()):
                     r'\b[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)*-[ \t]+\d+[A-Za-z0-9]*(?:-[A-Za-z0-9]+)*\b',
                     r'\b(?=[A-Za-z0-9-]*\d)[A-Za-z][A-Za-z0-9]*(?:-[A-Za-z0-9]+)+\b',
                     r'\b[A-Za-z]+\d[\w.-]*\b',
-                    r'\b(?=[IVXLCDM]{2,8}\b)M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})(?<=[IVXLCDM])\b',
+                    # Not part of an accented word: "CL" of "CLÍNICOS" (an all-capitals Spanish heading) was
+                    # read as a Roman numeral and the heading's translation refused (2026-11-24).
+                    r'(?<![À-ɏ])\b(?=[IVXLCDM]{2,8}\b)M{0,3}(?:CM|CD|D?C{0,3})(?:XC|XL|L?X{0,3})(?:IX|IV|V?I{0,3})(?<=[IVXLCDM])\b(?![À-ɏ])',
                     r'\b[A-Z][a-z]+ [A-Z][a-z]+-[a-z]+\b',
                     # Codes such as HR-2024, SKU-PR, UTF-8; not an English compound such as
                     # "OCR-aware", which then had to stay in English inside translations (2026-11-17).
-                    r'\b[A-Z]{2,}(?:-(?=[A-Za-z0-9]*[0-9A-Z])[A-Za-z0-9]+)+\b',
+                    # Not a hyphenated word in capitals: "HUMAN-READABLE" in a heading's translation is
+                    # a word, not a code (EMA template headings, 2026-11-24): every part of four
+                    # letters or more and no digit.
+                    r'\b(?![A-Z]{4,}(?:-[A-Z]{4,})+\b)[A-Z]{2,}(?:-(?=[A-Za-z0-9]*[0-9A-Z])[A-Za-z0-9]+)+\b',
                     r'\b\d{4}-\d{2}-\d{2}\b',
                     # A phone number is one literal: protected digit group by digit group, "+1 415 555
                     # 5551" came back as "+1, 415, 555, 5551" from a Hindi invoice (2026-11-23).
