@@ -110,6 +110,9 @@ def plausible(value,category):
     # Three digits or fewer identify nobody: a head count ("618 people") was masked as an identifier
     # and could not be removed on its own, which failed an Arabic invoice (2026-11-23).
     if category=='Identifiers' and v.isdigit() and len(v)<=3:return False
+    # One character repeated ("00 000 000", "000000000000") is a pattern, not a number: OCR reads a
+    # photo's grille as zeros, and a Cisco manual was blocked by such a reading (2026-11-23).
+    if category in {'Identifiers','Bank accounts','Phone numbers'} and len(set(re.sub(r'[\W_]','',v)))<=1:return False
     if category=='Names' and any(c.isdigit() for c in v):return False
     if category!='Dates of birth' and is_date(v):return False
     return True

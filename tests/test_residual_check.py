@@ -34,3 +34,12 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(masked, 3)
         self.assertNotIn('Adobe', text)
         self.assertIn('Format', text)
+
+
+class PatternTests(unittest.TestCase):
+    def test_a_repeated_character_is_not_an_identifier(self):
+        """Cisco manual, 2026-11-23: a photo's grille read as "00 000 000"."""
+        from transformation.validation.privacy import plausible
+        self.assertFalse(plausible('00 000 000', 'Identifiers'))
+        self.assertTrue(plausible('0000000001', 'Identifiers'))
+        self.assertTrue(plausible('EMP-2026-14033', 'Identifiers'))
