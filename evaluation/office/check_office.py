@@ -156,6 +156,9 @@ def main():
         row['valid'], row['invalid_reason'] = valid(data, kind)
         sources = [p for p in corpus.rglob(f"{s.get('doc')}.*") if p.suffix.lower() in ('.docx', '.pptx', '.doc', '.ppt')]
         source = next((p for p in sources if p.suffix.lower() == '.' + kind), None)
+        if source is None and str(s.get('doc', '')).endswith('-97'):
+            # A 97-2003 copy (make_office_mass --legacy): compared with the .docx/.pptx it was made from.
+            source = next(iter(corpus.rglob(f"{s['doc'][:-3]}.{kind}")), None)
         if key is None and source is not None and s.get('operation', 'translation') != 'pii':
             row.update(check_translation(source.read_bytes(), data, kind))
         if s.get('job'):
