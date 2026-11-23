@@ -26,11 +26,11 @@ class RepairTests(unittest.TestCase):
         from transformation.validation.value_redaction import redact_remaining
         with pymupdf.open() as pdf:
             page = pdf.new_page()
-            page.insert_text((50, 80), 'Licensed by Adobe to you. Format the disk.', fontsize=11)
+            page.insert_text((50, 80), "Licensed by Adobe to you. Format the disk. Adobe's terms, Adobe/PostScript.", fontsize=11)
             data = pdf.tobytes()
         out, masked = redact_remaining(data, [{'location': 'page 1', 'value': 'Adobe'}, {'location': 'page 1', 'value': 'Mat'}])
         with pymupdf.open(stream=out, filetype='pdf') as pdf:
             text = pdf[0].get_text()
-        self.assertEqual(masked, 1)
+        self.assertEqual(masked, 3)
         self.assertNotIn('Adobe', text)
         self.assertIn('Format', text)

@@ -563,11 +563,13 @@ def redact_remaining(data, residuals):
             if len(tokens) == 1 and not re.search(r'[A-Za-z0-9]', value):
                 found = list(page.search_for(value))          # scripts without word spaces
             else:
-                keys = [word(w[4]) for w in words]
+                # The check's own rule decides (residual_in): "Adobe's" or "Adobe/PostScript" holds
+                # "Adobe" and the whole word is masked; "Format" does not hold "Mat".
                 for i in range(len(words) - len(tokens) + 1):
-                    if keys[i:i + len(tokens)] == tokens:
-                        rect = pymupdf.Rect(words[i][:4])
-                        for w in words[i + 1:i + len(tokens)]:
+                    window = words[i:i + len(tokens)]
+                    if residual_in(value, ' '.join(w[4] for w in window)):
+                        rect = pymupdf.Rect(window[0][:4])
+                        for w in window[1:]:
                             rect |= pymupdf.Rect(w[:4])
                         found.append(rect)
             for rect in found:
