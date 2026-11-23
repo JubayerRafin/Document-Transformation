@@ -34,7 +34,8 @@ import cloud_worker as runner  # noqa: E402  (the site worker's job runner, reus
 PROJECT = runner.PROJECT
 # Largest upload and longest document accepted (the website reads them from /v1/workers).
 MAX_BYTES = int(float(os.environ.get('TRANSFORMX_SERVICE_MAX_MB', '100')) * 1_000_000)
-MAX_PAGES = int(os.environ.get('TRANSFORMX_MAX_PAGES', '250'))
+# Long manuals (the Samsung user guide has 302 pages) are accepted; a 1,000-page job takes about two hours.
+MAX_PAGES = int(os.environ.get('TRANSFORMX_MAX_PAGES', '1000'))
 SERVER_ID = 'local'
 STATUS_SECONDS = 45
 CATEGORIES = ['Names', 'Email addresses', 'Phone numbers', 'Addresses', 'Identifiers', 'Bank accounts', 'Dates of birth']

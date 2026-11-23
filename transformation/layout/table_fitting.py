@@ -138,12 +138,17 @@ def install_table_fitting(Typesetting):
             # BabelDOC also represents grade symbols such as B+ as formulas.
             # Its layout engine relocates these characters; apply the same
             # containment/font checks below, without accepting vector graphics.
+            # A formula with drawings (an icon or symbol drawn inline) cannot be kept inside the slot
+            # safely: BabelDOC typesets the paragraph as usual and it is listed for review. Raising
+            # here failed a whole 235-page manual over one heading on page 38 (Canon, 2026-11-23).
             for unit in units:
                 formula = unit.formular
                 if formula is not None and (
                     not formula.pdf_character or formula.pdf_curve or formula.pdf_form
                 ):
-                    raise RuntimeError("Non-text formulas inside a table slot require review.")
+                    record.update(status='formula_typeset_normally', requires_review=True,
+                                  reason='Non-text formulas inside a table slot require review.')
+                    return original_render(self, paragraph, page, fonts)
 
             if not any(getattr(unit,'font_size',None) or getattr(unit,'char',None) for unit in units):
                 # Vendor layout takes the mode of unit font sizes, but formula
@@ -153,7 +158,10 @@ def install_table_fitting(Typesetting):
                 for unit in units:
                     sizes=[c.pdf_style.font_size for c in unit.formular.pdf_character
                            if c.pdf_style and c.pdf_style.font_size and c.pdf_style.font_size>0]
-                    if not sizes:raise RuntimeError('Formula layout requires a measured source font size.')
+                    if not sizes:
+                        record.update(status='formula_typeset_normally', requires_review=True,
+                                      reason='Formula layout requires a measured source font size.')
+                        return original_render(self, paragraph, page, fonts)
                     unit.font_size=median(sizes)
                 record['formula_layout_font_seeded_from_source']=True
 

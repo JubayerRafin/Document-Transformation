@@ -143,9 +143,11 @@ class FormulaFittingTests(unittest.TestCase):
         if graphics:
             formula.pdf_curve.append(NS())
 
+        self.typeset_normally = typeset_normally = []
+
         class Harness:
             def render_paragraph(self, *args):
-                raise AssertionError('Assigned slot must use bounded rendering')
+                typeset_normally.append(args[0].debug_id)   # BabelDOC's own typesetting
 
             def create_typesetting_units(self, *args):
                 return [TypesettingUnit(formular=formula)]
@@ -158,6 +160,7 @@ class FormulaFittingTests(unittest.TestCase):
 
         install_table_fitting(Harness)
         fitter = Harness()
+        self.fitter = fitter
         fitter._transformx_table_slots = {(1, 'grade'): {'bbox': [10, 10, 30, 30]}}
         fitter._transformx_table_fit_results = []
         if heading:
@@ -172,12 +175,16 @@ class FormulaFittingTests(unittest.TestCase):
 
     def test_formula_symbol_is_preserved(self):
         paragraph = self.fit()
+        self.assertEqual(self.typeset_normally, [])      # an assigned slot uses bounded rendering
         self.assertEqual(paragraph.pdf_paragraph_composition[0].pdf_character.char_unicode, '+')
 
-    def test_graphics_are_rejected_without_mutation(self):
-        with self.assertRaisesRegex(RuntimeError, 'Non-text formulas'):
-            self.fit(graphics=True)
+    def test_graphics_are_typeset_normally_without_mutation_and_listed_for_review(self):
+        """Canon manual, 2026-11-23: one heading with an inline icon failed the whole document."""
+        self.fit(graphics=True)
+        self.assertEqual(self.typeset_normally, ['grade'])
         self.assertEqual(self.paragraph.pdf_paragraph_composition, ['original'])
+        record = self.fitter._transformx_table_fit_results[0]
+        self.assertEqual((record['status'], record['requires_review']), ('formula_typeset_normally', True))
 
     def test_overflow_rejected_without_mutation(self):
         with self.assertRaisesRegex(RuntimeError, 'cannot fit'):
