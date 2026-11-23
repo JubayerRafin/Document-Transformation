@@ -225,3 +225,52 @@ def repair_page(page, source):
             records.append({**record, 'status': 'kept', 'reason': 'MuPDF text did not match the paragraph',
                             'babeldoc_text': text[:120], 'mupdf_text': replacement[:120]})
     return overrides, records
+
+
+def drop_reread_fragments(page):
+    """Remove one-to-three-letter Arabic or Indic paragraphs that are pieces of a word another paragraph
+    already holds, once both have been read again from the page (repair_page).
+
+    BabelDOC put the letters of "كرسي" in an Arabic newsletter's table cell into paragraphs of their
+    own ("ﺮ", "س", "ﻛ"); read again in their small boxes they became "كرس", "رسي" and "كر", were
+    translated alone ("Dedicated", "Resy", "Sure") and drawn over "Office Chair", the translation of
+    the cell's paragraph, read again as "كرسي مكتب" (2026-11-24). A piece is removed when its text is
+    part of that paragraph's text and its box lies (80% or more) inside the paragraph's box widened
+    by half its font size. Returns the ids removed."""
+    def characters(paragraph):
+        out = []
+        for c in paragraph.pdf_paragraph_composition or []:
+            for part in (getattr(c, 'pdf_line', None), getattr(c, 'pdf_formula', None),
+                         getattr(c, 'pdf_same_style_characters', None)):
+                if part is not None:
+                    out.extend(part.pdf_character or [])
+            if getattr(c, 'pdf_character', None) is not None:
+                out.append(c.pdf_character)
+        return out
+
+    def size(paragraph):
+        return next((getattr(getattr(ch, 'pdf_style', None), 'font_size', 0) or 0 for ch in characters(paragraph)
+                     if getattr(getattr(ch, 'pdf_style', None), 'font_size', 0)), 0)
+    squeeze = lambda text: ''.join((text or '').split())
+    shaped = lambda text: bool(_JOINED_SCRIPTS.search(text) or RTL.search(text))
+    removed = []
+    for piece in list(page.pdf_paragraph):
+        text, a = squeeze(piece.unicode), getattr(piece, 'box', None)
+        if a is None or not text or not shaped(text) or len([c for c in characters(piece) if (getattr(c, 'char_unicode', '') or '').strip()]) > 3:
+            continue
+        area = max((a.x2 - a.x) * (a.y2 - a.y), 1e-6)
+        for whole in page.pdf_paragraph:
+            b = getattr(whole, 'box', None)
+            if whole is piece or b is None or getattr(whole, 'xobj_id', None) != getattr(piece, 'xobj_id', None):
+                continue
+            container = squeeze(whole.unicode)
+            if len(container) <= len(text) or text not in container:
+                continue
+            m = 0.5 * size(whole)
+            inside = (max(0.0, min(a.x2, b.x2 + m) - max(a.x, b.x - m))
+                      * max(0.0, min(a.y2, b.y2 + m) - max(a.y, b.y - m)))
+            if inside >= 0.8 * area:
+                page.pdf_paragraph.remove(piece)
+                removed.append(piece.debug_id)
+                break
+    return removed

@@ -84,6 +84,9 @@ def install_source_repairs(protected_values):
                 from transformation.pdf.unmapped_text import repair_page as reread_unmapped
                 reread,notes=reread_unmapped(page,source)
                 overrides.update(reread);unmapped_records.extend(notes)
+                from transformation.pdf.unmapped_text import drop_reread_fragments
+                unmapped_records.extend({'page':page.page_number+1,'paragraph_id':pid,'status':'removed_fragment'}
+                                        for pid in drop_reread_fragments(page))
                 blocks=[((b[0],source.rect.height-b[3],b[2],source.rect.height-b[1]),b[4])
                         for b in source.get_text('blocks') if b[6]==0]
                 from types import SimpleNamespace
