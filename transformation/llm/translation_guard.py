@@ -176,6 +176,53 @@ def era_years(source):
             _ERA_YEAR.sub(lambda m: f'{year(m)}年（{m.group(1)}{m.group(2)}年）', source)]
 
 
+# Sentence ends: Latin, Cyrillic and Greek punctuation before a space; CJK, Devanagari, Bengali and
+# Arabic sentence marks. A full stop after a single capital ("J. Smith") or a common abbreviation is
+# not an end.
+_LATIN_END = re.compile(r'(\S*)([.!?])(?=\s+\S)')
+_OTHER_END = re.compile(r'[。！？]|[।॥]|؟')
+_ABBREVIATIONS = {'e.g', 'i.e', 'etc', 'inc', 'ltd', 'co', 'no', 'nr', 'ca', 'vs', 'dr', 'mr', 'mrs', 'ms', 'st',
+                  'z.b', 'bzw', 'ggf', 'p', 'pp', 'fig', 'abb', 'art', 'vol'}
+_NO_SPACES = re.compile(r'[぀-ヿ㐀-鿿가-힣]')
+
+
+def split_sentences(text):
+    """text cut after each sentence end, every character kept ("".join(pieces) == text)."""
+    ends = []
+    for m in _LATIN_END.finditer(text):
+        word = m.group(1).rstrip('.').lower()
+        if (len(m.group(1)) == 1 and m.group(1).isupper()) or word in _ABBREVIATIONS or re.search(r'\d$', m.group(1)) and m.group(2) == '.' and re.match(r'\s*\d', text[m.end():]):
+            continue
+        ends.append(m.end())
+    ends += [m.end() for m in _OTHER_END.finditer(text) if m.end() < len(text.rstrip())]
+    pieces, start = [], 0
+    for end in sorted(set(ends)):
+        while end < len(text) and text[end].isspace():
+            end += 1
+        if end > start:
+            pieces.append(text[start:end]); start = end
+    if start < len(text):
+        pieces.append(text[start:])
+    return pieces
+
+
+def complete_sentence(piece):
+    """A sentence, not a piece of a word or line cut off at a paragraph's edge ("Le", "দেবে।"): four
+    words or more, or eight characters of a script written without spaces."""
+    piece = re.sub(r'\{v\d+\}', ' ', piece).strip()
+    return len(piece.split()) >= 4 or len(_NO_SPACES.findall(piece)) >= 8
+
+
+def omitted_sentence(source, target):
+    """Whether target has fewer sentences than source has complete ones (two or more). An English to
+    Chinese paragraph of three sentences came back as its last two; both kept their numbers, so the
+    literal check passed, and the first sentence was missing from the document (held-out report,
+    2026-11-24). Sentences are counted, not matched: a translation may join two short ones, so
+    only a paragraph of two or more complete sentences is checked."""
+    complete = sum(complete_sentence(p) for p in split_sentences(source))
+    return complete >= 2 and len([p for p in split_sentences(target) if p.strip()]) < complete
+
+
 def validate_candidate(source, target, values=()):
     if 'ZXKEEP' in target and 'ZXKEEP' not in source:
         raise ValueError('Translation invented or retained a placeholder marker.')
@@ -195,6 +242,8 @@ def validate_candidate(source, target, values=()):
         raise ValueError('Translation is far longer than its source.')
     if repeats_source(source, target):
         raise ValueError('Translation repeats the source text.')
+    if omitted_sentence(source, target):
+        raise ValueError('Translation omitted a source sentence.')
     if appended_glossary(source, target):
         raise ValueError('Translation appended a word list to the paragraph.')
     # A source with no letters or digits ("." after an inline icon) has nothing to translate: words in

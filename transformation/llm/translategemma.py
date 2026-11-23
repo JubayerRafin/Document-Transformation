@@ -317,6 +317,31 @@ def _second_model_translation(text,language,protected,context,source,model):
     return result,{key:stats[key] for key in ('prompt_eval_count','eval_count') if key in stats}
 
 
+def _sentence_by_sentence(endpoint,model,text,language,protected,context,source):
+    """(translation, stats) of text translated one sentence at a time and joined, or None when a
+    sentence fails or the joined text fails the paragraph's own checks. Joined with no space after
+    a Chinese or Japanese full stop, else with one."""
+    from transformation.llm.translation_guard import split_sentences, validate_candidate
+    pieces=[p for p in split_sentences(text) if p.strip()]
+    if len(pieces)<2:
+        return None
+    out,totals=[],{'prompt_eval_count':0,'eval_count':0}
+    try:
+        for piece in pieces:
+            translated,stats=translate(endpoint,model,piece.strip(),language,protected,context,source)
+            if stats.get('kept_source_requires_review'):
+                return None
+            for key in totals: totals[key]+=stats.get(key,0)
+            out.append(translated.strip())
+        joined=''
+        for part in out:
+            joined+=part if not joined or joined.endswith(('。','！','？')) else ' '+part
+        validate_candidate(text,joined,protected)
+    except (ValueError,RuntimeError):
+        return None
+    return joined,totals
+
+
 def translate(endpoint,model,text,language,protected=(),context='',source='en'):
     import hashlib,time
     from transformation.llm.ollama_native import chat,record_progress,needs_no_translation
@@ -461,6 +486,15 @@ def translate(endpoint,model,text,language,protected=(),context='',source='en'):
                 (audit/(uuid4().hex+'.json')).write_text(json.dumps({'source':text,'candidate':result,
                     'reason':str(error),'attempt':attempt,'model':model},ensure_ascii=False,indent=2),encoding='utf-8')
             if attempt==2:
+                # First: a paragraph whose answers keep dropping a sentence is translated sentence by
+                # sentence, each under the same checks, and joined (an English to Chinese report lost
+                # its first sentence, held-out evaluation, 2026-11-24).
+                if failure_reason=='Translation omitted a source sentence.':
+                    joined=_sentence_by_sentence(endpoint,model,text,language,protected,context,source)
+                    if joined is not None:
+                        record_progress('validation_sentence_by_sentence',source_sha256=digest,model=model)
+                        return joined[0],{**totals,**joined[1],'translation_backend':_backend(model),
+                                          'recovery':'sentence_by_sentence'}
                 # Both answers changed a value ("letter-size" -> "A4", an invented web address after a
                 # sentence cut at a line end; HP manual, 2026-11-21): the server's other model gets one
                 # try under the same checks before the paragraph is spliced or kept in English.
