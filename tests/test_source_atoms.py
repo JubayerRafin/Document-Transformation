@@ -20,6 +20,14 @@ class SourceAtomsTests(unittest.TestCase):
         for text in ['Accuracy of the model','Forward to section 4','A Summary','Résumé','']:
             self.assertFalse(is_source_atom(text),text)
 
+    def test_any_paragraph_left_unchanged_is_captured(self):
+        # Samsung manual, 2026-11-23: a codec column the translation left as it was was re-typeset.
+        char=NS(char_unicode='D',pdf_character_id=1,pdf_style=NS(font_size=8),box=box(),visual_bbox=NS(box=box()))
+        item=NS(pdf_character=char,pdf_line=None,pdf_same_style_characters=None,pdf_formula=None)
+        p=NS(debug_id='c',unicode='Dolby Digital+',vertical=False,box=box(),pdf_paragraph_composition=[item])
+        page=NS(page_number=0,pdf_paragraph=[p],cropbox=NS(box=box(0,0,100,100)))
+        self.assertIn((1,'c'),capture_source_atoms(NS(page=[page])))
+
     def test_exact_unchanged_source_can_be_copied(self):
         p,page,entry=self.fixture();result=preserved_source_characters(entry,p,page)
         self.assertEqual(result[0].pdf_style.font_size,8)

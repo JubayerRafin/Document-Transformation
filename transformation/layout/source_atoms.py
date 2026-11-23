@@ -29,11 +29,17 @@ def source_characters(paragraph):
 
 
 def capture_source_atoms(document):
+    """Every horizontal paragraph whose characters can be copied, keyed by (page, paragraph id): one
+    the translation leaves exactly as it was is drawn with these characters where they were
+    (preserved_source_characters). Only amounts, codes and dates were kept this way; a column of
+    file types or codec names ("*.avi" / "*.mkv" / ..., "AC3" / "LPCM" / ...) that the translation
+    left unchanged was re-typeset as wrapped text, items in the wrong rows and over each other
+    (Samsung manual, about 25 pages, 2026-11-23)."""
     result={}
     for page in document.page:
         neighbors={p.debug_id:copy.deepcopy(p.box) for p in page.pdf_paragraph if p.box}
         for p in page.pdf_paragraph:
-            if not p.vertical and is_source_atom(p.unicode) and source_characters(p):
+            if not p.vertical and (p.unicode or '').strip() and source_characters(p):
                 result[(page.page_number+1,p.debug_id)]={'paragraph':ir_copy(p),'neighbors':neighbors}
     return result
 
