@@ -60,8 +60,10 @@ class FinalCheckTests(unittest.TestCase):
     def test_a_recheck_finding_on_a_masked_area_counts_as_still_readable(self):
         from transformation.pipeline import _overlaps
         masked = {'page': 1, 'x': .2, 'y': .5, 'width': .3, 'height': .03}
-        self.assertTrue(_overlaps(dict(masked, x=.4), masked))
+        self.assertTrue(_overlaps(dict(masked, x=.3), masked))           # two thirds under the mask
         self.assertFalse(_overlaps(dict(masked, y=.6), masked))          # another line: masked next round
+        # OCR noise beside a mask, touching it by a hair (Cisco manual photo, 2026-11-23): masked next round.
+        self.assertFalse(_overlaps(dict(masked, x=.4995), masked))
         self.assertFalse(_overlaps(dict(masked, page=2), masked))
 
     def test_masking_removes_the_pixels_on_an_image_only_page(self):

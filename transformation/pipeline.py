@@ -45,9 +45,14 @@ def _engine_review_warnings(acceptance):
 
 
 def _overlaps(a,b):
-    """Two final-check areas (page fractions) on the same page share some area."""
-    return (a['page']==b['page'] and a['x']<b['x']+b['width'] and b['x']<a['x']+a['width']
-            and a['y']<b['y']+b['height'] and b['y']<a['y']+a['height'])
+    """At least half of final-check area a (page fractions) lies inside area b on the same page: text
+    read under a mask, so the mask did not hide it. Any shared area was counted before, and OCR noise
+    on an equipment photo touching an earlier mask by 0.35 pt failed a whole Cisco manual
+    (2026-11-23)."""
+    if a['page']!=b['page']:return False
+    width=min(a['x']+a['width'],b['x']+b['width'])-max(a['x'],b['x'])
+    height=min(a['y']+a['height'],b['y']+b['height'])-max(a['y'],b['y'])
+    return width>0 and height>0 and width*height>=.5*a['width']*a['height']
 
 
 def _document_glossary(options,ir,run,info):
@@ -653,10 +658,21 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 found=final_check_regions(verification['reports'],pii_keep)
                 if (any(p['known_residual_values'] for p in verification['reports'])
                         or unlocated_findings(verification['reports'],pii_keep)
-                        or any(_overlaps(f['region'],area) for f in found for area in masked_areas)
-                        or (found and round_number==FINAL_CHECK_ROUNDS)):
+                        or any(_overlaps(f['region'],area) for f in found for area in masked_areas)):
                     info['failure_code']='PRIVACY_CHECK_BLOCKED'
                     raise ValueError('Personal data was still readable after final-check masking; the result is blocked.')
+                if found and round_number==FINAL_CHECK_ROUNDS:
+                    # Lines still found after the last round are mostly the model's readings of OCR
+                    # noise in photos, a new one each round. They are masked too and listed for
+                    # review instead of failing the document (Cisco manual, 2026-11-23).
+                    masked=run/'output'/'result-final-check-last.pdf'
+                    redact_regions(destination,masked,[f['region'] for f in found],hashlib.sha256(artifact).hexdigest())
+                    artifact=masked.read_bytes();destination.write_bytes(artifact)
+                    info.setdefault('review_items',[]).extend(f['item'] for f in found)
+                    info.setdefault('redaction_map',[]).extend(f['box'] for f in found)
+                    info['final_check_masked']=info.get('final_check_masked',0)+len(found)
+                    info['final_check_unverified']=len(found)
+                    info['warnings'].append(f"{len(found)} line(s) found by the last privacy check round were masked without a further check; review them.")
             if info.get('final_check_masked'):
                 info['warnings'].append(f"{info['final_check_masked']} line(s) with personal data found by the final privacy check were masked before release; review them.")
             if verification['passed']:
