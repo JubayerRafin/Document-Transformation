@@ -634,6 +634,15 @@ def reconstruct(run, translated_pdf, corrections_path=None, force_native=False):
                 if any(not region_font.has_glyph(ord(c)) for c in text if not c.isspace()):
                     reason = reason or 'Output font lacks required characters; preserve original text.'
             if fitted is None:
+                if not reason:
+                    from transformation.llm.policy import expected_unchanged
+                    # A line that is only a removed value ("Olivia Grant" -> "[REDACTED]") keeps its
+                    # masked pixels, and an unchanged amount or code its own: both are right as they
+                    # are (combined PII and translation of scans, 2026-11-23).
+                    if (not re.sub(r'\[REDACTED\]|[\s.,:;()\-]', '', text)
+                            or (text.strip() == region['text'].strip() and expected_unchanged(text.strip()))):
+                        record['expected_preservation'] = True
+                        record['preservation_basis'] = 'removed_value_or_unchanged_literal'
                 reason = reason or f"Translation cannot fit inside the available region at minimum {font_policy['minimum']:.2f} pt; preserve original text."
             else:
                 best_size = fitted[0][2]
