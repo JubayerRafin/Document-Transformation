@@ -182,3 +182,21 @@ class LengthTests(unittest.TestCase):
         validate_candidate('概要', 'Overview')
         validate_candidate('従業員は会計年度末までに年次セキュリティ研修を修了する必要があります。',
                            'Employees must complete their annual security training by the end of the fiscal year.')
+
+
+class GluedUnitTests(unittest.TestCase):
+    """Cisco manual into Arabic, 2026-11-23: three paragraphs stayed in English over "240V" and "3in."."""
+
+    def test_a_number_glued_to_its_unit_may_be_written_apart_with_the_unit_translated(self):
+        from transformation.llm.translation_guard import validate_candidate
+        validate_candidate('to 240V AC', 'إلى 240 فولت تيار متردد')
+        validate_candidate('a minimum of 3in. (7.6 cm), and a minimum of 5 in. (12.7 cm)',
+                           'بحد أدنى 3 بوصات (7.6 سم)، وبحد أدنى 5 بوصات (12.7 سم)')
+        validate_candidate('a 42U rack', 'حامل بارتفاع 42 وحدة')
+
+    def test_another_number_or_a_split_part_number_is_still_refused(self):
+        from transformation.llm.translation_guard import validate_candidate
+        for source, target in (('to 240V AC', 'إلى 230 فولت تيار متردد'),
+                               ('Part DS-C48S-300AC', 'القطعة DS-C48S-300 AC')):
+            with self.assertRaises(ValueError, msg=target):
+                validate_candidate(source, target)

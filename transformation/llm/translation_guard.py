@@ -27,6 +27,23 @@ def source_unit_spacing(source,target,values=()):
     return target
 
 
+# Unit abbreviations a number is often glued to in technical text ("240V", "3in.", "50mm", "42U").
+GLUED_UNIT = re.compile(r'(?<![A-Za-z0-9_.+-])(\d+(?:[.,]\d+)?)'
+                        r'(mm|cm|km|m|in|ft|kg|g|lb|lbs|mA|A|kV|V|kW|W|VA|kVA|Hz|kHz|MHz|GHz|KB|MB|GB|TB|ms|dBm|dB|U)'
+                        r'(?=\.?(?![A-Za-z0-9_]))')
+
+
+def glued_units(source, values=()):
+    """Comparison-only: a number glued to a unit in the source ("240V", "3in.") is the number itself;
+    translations write it apart and translate the unit ("240 فولت", "3 بوصات"). The check did not
+    count the glued number, took the spaced one for an added value, and three paragraphs of a Cisco
+    manual stayed in English (2026-11-23). Explicit protected spans are left as they are; returned
+    document text is not rewritten."""
+    explicit = [(m.start(), m.end()) for value in values for m in re.finditer(re.escape(value), source)]
+    return GLUED_UNIT.sub(lambda m: m.group(0) if any(a < m.end() and m.start() < b for a, b in explicit)
+                          else m.group(1) + ' ' + m.group(2), source)
+
+
 # "percent" written out, in the languages that write it with Latin letters.
 PERCENT_WORDS=r'(?:percent|per\s?cent|prozent|pour\s?cent|por\s?ciento|por\s?cento|procent|per\s?cento|percento)'
 
@@ -116,7 +133,9 @@ def validate_candidate(source, target, values=()):
         return (permits_numeric_omissions(source,target,expected-actual,values)
                 and permits_numeric_additions(source,target,actual-expected,values))
     joined=joined_separator_spacing(source,values)
-    if not preserved(source) and (joined==source or not preserved(joined)):
+    spaced=glued_units(source,values)
+    if (not preserved(source) and (joined==source or not preserved(joined))
+            and (spaced==source or not preserved(spaced))):
         raise ValueError('Translation changed, added or omitted protected literals.')
     from transformation.llm.role_bindings import validate_bindings
     validate_bindings(source,target,values)
