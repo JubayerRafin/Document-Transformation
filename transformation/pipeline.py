@@ -368,6 +368,10 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 info['redaction_map']=redaction_map(data,findings,drawn)
                 save_json(run/'redaction-map.json',info['redaction_map'])
                 save_json(run/'review-items.json',info['review_items'])
+                collateral=[a for a in redaction_audit if a.get('method')=='collateral_glyph_check']
+                if collateral:
+                    info['redaction_collateral_pages']=[a['page'] for a in collateral]
+                    info['warnings'].append(f"Masks on {len(collateral)} page(s) also removed some nearby characters ({sum(a['removed_unselected_characters'] for a in collateral)} in all); review them.")
                 fallbacks=sum(1 for a in redaction_audit if a.get('localization')=='whole_line_fallback')
                 if fallbacks:
                     info['redaction_whole_line_fallbacks']=fallbacks
@@ -680,7 +684,7 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 independent['uninspected_content']=[c for c in independent['uninspected_content'] if c['kind'] not in {'image','raster'}]
         from transformation.validation.output_validation import set_aside_expected
         set_aside_expected(independent,redact)
-        independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'] or independent.get('partial_name_residuals'))
+        independent['acceptable']=not (independent['known_sensitive_residuals'] or independent['geometry_blockers'] or independent['layout_review_candidates'] or independent.get('office_overflow') or independent.get('office_render_error') or independent.get('rendered_layout',{}).get('geometry_blockers') or independent.get('rendered_layout',{}).get('layout_review_candidates') or info.get('translation_errors') or info.get('scan_acceptance_blockers') or independent['uninspected_content'] or independent.get('partial_name_residuals') or info.get('redaction_collateral_pages'))
         save_json(run/'independent-validation.json',independent)
         info['warnings']=list(dict.fromkeys(ir['warnings']+info['warnings']))
         info.update(status='generated',output_file=str(destination),

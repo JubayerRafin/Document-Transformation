@@ -518,7 +518,12 @@ def redact_pdf(data,ir,findings,style='box',boxes=None):
             if any(literal_spans(b['text'],v) for b in blocks for v in values):
                 raise RedactionVerificationError('Selected sensitive text remains searchable after redaction.','PRIVACY_CHECK_BLOCKED')
             remaining=Counter(_glyph_key(c) for b in blocks for c in b['chars'] if c is not None and not c['c'].isspace())
-            if _missing_glyphs(unselected.get(index,Counter()),remaining):
-                raise RedactionVerificationError('Precise redaction would remove surrounding text; review is required.','REDACTION_REVIEW_REQUIRED')
+            missing=_missing_glyphs(unselected.get(index,Counter()),remaining)
+            if missing:
+                # A mask that also removes some neighbouring characters costs layout, not privacy: the
+                # page is delivered and listed for review. It failed the whole 302-page Samsung guide
+                # (2026-11-23), where glyphs of different lines overlap.
+                audit.append({'region_id':None,'method':'collateral_glyph_check','page':index+1,
+                              'removed_unselected_characters':sum(missing.values()),'review_required':True})
     return result,audit
 

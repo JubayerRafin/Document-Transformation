@@ -267,6 +267,39 @@ def name_sweep(units, endpoint, model, chunk=6000):
     return names
 
 
+ORGANIZATION = re.compile(r'(?<![\w-])(?:Inc|Incorporated|Corp|Corporation|Ltd|Limited|LLC|GmbH|PLC|Company|Technologies|'
+                          r'Systems|Holdings|Group|Foundation|Institute|University|Association)\.?(?![\w-])', re.I)
+
+
+def person_names(values, units, sweep=False, known=()):
+    """The values that can be people's names. The model lists companies and brands as people
+    despite the instruction: in a Canon manual "CANON INC", "Adobe Systems Incorporated" and
+    "SunSoft, Inc" (whose part "Inc" was then masked everywhere), in a Samsung guide "Samsung" and
+    "Bixby", over 300 masks; the result was then blocked or failed (2026-11-23). Left out: a value
+    with a company word (Inc, Ltd, Corporation, Technologies, ...); in the document-wide name list
+    (sweep=True, spread to every occurrence) a single word of three letters or fewer ("Yes", "Heb"
+    read in photos; the model's own findings in context keep "Kim" or "Li"); and a single word standing alone ten times or more in
+    the document that is never part of a longer listed name (a brand). A repeated surname of a
+    person ("Smith") also appears in a full name ("John Smith") and stays."""
+    values = [v for v in values if isinstance(v, str) and v.strip()]
+    text = '\n'.join(u.get('text', '') for u in units)
+    longer = [v for v in list(values) + [k for k in known if isinstance(k, str)] if len(v.split()) > 1]
+    kept = []
+    for value in values:
+        v = value.strip()
+        if ORGANIZATION.search(v):
+            continue
+        if len(v.split()) == 1 and not CJK.search(v):
+            letters = sum(c.isalpha() for c in v)
+            if sweep and letters <= 3:
+                continue
+            alone = len(re.findall(r'(?<![\w-])' + re.escape(v) + r'(?![\w-])', text))
+            if alone >= 10 and not any(re.search(r'(?<![\w-])' + re.escape(v) + r'(?![\w-])', other) for other in longer):
+                continue
+        kept.append(value)
+    return kept
+
+
 def name_occurrences(units, names, longer_names=()):
     """Verbatim occurrences of swept names, without fragments of longer names or emails.
 
@@ -495,6 +528,11 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
         findings = detected.result()
         decisions = labelled.result() if labelled else {}
         names = swept.result() if swept else set()
+    model_names = [f['value'] for f in findings if f.get('category') == 'Names']
+    names = set(person_names(names, units, sweep=True, known=model_names))
+    people = set(person_names(model_names, units, known=names))
+    findings = [f for f in findings if f.get('category') != 'Names' or f.get('method') != 'model_proposal'
+                or f['value'] in people]
     if smart:
         evidence['field_labels'] = decisions
         sensitive, plain = {}, {}
