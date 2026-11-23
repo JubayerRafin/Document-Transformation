@@ -63,3 +63,14 @@ class ScriptIslandTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class LineViewTests(unittest.TestCase):
+    def test_digit_check_pieces_are_not_line_readings(self):
+        from tools.ocr.recognize_paddle_boxes import line_views
+        reads = [{'text': '치를 기록했습니다. 이번 분기 매출은 5%증가했습니다.', 'score': .92, 'variant': 'detector_bounds'},
+                 {'text': '', 'score': 0.0, 'variant': 'digit_check'},
+                 {'text': 'L', 'score': .98, 'variant': 'digit_check_piece_17'}]
+        views = line_views(reads)
+        self.assertEqual([r['variant'] for r in views], ['detector_bounds', 'digit_check'])
+        self.assertEqual(max((r for r in views if r['text'].strip()), key=lambda r: r['score'])['text'], reads[0]['text'])

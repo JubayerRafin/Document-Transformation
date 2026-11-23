@@ -476,7 +476,7 @@ def independent_literal_evidence(candidates,text):
         return False
     allowed={'en_PP-OCRv5_mobile_rec','PP-OCRv5_server_rec'}
     key=consensus_key(text)
-    if any(c.get('score',0)>=.95 and consensus_key(c.get('text',''))!=key for c in candidates):return False
+    if any(c.get('score',0)>=.95 and consensus_key(c.get('text',''))!=key for c in line_views(candidates)):return False
     groups={model:[c for c in candidates if c.get('model')==model and
                    consensus_key(c.get('text',''))==key] for model in allowed}
     if any(not views for views in groups.values()):return False
@@ -521,7 +521,7 @@ def second_model_agreement(crops, candidates, language, reader):
     model, and those lines stayed untranslated (9.8% of a Japanese development scan, 2026-11-24)."""
     from transformation.ocr.read_alike import characters
     same = (lambda t: characters(katakana_lookalikes(t))) if language == 'ja' else characters
-    confident = [c for c in candidates if isinstance(c.get('text'), str) and c['text'].strip()
+    confident = [c for c in line_views(candidates) if isinstance(c.get('text'), str) and c['text'].strip()
                  and isinstance(c.get('score'), (int, float)) and c['score'] >= .7]
     if not confident:
         return None
@@ -815,6 +815,14 @@ def source_word_segments(crop,max_segments=4):
     return [crop[:,a:b] for a,b in zip(cuts,cuts[1:])]
 
 
+def line_views(candidates):
+    """Readings of the whole line: the digit checker's readings of pieces of a line (a number, one
+    letter) are not. A Korean held-out line became "L", a piece read at 0.98, although five readings
+    of the line agreed at 0.90-0.92 (2026-11-24); the piece also counted as a strong reading that
+    contradicted them."""
+    return [c for c in candidates if not str(c.get('variant', '')).startswith('digit_check_piece_')]
+
+
 def refine_recognition(crop,primary,secondary_factory,language,previous):
     """A bounded second stage for unresolved small text, without text correction."""
     import cv2
@@ -849,6 +857,7 @@ def refine_recognition(crop,primary,secondary_factory,language,previous):
         strong_views=[r for r in reads if r['score']>=.95]
         if len(keys)==1 and len(strong_views)>=2:
             confirmed=max(strong_views,key=lambda r:r['score'])
+    previous=line_views(previous)
     strong={consensus_key(r['text']) for r in previous if r['score']>=.95 and r['text'].strip()}
     if confirmed and (not strong or strong=={consensus_key(confirmed['text'])}):
         return confirmed,False,'targeted_source_model_agreement',reads
