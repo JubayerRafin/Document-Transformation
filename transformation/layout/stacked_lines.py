@@ -482,6 +482,42 @@ def _char_size(paragraph):
                  if getattr(getattr(c, 'pdf_style', None), 'font_size', 0)), 0)
 
 
+def drop_contained_duplicates(page):
+    """Remove Arabic or Indic paragraphs that repeat a piece of a paragraph they lie inside.
+
+    In an Arabic newsletter's table cell, "كرسي مكتب" (office chair, two lines) was a paragraph and
+    so were "كرس", "رسي" and "كر", pieces of its first word inside the same box; each piece was
+    translated alone ("Dedicated", "Resy", "Sure") and drawn in small type over "Office Chair"
+    (2026-11-24). The source draws each letter once: the pieces are the layout reading the joined
+    letters' overlapping boxes again. A paragraph of these scripts whose box lies (80% or more) inside
+    another's and whose letters appear in that paragraph's letters in order is that repeat, and is
+    removed. Returns how many were removed."""
+    import unicodedata
+    removed = 0
+    letters = lambda p: ''.join(c for c in ''.join(getattr(ch, 'char_unicode', '') or '' for ch in _characters(p))
+                                if c.isalpha() or unicodedata.category(c).startswith('M'))
+    items = [p for p in page.pdf_paragraph if getattr(p, 'box', None) and not getattr(p, 'vertical', False)]
+    for piece in sorted(items, key=lambda p: len(letters(p))):
+        text = letters(piece)
+        if len(text) < 2 or not _shaped_script(text) or piece not in page.pdf_paragraph:
+            continue
+        a = piece.box
+        area = max((a.x2 - a.x) * (a.y2 - a.y), 1e-6)
+        for whole in page.pdf_paragraph:
+            if whole is piece or getattr(whole, 'xobj_id', None) != getattr(piece, 'xobj_id', None):
+                continue
+            b = getattr(whole, 'box', None)
+            if b is None:
+                continue
+            inside = max(0.0, min(a.x2, b.x2) - max(a.x, b.x)) * max(0.0, min(a.y2, b.y2) - max(a.y, b.y))
+            container = letters(whole)
+            if inside >= 0.8 * area and len(container) > len(text) and text in container:
+                page.pdf_paragraph.remove(piece)
+                removed += 1
+                break
+    return removed
+
+
 def join_overlapping_fragments(page, update):
     """Join one-line pieces of one Indic or Arabic line whose boxes overlap side by side.
 
@@ -1064,7 +1100,8 @@ def install(ParagraphFinder):
             self.update_line_data(line)
             self.update_paragraph_data(paragraph, update_unicode=True)
 
-        changed = join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
+        changed = drop_contained_duplicates(page)
+        changed += join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
         changed += split_at_rules(page, update, make_id)
         changed += split_at_badges(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)

@@ -262,6 +262,18 @@ class OverlappingFragmentTests(unittest.TestCase):
         return NS(debug_id=pid, box=NS(x=x, y=y, x2=x2, y2=y2), vertical=False, xobj_id=0,
                   pdf_paragraph_composition=[NS(pdf_line=NS(pdf_character=chars))])
 
+    def test_arabic_pieces_inside_their_own_cell_paragraph_are_removed(self):
+        """Arabic newsletter, 2026-11-24: "كرس", "رسي", "كر" inside the box of "كرسي مكتب"."""
+        from transformation.layout.stacked_lines import drop_contained_duplicates
+        whole = self.piece('w', 'كرسي مكتب', 259.8, 760.0, 280.8, 782.0)
+        pieces = [self.piece('p1', 'كرس', 266.5, 771.0, 280.8, 781.0), self.piece('p2', 'رسي', 260.5, 771.0, 276.3, 781.0),
+                  self.piece('p3', 'كر', 272.5, 771.0, 280.8, 781.0)]
+        other = self.piece('o', 'مكتب', 300.0, 771.0, 320.0, 781.0)          # another cell: kept
+        latin = self.piece('l', 'Total', 262.0, 771.0, 279.0, 781.0)         # not a joined script: kept
+        page = NS(pdf_paragraph=[whole, *pieces, other, latin])
+        self.assertEqual(drop_contained_duplicates(page), 3)
+        self.assertEqual([p.debug_id for p in page.pdf_paragraph], ['w', 'o', 'l'])
+
     def test_overlapping_pieces_of_one_hindi_line_become_one_paragraph(self):
         from transformation.layout.stacked_lines import join_overlapping_fragments
         # Boxes measured in the Hindi report: "परामर्श", "र्श घंट", "घंटे" on one line of a cell.
