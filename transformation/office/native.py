@@ -220,6 +220,25 @@ def office_values(values, texts=()):
     return list(dict.fromkeys(out))
 
 
+def token_spans(text, value):
+    """(start, end) of each whitespace-delimited token of text that holds value (spaces and line
+    breaks of value ignored) where the output check would find it, though not as a whole word."""
+    from transformation.validation.output_validation import residual_in
+    needle = ''.join(value.split())
+    if len(needle) < 4 or not residual_in(value, text):
+        return []
+    spans = []
+    for token in re.finditer(r'\S+', text):
+        start, end = token.start(), token.end()
+        while start < end and text[start] in '([{"\'«“':
+            start += 1
+        while end > start and text[end - 1] in '.,;:!?)]}"\'»”':
+            end -= 1   # sentence punctuation after an address stays
+        if needle.casefold() in text[start:end].casefold():
+            spans.append((start, end))
+    return spans
+
+
 def masked_runs(texts, values, label):
     """Run texts with every value replaced by label(value), across run boundaries, styles kept."""
     from transformation.validation.value_redaction import literal_spans
@@ -230,6 +249,19 @@ def masked_runs(texts, values, label):
         for start, end in literal_spans(text, value):
             if not any(start < b and end > a for a, b, _ in matches):
                 matches.append((start, end, value))
+    # A piece of a value the drawing wrapped ("@stonebridgemu" of "mathis.chevalier@stonebridgemut
+    # .example" in a narrow table cell, 2026-11-24) is inside a longer token, so the word-bounded match
+    # above skips it while the output check (residual_in) still finds it and blocks the result. Such a
+    # piece masks the whole whitespace-delimited token it stands in.
+    for value in sorted(set(values), key=len, reverse=True):
+        for start, end in token_spans(text, value):
+            # The token replaces the masks inside it ("mathis.chevalier" of the same address).
+            inside = [m for m in matches if start <= m[0] and m[1] <= end]
+            if any(start < b and end > a for a, b, _ in matches if (a, b, _) not in inside):
+                continue
+            for m in inside:
+                matches.remove(m)
+            matches.append((start, end, value))
     if not matches:
         return None
     starts = {a: (b, v) for a, b, v in matches}

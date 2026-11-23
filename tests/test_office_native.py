@@ -219,3 +219,11 @@ def test_table_reads_right_to_left_with_its_text():
     ids = [r['id'] for r in text_regions(extract_package(data, 'a.docx'))]
     xml = zipfile.ZipFile(io.BytesIO(native.set_direction(data, 'docx', ids, True))).read('word/document.xml').decode()
     assert '<w:bidiVisual' in xml
+
+
+def test_piece_of_a_wrapped_address_masks_the_whole_address():
+    # The drawing wrapped the address in a narrow cell; the detector returned two pieces.
+    masked = native.masked_runs(['Mail: mathis.chevalier@stonebridgemut.example, then'],
+                                ['mathis.chevalier', '@stonebridgemu'], lambda v: '[EMAIL]')
+    assert masked == ['Mail: [EMAIL], then']
+    assert native.masked_runs(['Format the drive'], ['Mat'], lambda v: '[X]') is None
