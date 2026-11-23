@@ -30,13 +30,16 @@ def call(url, data=None, headers=None, method=None):
 
 MEDIA = {'.pdf': 'application/pdf',
          '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-         '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation'}
+         '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+         '.doc': 'application/msword', '.ppt': 'application/vnd.ms-powerpoint'}
+# Word and PowerPoint 97-2003 files come back as .docx and .pptx, as the website asks for them.
+RESULT = {'.doc': 'docx', '.ppt': 'pptx'}
 
 
 def submit(base, pdf, source, target, operation='translation'):
     """pdf: a PDF, Word or PowerPoint file (the result comes back in the same format)."""
     options = {'operation': operation, 'source_language': source, 'target_language': target,
-               'output_format': pdf.suffix.lower().lstrip('.'),
+               'output_format': RESULT.get(pdf.suffix.lower(), pdf.suffix.lower().lstrip('.')),
                'protected_values': [], 'document_context': '', 'worker_id': 'local',
                'pii_categories': [] if operation == 'translation' else ['Names', 'Email addresses', 'Phone numbers', 'Addresses', 'Identifiers', 'Bank accounts', 'Dates of birth']}
     boundary = '----tx' + uuid.uuid4().hex
