@@ -93,6 +93,9 @@ def protect_values(text, values=()):
                     r'(?<![\w(])\(\d{2,4}\)[ .-]?\d{3,4}[ .-]\d{3,4}(?![\w-])',
                     r'\b(?:\d{1,3}\.){3}\d{1,3}\b',
                     r'\bsk_[A-Za-z0-9_.-]+\b',
+                    # A file type ("*.ts", ".webm"): "*.ts" was translated as "ts 파일 형식" in a
+                    # Samsung table of video formats (2026-11-23).
+                    r'(?<![\w*.])\*?\.[A-Za-z0-9]{2,5}(?![\w.])',
                     r'(?<!\w)\d+(?:,\d+)*(?:\.\d+)?%?(?!\w)',
                     # Letter grades (A-, B+): models transliterated "A-" into Arabic, Hindi and Bengali
                     # letters while keeping "B+" (2026-11-17 review).
