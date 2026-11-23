@@ -632,8 +632,21 @@ def detect_document(data, ir, categories, endpoint, model, assist=True, workers=
     # classifier confirmed is a personal field (a key/value table without a header row).
     first_row_values = {compact(p['value']) for p in pairs if p.get('first_row')
                         and evidence['field_labels'].get(p['label']) not in (None, 'none')}
-    headers = {compact(c['text']) for c in cells if c['metadata']['row'] == 0} - first_row_values
-    findings = [f for f in findings if compact(f['value']) not in headers]
+    # Only a real table has a header row: two rows and two columns at least. LibreOffice draws a box
+    # round a commented word in a Word letter, the box was read as a one-cell "table", and the
+    # commented customer number in it counted as a header, so it was never masked (Word and
+    # PowerPoint mass test, 2026-11-24: every letter's commented number stayed readable). A value
+    # found after its own label outside any table ("Customer number: AH-7032088") is a value.
+    shape = {}
+    for c in cells:
+        rows, columns = shape.setdefault(c['metadata'].get('table_parent'), (set(), set()))
+        rows.add(c['metadata'].get('row')); columns.add(c['metadata'].get('column'))
+    real = {t for t, (rows, columns) in shape.items() if len(rows) >= 2 and len(columns) >= 2}
+    headers = {compact(c['text']) for c in cells if c['metadata']['row'] == 0
+               and c['metadata'].get('table_parent') in real} - first_row_values
+    cell_ids = {c['id'] for c in cells}
+    findings = [f for f in findings if compact(f['value']) not in headers
+                or (f.get('method') == 'field_label' and f['region_id'] not in cell_ids)]
     # A model-proposed identifier/account looks like one: it has a digit or an ID symbol.
     # Plain words ("API key", "Device Console") are labels or headings, not values.
     # The same shape rules as the final check (privacy.plausible), so a head count ("618") proposed

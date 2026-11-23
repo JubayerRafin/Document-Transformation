@@ -249,6 +249,16 @@ class DetectDocumentTests(unittest.TestCase):
         findings, _, _ = self.run_detect(data, ir, ['Names'], stub(labels={'Field': 'none', 'Holder': 'Names', 'Branch': 'none'}))
         self.assertEqual({f['value'] for f in findings}, {'Ann Moor'})
 
+    def test_a_box_round_a_commented_value_is_not_a_table_header(self):
+        """Word letters, 2026-11-24: LibreOffice's box round a commented customer number was read as a
+        one-cell table; as its "header" the number was never masked."""
+        ir = {'units': [{'number': 1, 'regions': [{'id': 't', 'kind': 'table', 'text': '', 'bbox': [140, 30, 230, 45],
+                                                   'cells': [['AH-7032088']]}]}]}
+        data = pdf([(20, 40, 'Customer number: AH-7032088'), (20, 60, 'Product code: HK-1-10')])
+        findings, _, _ = self.run_detect(data, ir, ['Identifiers'],
+                                         stub(labels={'Customer number': 'Identifiers', 'Product code': 'none'}))
+        self.assertIn('AH-7032088', {f['value'] for f in findings})
+
     def test_honorific_is_not_part_of_the_masked_name(self):
         data = pdf([(20, 40, 'Signed by Mr. Thomas Becker')])
         region = lambda text: [{'value': 'Mr. Thomas Becker', 'category': 'Names'}] if 'Becker' in text else []
