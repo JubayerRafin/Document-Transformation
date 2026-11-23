@@ -584,3 +584,33 @@ class LonePunctuationTests(unittest.TestCase):
                      pdf_paragraph_composition=[NS(pdf_line=self.line('-', 40, 100))])
         page = NS(pdf_paragraph=[text, bullet, outside])
         self.assertEqual(attach_lone_punctuation(page, lambda p, line: None), 0)
+
+
+class StepNumberTests(unittest.TestCase):
+    """Canon manual, 2026-11-23: a large red "2" was redrawn in its step's small black type."""
+
+    def paragraph(self, items):
+        chars, x = [], 70.0
+        for text, size in items:
+            for ch in text:
+                box = NS(x=x, y=100, x2=x + 0.6 * size, y2=100 + size)
+                chars.append(NS(char_unicode=ch, visual_bbox=NS(box=box), box=box, pdf_style=NS(font_size=size)))
+                x += 0.6 * size
+        line = NS(pdf_character=chars, box=NS(x=70, y=100, x2=x, y2=116))
+        return NS(pdf_paragraph_composition=[NS(pdf_line=line)], debug_id='s', vertical=False)
+
+    def run_split(self, paragraph):
+        from transformation.layout.stacked_lines import split_step_numbers
+        page = NS(pdf_paragraph=[paragraph])
+        count = split_step_numbers(page, lambda p, line: None, lambda p: p.debug_id + '-n')
+        return count, [''.join(c.char_unicode for comp in p.pdf_paragraph_composition for c in comp.pdf_line.pdf_character)
+                       for p in page.pdf_paragraph]
+
+    def test_a_large_step_number_becomes_its_own_paragraph(self):
+        self.assertEqual(self.run_split(self.paragraph([('2', 16), (' Select the paper source.', 9)])),
+                         (1, ['2', 'Select the paper source.']))
+
+    def test_numbers_set_like_their_text_or_without_text_stay(self):
+        self.assertEqual(self.run_split(self.paragraph([('2 Select the paper source.', 9)]))[0], 0)
+        self.assertEqual(self.run_split(self.paragraph([('12', 16), (' 345', 9)]))[0], 0)       # no letters
+        self.assertEqual(self.run_split(self.paragraph([('2024', 16), (' Annual report', 9)]))[0], 0)   # not a step number

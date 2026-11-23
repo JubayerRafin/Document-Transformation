@@ -982,6 +982,64 @@ def trim_overhanging_spaces(page, update):
     return changed
 
 
+def split_step_numbers(page, update, make_id):
+    """Keep a large step number apart from the sentence it starts.
+
+    Manuals print step numbers larger than the step ("2" in large red type before "Select the paper
+    source."). BabelDOC put the number in the sentence's paragraph and the translation redrew it in
+    the sentence's small black type, with the sentence wrapped around it (Canon manual, 2026-11-23).
+    A paragraph whose first characters are a number of one or two digits (with "." or ")") set at
+    least 1.3 times the size of its other characters, which hold letters, is split into the number,
+    kept as it is, and the sentence. Returns how many numbers were split off."""
+    import copy
+    from statistics import median
+    added = 0
+    for paragraph in list(page.pdf_paragraph):
+        compositions = paragraph.pdf_paragraph_composition or []
+        if getattr(paragraph, 'vertical', False) or not compositions or not getattr(compositions[0], 'pdf_line', None):
+            continue
+        first = compositions[0].pdf_line.pdf_character or []
+        visible = [i for i, c in enumerate(first) if (c.char_unicode or '').strip()]
+        lead = []
+        for i in visible:
+            if first[i].char_unicode.isdigit() and len(lead) < 2 and (not lead or i == lead[-1] + 1):
+                lead.append(i)
+            else:
+                break
+        if not lead or (lead[-1] + 1 < len(first) and (first[lead[-1] + 1].char_unicode or '').isdigit()):
+            continue      # no number, or one of three digits or more ("2024")
+        end = lead[-1] + 1
+        if end < len(first) and first[end].char_unicode in '.)':
+            end += 1
+        size = lambda c: getattr(getattr(c, 'pdf_style', None), 'font_size', None) or 0
+        rest = [c for c in first[end:] if (c.char_unicode or '').strip()] + [
+            c for comp in compositions[1:] if getattr(comp, 'pdf_line', None) for c in comp.pdf_line.pdf_character or []
+            if (c.char_unicode or '').strip()]
+        if not any(c.char_unicode.isalpha() for c in rest):
+            continue
+        body = median(size(c) for c in rest)
+        if not body or min(size(first[i]) for i in lead) < 1.3 * body:
+            continue
+        number = copy.deepcopy(paragraph)
+        number.debug_id = make_id(paragraph)
+        number_line = copy.copy(compositions[0].pdf_line)
+        number_line.pdf_character = first[:end]
+        number.pdf_paragraph_composition = [copy.copy(compositions[0])]
+        number.pdf_paragraph_composition[0].pdf_line = number_line
+        remaining = first[end:]
+        while remaining and not (remaining[0].char_unicode or '').strip():
+            remaining = remaining[1:]
+        compositions[0].pdf_line.pdf_character = remaining
+        if not remaining:
+            paragraph.pdf_paragraph_composition = compositions[1:]
+        update(number, number_line)
+        if paragraph.pdf_paragraph_composition:
+            update(paragraph, paragraph.pdf_paragraph_composition[0].pdf_line)
+        page.pdf_paragraph.insert(page.pdf_paragraph.index(paragraph), number)
+        added += 1
+    return added
+
+
 def install(ParagraphFinder):
     if getattr(ParagraphFinder, '_transformx_stacked_lines', False):
         return
@@ -1005,6 +1063,7 @@ def install(ParagraphFinder):
         changed += split_at_rules(page, update, make_id)
         changed += split_at_badges(page, update, make_id)
         changed += split_at_list_markers(page, update, make_id)
+        changed += split_step_numbers(page, update, make_id)
         # A piece cut off the end of a list item's line ("... click the Email Setup lin" | "k.", HP
         # manual, 2026-11-23) is found only once the list is split into one-line items.
         changed += join_broken_line(page, lambda p: self.update_paragraph_data(p, update_unicode=True))
