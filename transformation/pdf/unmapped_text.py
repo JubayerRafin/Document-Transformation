@@ -103,6 +103,14 @@ def _clusters(line):
     the letter with no width inside that box ("ع ّ و" for "عوّ"); such a pair is put back in
     reading order, letter then mark, at the cluster's position."""
     chars = [[c['bbox'][0], c['bbox'][2], c['c']] for span in line['spans'] for c in span.get('chars', [])]
+    # PyMuPDF 1.28 gives such a mark no width as well, and fills the cluster's place with a space of its
+    # own ("مح وّل" for "محوّل"; the model read "وّل" as "أوّل", first: "First network", Arabic report,
+    # 2026-11-23). A space that starts exactly where a zero-width character after it sits, and touches
+    # the letter before it, is that filler; a real word space ends where the next cluster's box does.
+    chars = [c for k, c in enumerate(chars)
+             if not (c[2] == ' ' and 0 < k < len(chars) - 1 and chars[k + 1][1] - chars[k + 1][0] < 0.5
+                     and abs(chars[k + 1][0] - c[0]) <= 0.5 and abs(chars[k - 1][0] - c[1]) <= 0.5
+                     and RTL.search(chars[k - 1][2]) and RTL.search(chars[k + 1][2]))]
     i = 0
     while i < len(chars) - 1:
         mark, letter = chars[i], chars[i + 1]
