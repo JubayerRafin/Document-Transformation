@@ -454,6 +454,12 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
                 from transformation.pdf.ir_bridge import collect_translations
                 save_json(run/'ir-translations.json',collect_translations(context_ir,engine_runs))
                 info['translation_errors']=sum(len(json.loads((p/'region-errors.json').read_text(encoding='utf-8'))) for p in engine_runs if (p/'region-errors.json').exists())
+                # Paragraphs the engine kept in the source language, or left with a third script, are
+                # untranslated passages too: a Japanese paragraph kept as it was showed "Checks passed"
+                # apart from the scan's own flags (2026-11-23).
+                engine_acceptance=event.get('acceptance') or {}
+                info['translation_errors']+=sum(engine_acceptance.get(k) for k in ('untranslated_paragraphs','mixed_script_paragraphs')
+                                                if isinstance(engine_acceptance.get(k),int) and engine_acceptance.get(k)>0)
                 info['warnings'].append('PDF translation uses native BabelDOC geometry with shared-IR context and a page/spatial association report. Ambiguous associations remain unassigned; external boxes do not overwrite native glyph geometry.')
             else: processed=safe_data
             if any(r['kind']=='figure' for u in ir['units'] if not u.get('ocr_folder') for r in u['regions']):
@@ -572,7 +578,15 @@ def run_pipeline(data,filename,*,output_kind='pdf',redact=False,pii_categories=(
             if kind=='pdf' and output_kind=='pdf' and translate and any(u.get('ocr_folder') for u in ir['units']):
                 font_regions=[{'page':u['number'],'bbox':r['slot_bbox'],'minimum':r['font_policy']['minimum']}
                               for u in native_ir['units'] for r in u.get('locked_regions',[]) if r.get('font_policy')]
-                independent=inspect_output(artifact,output_kind,all_values,min_font_size=8.0,font_regions=font_regions,intended_overlays=intended_overlays)
+                # The scan's rebuilt text layer (ocr-nativeized.pdf) holds the source text sizes.
+                source_text={}
+                with pymupdf.open(native_path) as rebuilt:
+                    for number,source_page in enumerate(rebuilt,1):
+                        source_text[number]=[(pymupdf.Rect(span['bbox']),span['size'])
+                                             for block in source_page.get_text('dict')['blocks'] for line in block.get('lines',[])
+                                             for span in line['spans'] if span['text'].strip()]
+                independent=inspect_output(artifact,output_kind,all_values,min_font_size=8.0,font_regions=font_regions,
+                                           intended_overlays=intended_overlays,source_text=source_text)
             else:
                 independent=inspect_output(artifact,output_kind,all_values,intended_overlays=intended_overlays)
         if redact and kind=='pdf' and output_kind=='pdf' and not translate:

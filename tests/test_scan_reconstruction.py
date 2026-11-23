@@ -88,3 +88,46 @@ class SizeHarmonyTests(unittest.TestCase):
         self.assertEqual([c['size'] for c in cells], [10.0, 10.0, 10.0])
         self.assertTrue(cells[0]['record']['size_harmonized'])
         self.assertEqual(title['size'], 20.0)                  # a different source size is its own group
+
+
+class NarrowedLineTests(unittest.TestCase):
+    """Arabic scan, 2026-11-23: unshaped letters are wider than the joined script, so table cells
+    kept their Arabic pixels, untranslated."""
+
+    def test_unshaped_arabic_is_drawn_at_its_shaped_size_squeezed_to_the_box(self):
+        from pathlib import Path
+        import pymupdf
+        from transformation.pdf.scan_reconstruction import fit_text, narrowed_line
+        path = Path.home() / '.cache/babeldoc/fonts/GoNotoKurrent-Regular.ttf'
+        if not path.exists():
+            self.skipTest('needs a font covering Arabic')
+        font = pymupdf.Font(fontfile=str(path))
+        box = pymupdf.Rect(489.9, 492.7, 547.0, 504.7)           # the "قفازات السلامة" cell
+        policy = {'minimum': 8.0, 'maximum': 11.4}
+        self.assertIsNone(fit_text(box, 'قفازات السلامة', font, max_size=11.4, min_size=8.0))
+        (baseline, text, size, scale), = narrowed_line(box, 'قفازات السلامة', font, policy)
+        self.assertGreaterEqual(size, 8.0)
+        self.assertLess(scale, 1.0)
+        self.assertLessEqual(font.text_length(text, fontsize=size) * scale, box.width)
+        # Drawn with that squeeze, the glyphs keep their height (BabelDOC's pdfminer takes a
+        # character's size from it; MuPDF reports the square root of both scales) and stay in the box.
+        boxes = []
+        with pymupdf.open() as pdf:
+            for squeeze in (scale, 1.0):
+                page = pdf.new_page()
+                page.insert_font(fontname='ar', fontbuffer=font.buffer)
+                page.insert_text(baseline, text, fontname='ar', fontsize=size,
+                                 morph=(pymupdf.Point(baseline), pymupdf.Matrix(squeeze, 1)))
+                boxes.append(pymupdf.Rect(page.get_text('dict')['blocks'][0]['lines'][0]['spans'][0]['bbox']))
+        self.assertAlmostEqual(boxes[0].height, boxes[1].height, places=1)
+        self.assertLessEqual(boxes[0].x1, box.x1 + .5)
+
+    def test_a_line_whose_shaped_text_does_not_fit_either_is_refused(self):
+        import pymupdf
+        from pathlib import Path
+        from transformation.pdf.scan_reconstruction import narrowed_line
+        path = Path.home() / '.cache/babeldoc/fonts/GoNotoKurrent-Regular.ttf'
+        if not path.exists():
+            self.skipTest('needs a font covering Arabic')
+        font = pymupdf.Font(fontfile=str(path))
+        self.assertIsNone(narrowed_line(pymupdf.Rect(0, 0, 20, 12), 'قفازات السلامة', font, {'minimum': 8.0, 'maximum': 11.4}))

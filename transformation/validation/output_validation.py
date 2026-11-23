@@ -32,7 +32,22 @@ def partial_name_residuals(source,output,names):
     return sorted(residual)
 
 
-def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intended_overlays=()):
+def source_floor(span_box,sources):
+    """The floor for an output line drawn where source text was: 70% of that text's size, never below
+    4 pt (None when less than 30% of the line lies over source text). Translation shrinks text to
+    70% of its source size before it takes more room (BabelDOC's typesetting); a scanned invoice whose
+    own table text is 7 pt was reported as 31 layout problems against a flat 8 pt floor (2026-11-23).
+    sources: (rect, size) of the source page's text."""
+    area=span_box.get_area()
+    if area<=0:return None
+    best=max(sources,key=lambda s:(s[0]&span_box).get_area(),default=None)
+    if best is None or (best[0]&span_box).get_area()<area*.3:return None
+    return max(4.0,.7*best[1])
+
+
+def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intended_overlays=(),source_text=None):
+    """source_text: {page number: [(rect, size), ...]} of the source document; with it, text below
+    min_font_size is accepted down to source_floor() where it covers source text."""
     residual=[]; uninspected=[]; geometry=[]; candidates=[]
     import math
     for region in font_regions:
@@ -56,6 +71,9 @@ def inspect_output(data,kind,values=(),min_font_size=None,font_regions=(),intend
                             matching=[r['minimum'] for r in font_regions if r['page']==number and
                                       (pymupdf.Rect(r['bbox'])+(-.25,-.25,.25,.25)).contains(pymupdf.Rect(span['bbox']))]
                             if minimum is not None and matching:minimum=min(minimum,min(matching))
+                            if minimum is not None and source_text:
+                                floor=source_floor(pymupdf.Rect(span['bbox']),source_text.get(number,()))
+                                if floor is not None:minimum=min(minimum,floor)
                             # A quarter point of rounding: 7.9 pt text against an 8 pt floor was
                             # reported as a layout problem on most scanned pages (2026-11-23).
                             if minimum is not None and span['text'].strip() and span['size']<minimum-.25:
