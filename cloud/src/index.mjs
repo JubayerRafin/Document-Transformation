@@ -3,7 +3,8 @@ import {manualRoute} from './manual-redaction.mjs';
 const BUCKET='transformx-private', MAX=50_000_000;
 // Reasons a worker may report. Free text from the engine never reaches the API.
 export const FAILURE_CODES=['ENGINE_FAILED','ENGINE_TIMEOUT','INPUT_REJECTED','OUTPUT_INVALID','RESULT_UPLOAD_FAILED',
- 'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED','TRANSLATION_MODEL_UNAVAILABLE'];
+ 'REDACTION_REVIEW_REQUIRED','PRIVACY_CHECK_BLOCKED','MANUAL_REDACTION_FAILED','TRANSLATION_MODEL_UNAVAILABLE',
+ 'PII_MODEL_UNAVAILABLE'];
 // Running jobs heartbeat every ~10 s; silence this long means the worker stopped.
 const STALE_SECONDS=900;
 const CHECK_COUNTS=['known_sensitive_residuals','partial_name_residuals','geometry_blockers','layout_review_candidates','uninspected_content','scan_acceptance_blockers','translation_errors'];
