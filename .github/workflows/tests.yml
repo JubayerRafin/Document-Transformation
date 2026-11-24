@@ -28,7 +28,13 @@ jobs:
       # The last line is the extraction stage (requirements-deep-doc.txt without docling).
       # pytest runs the unittest-style tests and the function-style ones (tests/test_office_native.py).
       - name: Unit tests
-        run: python -m pytest -q -p no:cacheprovider tests
+        shell: bash
+        run: |
+          set -o pipefail
+          python -m pytest -q -rfE -p no:cacheprovider tests 2>&1 | tee pytest.log || {
+            # Collection errors and crashes have no test annotation: show pytest's summary lines.
+            grep -E '^(FAILED|ERROR)|Error|error' pytest.log | tail -n 15 | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1; }
 
   website:
     runs-on: ubuntu-latest
