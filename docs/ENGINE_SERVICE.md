@@ -111,6 +111,33 @@ server. A job's chosen server and key file are given to that job's process only,
 model's key is never sent to another server. Users see a notice before choosing a model on another
 machine.
 
+### The higher-quality model on the same GPU (TranslateGemma 27B)
+
+On a self-hosted server, `tools/gpu/start_worker.sh` adds one more choice without a settings entry
+when `/workspace/models/translategemma-27b` holds verified weights
+(`TRANSFORMX_HIGH_QUALITY_SETUP=1 bash tools/gpu/setup_vllm.sh`): **TranslateGemma 27B · higher
+quality, slower** (id `high_quality`). It writes three settings to `servers.env`:
+
+| Setting | Value on an L40S | Meaning |
+|---|---|---|
+| `TRANSFORMX_HIGH_QUALITY_TRANSLATION` | `http://127.0.0.1:8011/v1,translategemma:27b` | The choice's server and model (`transformation/settings.py` adds it, marked exclusive) |
+| `TRANSFORMX_GPU_SWAP` | `http://127.0.0.1:8000+http://127.0.0.1:8010,http://127.0.0.1:8011` | Servers joined by `+` stay awake together; 27B is a group of its own |
+| `TRANSFORMX_OPENAI_COMPATIBLE` | `…,http://127.0.0.1:8011` | 27B is called like the other vLLM servers |
+
+At start the script unloads any model Ollama holds, puts the PII model and 12B to sleep, starts 27B
+with 78% of the GPU (`TRANSFORMX_HIGH_QUALITY_GPU_SHARE`), puts it to sleep and wakes the other two.
+If 27B does not start, the other two wake and the server runs without the choice
+(`TRANSFORMX_HIGH_QUALITY=off` skips it). A job that chooses it starts only when no other job runs,
+and no job starts beside it (`Store.claim_next` in `tools/service/local_server.py`); before each
+model call `gpu_share.ensure` gives the GPU to the right group. Such a job never calls the PII model
+as a second translator mid-translation (`TRANSFORMX_SECOND_TRANSLATION_MODEL=off`), since waking it
+would put 27B to sleep under the other paragraphs.
+
+Measured on 1,997 held-out paragraphs (24 November 2026, `evaluation/suite/model_ab.py`): MetricX-24
+2.09 → 1.96 and with references 1.83 → 1.67, COMET-22 0.920 → 0.919, twice as long per paragraph.
+In a live test a translation job took about 18 s per page on 27B, and translate-and-redact 15.8 s
+against 10.6 s on the default model.
+
 ## Configuration reference
 
 The sections below list the environment variables behind each setting. The engine profile
