@@ -305,7 +305,9 @@ def _second_model_translation(text,language,protected,context,source,model):
     only when it passes the same checks and has no third script. Returns (text, stats) or None."""
     import os
     endpoint,other=os.environ.get('TRANSFORMX_PII_ENDPOINT'),os.environ.get('TRANSFORMX_PII_MODEL')
-    if not endpoint or not other or other==model:
+    # Off for a model that takes the GPU alone (settings.choice_environment): the other model's wake
+    # would put it to sleep under the paragraphs still being translated beside this one.
+    if not endpoint or not other or other==model or os.environ.get('TRANSFORMX_SECOND_TRANSLATION_MODEL')=='off':
         return None
     try:
         result,stats=translate(endpoint,other,text,language,protected,context,source)

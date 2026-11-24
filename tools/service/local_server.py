@@ -287,10 +287,18 @@ class Store:
             queued = [j for j in self.jobs.values() if j['status'] == 'queued']
             return min(queued, key=lambda j: j['created']) if queued else None
 
-    def claim_next(self):
-        """The oldest queued job, marked running in the same step, so two workers never take one job."""
+    def claim_next(self, exclusive=()):
+        """The oldest queued job, marked running in the same step, so two workers never take one job.
+
+        exclusive: translation model ids whose jobs need the GPU alone (TranslateGemma 27B takes turns
+        with the default models). Such a job starts only when no other job runs, and no job starts
+        beside it; jobs keep their order, so a waiting one is not passed by later ones."""
         with self.lock:
             job = self.next_queued()
+            needs_gpu = lambda j: j['options'].get('translation_model') in exclusive
+            running = [j for j in self.jobs.values() if j['status'] == 'running']
+            if job and running and (needs_gpu(job) or any(needs_gpu(j) for j in running)):
+                return None
             if job:
                 job.update(status='running', stage='starting', error_code=None)
                 self.save(job)
@@ -377,7 +385,9 @@ class Engine:
         """One job worker: runs queued jobs one after another. TRANSFORMX_SERVICE_WORKERS workers run
         side by side; the model servers take their requests together."""
         while not self.stopping:
-            job = None if (not self.fake and runner.low_disk(self.store.root)) else self.store.claim_next()
+            from transformation import settings
+            job = None if (not self.fake and runner.low_disk(self.store.root)) else self.store.claim_next(
+                settings.exclusive_choices())
             if not job:
                 self.wake.wait(2)
                 self.wake.clear()

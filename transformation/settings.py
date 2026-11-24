@@ -482,7 +482,25 @@ def model_choices(role, path=None, environ=None):
                         'endpoint': entry['endpoint'], 'model': entry['model'],
                         'key_file': entry.get('key_file', ''),
                         'requests_per_second': entry.get('requests_per_second')})
+    # A higher-quality translation model this server runs only on request (tools/gpu/start_worker.sh:
+    # TranslateGemma 27B, which needs the GPU alone): "endpoint,model". Its jobs run one at a time
+    # with no other job beside them (exclusive), since its server and the defaults take turns on
+    # the GPU.
+    extra = environ.get('TRANSFORMX_HIGH_QUALITY_TRANSLATION', '') if role == 'translation' else ''
+    if extra.count(',') == 1 and HIGH_QUALITY not in {c['id'] for c in choices}:
+        endpoint, model = [part.strip() for part in extra.split(',')]
+        label = 'TranslateGemma 27B · higher quality, slower' if '27b' in model.lower() else f'{model} · higher quality, slower'
+        choices.append({'id': HIGH_QUALITY, 'label': label[:80], 'endpoint': endpoint, 'model': model,
+                        'key_file': '', 'requests_per_second': None, 'exclusive': True})
     return choices
+
+
+HIGH_QUALITY = 'high_quality'
+
+
+def exclusive_choices(environ=None):
+    """Ids of translation models whose jobs must run alone on the GPU."""
+    return {c['id'] for c in model_choices('translation', environ=environ) if c.get('exclusive')}
 
 
 def translation_choices(path=None, environ=None):
@@ -510,6 +528,9 @@ def choice_environment(choice, environ=None, role='translation'):
         env[prefix + '_API_KEY_FILE'] = choice['key_file']
     if choice.get('requests_per_second') and role == 'translation':
         env['TRANSFORMX_TRANSLATION_QPS'] = str(choice['requests_per_second'])
+    if choice.get('exclusive'):
+        # Its server takes the GPU alone: no call to the PII model in the middle of translation.
+        env['TRANSFORMX_SECOND_TRANSLATION_MODEL'] = 'off'
     # Naming a server in the settings file is the operator's decision to use it: it is listed as an
     # OpenAI-compatible server for this job.
     from transformation.llm.endpoints import root

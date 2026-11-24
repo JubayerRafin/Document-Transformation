@@ -128,3 +128,43 @@ class GpuShareTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+HQ = 'http://127.0.0.1:8011'
+
+
+class GroupServers(FakeServers):
+    """An L40S: the PII model and TranslateGemma 12B fit together; 27B needs the GPU alone."""
+    def __call__(self, url, data=None, method='GET', timeout=120):
+        base, path = url[:21], url[21:]
+        if path in ('/wake_up', '/wake_up?tags=kv_cache'):
+            self.calls.append((method, url[16:]))
+            if (base == HQ and self.awake) or (base != HQ and HQ in self.awake):
+                raise urllib.error.HTTPError(url, 500, 'out of memory', {}, None)
+            self.awake.add(base); return {}
+        return super().__call__(url, data, method, timeout)
+
+
+class GpuGroupTests(GpuShareTests):
+    swap = f'{PII}+{TRANSLATION},{HQ}'
+
+    def run_group(self, servers, endpoint):
+        with patch.dict(os.environ, {gpu_share.SWAP_ENV: self.swap}, clear=True), \
+             patch.object(gpu_share, '_request', side_effect=servers):
+            gpu_share.ensure(endpoint)
+
+    def test_servers_of_one_group_stay_awake_together(self):
+        servers = GroupServers(awake=(PII, TRANSLATION))
+        self.run_group(servers, TRANSLATION + '/v1')
+        self.run_group(servers, PII + '/v1')
+        self.assertEqual(servers.awake, {PII, TRANSLATION})
+        self.assertFalse([u for m, u in servers.calls if m == 'POST'])
+
+    def test_the_high_quality_model_gets_the_gpu_alone_and_gives_it_back(self):
+        servers = GroupServers(awake=(PII, TRANSLATION))
+        self.run_group(servers, HQ + '/v1')
+        self.assertEqual(servers.awake, {HQ})
+        self.run_group(servers, TRANSLATION + '/v1')
+        self.assertEqual(servers.awake, {TRANSLATION})
+        self.run_group(servers, PII + '/v1')
+        self.assertEqual(servers.awake, {PII, TRANSLATION})

@@ -129,6 +129,59 @@ if [ -n "$servers" ]; then
   fi
 fi
 
+# TranslateGemma 27B, a higher-quality translation model users may choose on the website (setup:
+# tools/gpu/setup_vllm.sh with TRANSFORMX_HIGH_QUALITY_SETUP=1). Measured 2026-11-24 on 1,997 held-out
+# paragraphs: MetricX-24 2.09 -> 1.96, COMET-22 unchanged, twice as slow. It needs the GPU alone
+# (28 GB in FP8 beside 34 GB for the other two), so it sleeps until a job chooses it; the default
+# models then sleep while it works (transformation/llm/gpu_share.py) and its jobs run one at a time.
+hq_model="${TRANSFORMX_HIGH_QUALITY_MODEL:-/workspace/models/translategemma-27b}"
+if [ "${TRANSFORMX_HIGH_QUALITY:-auto}" != off ] && [ -x "$vllm" ] && [ -f "$hq_model/.verified" ] \
+    && [ -n "$servers" ] && local_server "${TRANSFORMX_TRANSLATION_ENDPOINT:-}" 8010; then
+  plain="${servers//#2/}"
+  # Weights of a sleeping server wait in pinned host memory (level 1, a few seconds to wake) when the
+  # machine has room for all three models' weights, else they are reloaded from disk (level 2).
+  hq_level=2; [ "${mem_limit:-0}" -ge 120000000000 ] && hq_level=1
+  if ! curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1; then
+    # A model Ollama holds (8 GB) left too little room twice (2026-11-24): unload it first. With the
+    # two default servers asleep about 4.7 of 44 GiB stay in use on an L40S.
+    curl -fsS http://127.0.0.1:11434/api/ps 2>/dev/null | python3 -c 'import json,sys
+for m in json.load(sys.stdin).get("models",[]): print(m["name"])' 2>/dev/null | while read -r loaded; do
+      curl -fsS http://127.0.0.1:11434/api/generate -d "{\"model\":\"$loaded\",\"keep_alive\":0}" >/dev/null 2>&1 || true
+    done
+    for server in ${plain//,/ }; do curl -fsS -X POST "$server/sleep?level=1" >/dev/null 2>&1 || true; done
+    nohup env PATH="$(dirname "$vllm"):$PATH" VLLM_SERVER_DEV_MODE=1 "$vllm" serve "$hq_model" --served-model-name "translategemma:27b" \
+      --host 127.0.0.1 --port 8011 --quantization fp8 --max-model-len 4096 --max-num-seqs 16 --enable-prefix-caching \
+      --gpu-memory-utilization "${TRANSFORMX_HIGH_QUALITY_GPU_SHARE:-0.78}" --limit-mm-per-prompt '{"image":0}' \
+      --chat-template "$app/tools/gpu/translategemma.jinja" --enable-sleep-mode > /workspace/vllm-27b.log 2>&1 &
+    hq_pid=$!
+    echo "Starting the higher-quality translation model server (about 3 minutes)..."
+    # The two sleeping servers keep about 7 GB on the GPU (an L40S had 34 of 44 GiB free, 2026-11-24).
+    # If 27B cannot start, the others wake and the site runs without it: never leave them asleep.
+    for _ in $(seq 1 300); do
+      curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1 && break
+      kill -0 "$hq_pid" 2>/dev/null || break
+      sleep 2
+    done
+    if curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1; then
+      curl -fsS -X POST "http://127.0.0.1:8011/sleep?level=$hq_level" >/dev/null
+    else
+      kill "$hq_pid" 2>/dev/null || true
+      echo "The higher-quality model did not start (see /workspace/vllm-27b.log); continuing without it."
+    fi
+    for server in ${plain//,/ }; do curl -fsS -X POST "$server/wake_up" >/dev/null 2>&1 || true; done
+  fi
+fi
+if curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1 && [ -n "$servers" ]; then
+  marker=""; [ "${hq_level:-2}" = 2 ] && marker="#2"
+  # Servers joined by "+" stay awake together; 27B is a group of its own.
+  together="$servers"; [ "$shared" = 0 ] && together="${servers//,/+}"
+  export TRANSFORMX_GPU_SWAP="$together,http://127.0.0.1:8011$marker"
+  export TRANSFORMX_OPENAI_COMPATIBLE="$TRANSFORMX_OPENAI_COMPATIBLE,http://127.0.0.1:8011"
+  # Written to servers.env, which is sourced: a comma, no spaces.
+  export TRANSFORMX_HIGH_QUALITY_TRANSLATION="http://127.0.0.1:8011/v1,translategemma:27b"
+  echo "Higher-quality translation model translategemma:27b ready on request (it takes the GPU alone)."
+fi
+
 if [ -n "${TRANSFORMX_PII_ENDPOINT:-}" ] && [ -n "${TRANSFORMX_TRANSLATION_ENDPOINT:-}" ] \
     && [ -z "${TRANSFORMX_OLLAMA_KEEP_ALIVE_SET:-}" ]; then
   # Both models run on vLLM: a model Ollama loads anyway (a tool run without the vLLM settings)
