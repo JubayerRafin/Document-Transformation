@@ -144,15 +144,29 @@ if [ "${TRANSFORMX_HIGH_QUALITY:-auto}" != off ] && [ -x "$vllm" ] && [ -f "$hq_
   if ! curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1; then
     for server in ${plain//,/ }; do curl -fsS -X POST "$server/sleep?level=1" >/dev/null 2>&1 || true; done
     nohup env PATH="$(dirname "$vllm"):$PATH" VLLM_SERVER_DEV_MODE=1 "$vllm" serve "$hq_model" --served-model-name "translategemma:27b" \
-      --host 127.0.0.1 --port 8011 --quantization fp8 --max-model-len 4096 --max-num-seqs 32 --enable-prefix-caching \
-      --gpu-memory-utilization "${TRANSFORMX_HIGH_QUALITY_GPU_SHARE:-0.80}" --limit-mm-per-prompt '{"image":0}' \
+      --host 127.0.0.1 --port 8011 --quantization fp8 --max-model-len 4096 --max-num-seqs 16 --enable-prefix-caching \
+      --gpu-memory-utilization "${TRANSFORMX_HIGH_QUALITY_GPU_SHARE:-0.72}" --limit-mm-per-prompt '{"image":0}' \
       --chat-template "$app/tools/gpu/translategemma.jinja" --enable-sleep-mode > /workspace/vllm-27b.log 2>&1 &
+    hq_pid=$!
     echo "Starting the higher-quality translation model server (about 3 minutes)..."
-    wait_for 8011 /workspace/vllm-27b.log
-    curl -fsS -X POST "http://127.0.0.1:8011/sleep?level=$hq_level" >/dev/null
+    # The two sleeping servers keep about 7 GB on the GPU (an L40S had 34 of 44 GiB free, 2026-11-24).
+    # If 27B cannot start, the others wake and the site runs without it: never leave them asleep.
+    for _ in $(seq 1 300); do
+      curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1 && break
+      kill -0 "$hq_pid" 2>/dev/null || break
+      sleep 2
+    done
+    if curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1; then
+      curl -fsS -X POST "http://127.0.0.1:8011/sleep?level=$hq_level" >/dev/null
+    else
+      kill "$hq_pid" 2>/dev/null || true
+      echo "The higher-quality model did not start (see /workspace/vllm-27b.log); continuing without it."
+    fi
     for server in ${plain//,/ }; do curl -fsS -X POST "$server/wake_up" >/dev/null 2>&1 || true; done
   fi
-  marker=""; [ "$hq_level" = 2 ] && marker="#2"
+fi
+if curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1 && [ -n "$servers" ]; then
+  marker=""; [ "${hq_level:-2}" = 2 ] && marker="#2"
   # Servers joined by "+" stay awake together; 27B is a group of its own.
   together="$servers"; [ "$shared" = 0 ] && together="${servers//,/+}"
   export TRANSFORMX_GPU_SWAP="$together,http://127.0.0.1:8011$marker"
