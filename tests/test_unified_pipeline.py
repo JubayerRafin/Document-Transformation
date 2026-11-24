@@ -80,7 +80,9 @@ class UnifiedTests(unittest.TestCase):
             data=pdf_fixture() if source=='pdf' else office_fixture(source)
             for output in ('pdf','docx','pptx'):
                 with self.subTest(source=source,output=output),tempfile.TemporaryDirectory() as folder:
-                    if source!='pdf' and output!=source and not CAN_RENDER_OFFICE:
+                    # A Word or PowerPoint source is drawn by LibreOffice for its PII check
+                    # (office/native.detection_pdf), and for another output format.
+                    if source!='pdf' and not CAN_RENDER_OFFICE:
                         self.skipTest('needs Microsoft Office or LibreOffice to render the document')
                     events=list(run_pipeline(data,'unrelated.'+source,output_kind=output,translate=False,
                         redact=True,pii_categories=['Email addresses'],pii_assist=False,table_strategy='native',root=Path(folder)))
