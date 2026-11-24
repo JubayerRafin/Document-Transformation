@@ -123,7 +123,8 @@ class UnifiedTests(unittest.TestCase):
         self.assertEqual(result.tables[0].cell(1,0).text,'Drucker')
         self.assertNotIn('Printer',[p.text for p in result.paragraphs])
 
-    @unittest.skipUnless(HAS_OFFICE,'Office dependencies not installed')
+    # Word and PowerPoint PII reads the document as LibreOffice draws it (office/native.detection_pdf).
+    @unittest.skipUnless(HAS_OFFICE and CAN_RENDER_OFFICE,'Office dependencies or LibreOffice not installed')
     def test_redaction_happens_before_translation(self):
         seen=[]
         def translate(endpoint,model,text,*args,**kwargs):
