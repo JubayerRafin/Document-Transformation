@@ -1,0 +1,185 @@
+{
+  "reference_version": "1.0",
+  "source_name": "hp-e877-pages-031-040.pdf",
+  "source_sha256": "c453c2e13142ba420e145e68b0f13e31eb819e3010099baf91e3815932948f2f",
+  "coordinate_system": "displayed-page points; top-left origin; bbox=[left,top,right,bottom]",
+  "reviewed": false,
+  "reviewed_by": "",
+  "pages": [
+    {
+      "number": 1,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 2,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 3,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 4,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 5,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [
+        "text",
+        "tables",
+        "figures"
+      ],
+      "text": "Table 2-3 Prepunched paper - Portrait\nTable 2-4 Prepunched paper - Landscape\n24 Chapter 2 Paper trays",
+      "tables": [
+        {
+          "id": "p5_table1",
+          "bbox": [
+            89.75,
+            73.81,
+            541.24,
+            408.83
+          ],
+          "cells": [
+            [
+              "Duplex mode",
+              "How to load paper"
+            ],
+            [
+              "1-sided printing",
+              "Face-down\nHoles toward the back of the printer"
+            ],
+            [
+              "Automatic 2-sided printing or with Alternative Letterhead Mode enabled",
+              "Face-up\nHoles toward the back of the printer"
+            ]
+          ]
+        },
+        {
+          "id": "p5_table2",
+          "bbox": [
+            89.75,
+            445.76,
+            541.24,
+            622.94
+          ],
+          "cells": [
+            [
+              "Duplex mode",
+              "How to load paper"
+            ],
+            [
+              "1-sided printing",
+              "Face-down\nHoles away from the printer"
+            ]
+          ]
+        }
+      ],
+      "figures": [
+        {
+          "id": "p5_figure1",
+          "bbox": [
+            320.02,
+            138.35,
+            425.53,
+            243.0
+          ]
+        },
+        {
+          "id": "p5_figure2",
+          "bbox": [
+            320.02,
+            294.44,
+            425.53,
+            399.09
+          ]
+        },
+        {
+          "id": "p5_figure3",
+          "bbox": [
+            320.02,
+            510.3,
+            425.53,
+            614.95
+          ]
+        }
+      ]
+    },
+    {
+      "number": 6,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 7,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 8,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 9,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    },
+    {
+      "number": 10,
+      "width": 594.9921264648438,
+      "height": 792.0,
+      "rotation": 0,
+      "tasks": [],
+      "text": "",
+      "tables": [],
+      "figures": []
+    }
+  ]
+}
