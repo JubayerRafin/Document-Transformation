@@ -70,13 +70,21 @@ def _entries():
     the kernel killed a server (2026-11-16), so a second server sleeps at level 2: weights are
     discarded and reloaded from disk on wake (about 10 s for TranslateGemma). Level 2 suits a server
     without a speculative draft model (vLLM's reload does not restore draft weights)."""
-    entries = []
-    for item in os.environ.get(SWAP_ENV, '').split(','):
-        item = item.strip()
-        if not item: continue
-        url, _, level = item.partition('#')
-        entries.append((_base(url), 2 if level.strip() == '2' else 1))
-    return entries
+    return [(base, level) for base, level, _ in _members()]
+
+
+def _members():
+    """[(base URL, sleep level, group)]. Servers joined by '+' are one group that fits on the GPU
+    together and stays awake together ('http://127.0.0.1:8000+http://127.0.0.1:8010,http://127.0.0.1:8011'
+    on an L40S: the PII model and TranslateGemma 12B share it, TranslateGemma 27B needs it alone)."""
+    members = []
+    for group, part in enumerate(os.environ.get(SWAP_ENV, '').split(',')):
+        for item in part.split('+'):
+            item = item.strip()
+            if not item: continue
+            url, _, level = item.partition('#')
+            members.append((_base(url), 2 if level.strip() == '2' else 1, group))
+    return members
 
 
 def shared_servers():
@@ -128,7 +136,9 @@ def ensure(endpoint):
     if not servers: return
     target = _base(endpoint)
     ollama = _base(os.environ.get(OLLAMA_ENV, 'http://127.0.0.1:11434'))
-    others = [s for s in servers if s != target]
+    group = {base: g for base, _, g in _members()}
+    # Servers of the target's own group may stay awake beside it.
+    others = [s for s in servers if group.get(s) != group.get(target)]
     if target not in servers:
         if all(_sleeping(s) for s in servers): return
         with _switch_lock():

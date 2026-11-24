@@ -52,4 +52,27 @@ PY
   fi
   echo "Translation model in $tg_dir."
 fi
+# TranslateGemma 27B, the optional higher-quality model (TRANSFORMX_HIGH_QUALITY_SETUP=1; about 55 GB
+# of disk, a GPU of 40 GB or more): the same pinned Infomaniak build, checked against Google's 27B.
+hq_dir="${TRANSFORMX_HIGH_QUALITY_MODEL:-/workspace/models/translategemma-27b}"
+if [ "${TRANSFORMX_HIGH_QUALITY_SETUP:-0}" = 1 ] && [ ! -f "$hq_dir/.verified" ]; then
+  uvx --from "huggingface_hub[cli]" hf download Infomaniak-AI/vllm-translategemma-27b-it \
+    --revision be47a43850d00bdf556df71fdff7f9740ded598e --local-dir "$hq_dir"
+  "$env_dir/bin/python" - "$hq_dir" <<'PY'
+import hashlib, json, sys, urllib.request
+from pathlib import Path
+folder = Path(sys.argv[1])
+info = json.load(urllib.request.urlopen('https://huggingface.co/api/models/google/translategemma-27b-it?blobs=true', timeout=60))
+expected = {s['rfilename']: (s.get('lfs') or {}).get('sha256') for s in info['siblings']
+            if s['rfilename'].endswith(('.safetensors', 'tokenizer.json', 'tokenizer.model'))}
+for name, sha in sorted(expected.items()):
+    digest = hashlib.sha256()
+    with open(folder / name, 'rb') as f:
+        for chunk in iter(lambda: f.read(1 << 24), b''): digest.update(chunk)
+    if digest.hexdigest() != sha: sys.exit(f'{name} differs from google/translategemma-27b-it; not using this model.')
+(folder / '.verified').write_text('weights and tokenizer match google/translategemma-27b-it\n')
+print('TranslateGemma 27B weights verified against Google\'s published checksums.')
+PY
+  echo "Higher-quality translation model in $hq_dir."
+fi
 echo "Restart the worker with tools/gpu/start_worker.sh to serve PII and translation from vLLM."
