@@ -142,10 +142,16 @@ if [ "${TRANSFORMX_HIGH_QUALITY:-auto}" != off ] && [ -x "$vllm" ] && [ -f "$hq_
   # machine has room for all three models' weights, else they are reloaded from disk (level 2).
   hq_level=2; [ "${mem_limit:-0}" -ge 120000000000 ] && hq_level=1
   if ! curl -fsS http://127.0.0.1:8011/v1/models >/dev/null 2>&1; then
+    # A model Ollama holds (8 GB) left too little room twice (2026-11-24): unload it first. With the
+    # two default servers asleep about 4.7 of 44 GiB stay in use on an L40S.
+    curl -fsS http://127.0.0.1:11434/api/ps 2>/dev/null | python3 -c 'import json,sys
+for m in json.load(sys.stdin).get("models",[]): print(m["name"])' 2>/dev/null | while read -r loaded; do
+      curl -fsS http://127.0.0.1:11434/api/generate -d "{\"model\":\"$loaded\",\"keep_alive\":0}" >/dev/null 2>&1 || true
+    done
     for server in ${plain//,/ }; do curl -fsS -X POST "$server/sleep?level=1" >/dev/null 2>&1 || true; done
     nohup env PATH="$(dirname "$vllm"):$PATH" VLLM_SERVER_DEV_MODE=1 "$vllm" serve "$hq_model" --served-model-name "translategemma:27b" \
       --host 127.0.0.1 --port 8011 --quantization fp8 --max-model-len 4096 --max-num-seqs 16 --enable-prefix-caching \
-      --gpu-memory-utilization "${TRANSFORMX_HIGH_QUALITY_GPU_SHARE:-0.72}" --limit-mm-per-prompt '{"image":0}' \
+      --gpu-memory-utilization "${TRANSFORMX_HIGH_QUALITY_GPU_SHARE:-0.78}" --limit-mm-per-prompt '{"image":0}' \
       --chat-template "$app/tools/gpu/translategemma.jinja" --enable-sleep-mode > /workspace/vllm-27b.log 2>&1 &
     hq_pid=$!
     echo "Starting the higher-quality translation model server (about 3 minutes)..."
