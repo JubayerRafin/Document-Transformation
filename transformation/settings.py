@@ -528,6 +528,9 @@ def choice_environment(choice, environ=None, role='translation'):
         env[prefix + '_API_KEY_FILE'] = choice['key_file']
     if choice.get('requests_per_second') and role == 'translation':
         env['TRANSFORMX_TRANSLATION_QPS'] = str(choice['requests_per_second'])
+    if choice.get('exclusive'):
+        # Its server takes the GPU alone: no call to the PII model in the middle of translation.
+        env['TRANSFORMX_SECOND_TRANSLATION_MODEL'] = 'off'
     # Naming a server in the settings file is the operator's decision to use it: it is listed as an
     # OpenAI-compatible server for this job.
     from transformation.llm.endpoints import root

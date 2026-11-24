@@ -58,3 +58,16 @@ class ExclusiveJobTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class SecondModelTests(unittest.TestCase):
+    def test_a_high_quality_job_never_calls_the_pii_model_mid_translation(self):
+        with patch.object(settings, 'find', return_value=None):
+            choice = settings.model_choices('translation', environ=HQ)[1]
+        env = settings.choice_environment(choice, {'TRANSFORMX_PII_ENDPOINT': 'http://127.0.0.1:8000/v1',
+                                                   'TRANSFORMX_PII_MODEL': 'qwen'})
+        self.assertEqual(env['TRANSFORMX_SECOND_TRANSLATION_MODEL'], 'off')
+        from transformation.llm import translategemma
+        with patch.dict('os.environ', env, clear=True), patch.object(translategemma, 'translate') as call:
+            self.assertIsNone(translategemma._second_model_translation('text', 'Korean', (), '', 'en', 'translategemma:27b'))
+        call.assert_not_called()
