@@ -1,6 +1,6 @@
 # TransformX
 
-TransformX translates PDF, Word (.docx) and PowerPoint (.pptx) documents and redacts personal
+TransformX translates PDF, Word (.docx, .doc) and PowerPoint (.pptx, .ppt) documents and redacts personal
 information (PII) while keeping the original layout. Users upload a document on the website; a
 private GPU server processes it and returns it translated or redacted, in the format it was
 uploaded in, for review.
@@ -12,6 +12,8 @@ paragraphs and tables right to left; PowerPoint boxes the translation outgrows g
 measured against the source deck. For PII, tracked changes are accepted and author fields cleared
 before masking, and speaker notes, comments, headers and footers are checked too. The website shows
 a LibreOffice PDF preview of the source and the result; manual box redaction is for PDF results.
+Word and PowerPoint 97-2003 files (.doc, .ppt) are converted by LibreOffice and come back as .docx
+and .pptx.
 
 Three job types are supported:
 
@@ -22,7 +24,9 @@ Three job types are supported:
 | **Translation + PII** | Both in one job: PII is masked first, then the document is translated and checked again. |
 
 There is also **manual redaction**: users draw boxes or pick values on the page, and the server
-removes them.
+removes them. If a redaction result removed something that should stay, its page lists every removed
+value (category, pages, how often); ticking **Keep visible** makes a new version from the original
+with those values left visible, and the earlier result stays in the history.
 
 ### Languages
 
@@ -36,6 +40,27 @@ by a second recognition model).
 
 Highlights, notes, form fields and links in a source PDF are kept in its translation. If the GPU
 server offers more than one translation model, users choose one per job on the upload form.
+
+### Translation models
+
+| Model | Use | Measured (1,997 held-out paragraphs, 20 language pairs, 24 Nov 2026) |
+|---|---|---|
+| TranslateGemma 12B | Default | MetricX-24 2.09, COMET-22 0.920 |
+| TranslateGemma 27B | Optional: **"TranslateGemma 27B · higher quality, slower"** | MetricX-24 1.96, COMET-22 0.919; twice as slow |
+
+27B is better mainly out of English (MetricX: Hindi 2.75 → 2.27, Spanish 2.00 → 1.57, French
+2.26 → 1.85, Chinese 2.01 → 1.60); into English it is about the same. Lower MetricX is better
+(0 = no errors), higher COMET is better. The comparison tool is `evaluation/suite/model_ab.py`.
+
+27B does not fit on the GPU beside the PII model, so on a server that has it:
+
+- it is loaded once at start and then sleeps (weights in host memory, a few seconds to wake);
+- a job that chooses it gets the GPU alone: the PII model and 12B sleep while it works and wake
+  again afterwards (`transformation/llm/gpu_share.py`, servers grouped in `TRANSFORMX_GPU_SWAP`);
+- its jobs run one at a time, never beside another job, and never fall back to the PII model in the
+  middle of translation;
+- if it cannot start (too little free GPU memory), the default models wake and the site runs
+  without the option.
 
 Customers can set a **glossary** per language pair: required translations for their own terms,
 applied to every new translation.
@@ -112,6 +137,16 @@ bash tools/gpu/setup_transformx.sh pii      # PaddleOCR (GPU) and Ollama
 bash tools/gpu/setup_full_pipeline.sh       # Deep Doc Extractor, BabelDOC, LibreOffice
 bash tools/gpu/setup_vllm.sh                # vLLM and both models (checksums verified)
 ```
+
+For the optional higher-quality translation model (TranslateGemma 27B, about 55 GB more disk and a
+GPU of 40 GB or more), add it to the vLLM setup; it is checked against Google's published checksums
+and offered on the website after the next start:
+
+```bash
+TRANSFORMX_HIGH_QUALITY_SETUP=1 bash tools/gpu/setup_vllm.sh
+```
+
+`TRANSFORMX_HIGH_QUALITY=off` starts the server without it even when it is installed.
 
 Then register the server on the website (**GPU servers → Register**), copy the downloaded
 `gpu.worker.local.json` to `configs/` on the server, and start it:
