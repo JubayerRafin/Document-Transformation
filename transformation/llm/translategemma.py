@@ -199,7 +199,15 @@ def messages(text,language,context='',source='en',model=None):
     if context: header+='Background for disambiguation only; do not translate or add it: '+context+'\n'
     if model is not None and not is_translategemma(model):
         header+=(f'The user message is the {source_name} text to translate. Reply with only its {language} '
-                 'translation, without any additional explanations, commentary, quotes or Markdown.')
+                 'translation, without any additional explanations, commentary, quotes or Markdown. '
+                 # A hosted chat model answered a line holding only "GBP 662,910." with a note that it
+                 # had no Japanese to translate, and a cut-off line with a remark that it was cut off
+                 # (hosted-model comparison, 2026-11-26).
+                 'The text may be a fragment cut off mid-sentence, already in the target language, or only '
+                 'numbers, codes or amounts: still reply with the translation alone, copying unchanged '
+                 'what needs no translation, and never comment on the text or ask for more. '
+                 'Write numbers with the digits the source uses. '
+                 'Do not add line breaks the source does not have.')
         return [{'role':'system','content':header},{'role':'user','content':text}]
     header+=(f'Produce only the {language} translation, without any additional explanations or commentary. '
              f'Please translate the following {source_name} text into {language}:\n\n\n')
