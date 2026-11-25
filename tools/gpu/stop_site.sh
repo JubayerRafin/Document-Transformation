@@ -4,7 +4,7 @@
 #
 # usage: bash tools/gpu/stop_site.sh [--now] [--models]
 #   waits until no job is running (up to an hour) unless --now; a job stopped by --now shows as
-#   interrupted and can be started again.
+#   interrupted; upload the document again to run it.
 #   --models also stops the model servers (vLLM) and frees the GPU; starting them again takes a few
 #   minutes.
 set -euo pipefail

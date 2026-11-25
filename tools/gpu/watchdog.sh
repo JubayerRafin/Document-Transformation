@@ -8,8 +8,8 @@
 #
 # A problem must be seen on 3 checks in a row (about 3 minutes) before anything is restarted, so a
 # server busy with a large job is not restarted for one slow answer. A stopped or silent website is
-# restarted with start_site.sh --restart (a job running at that moment shows as interrupted and can
-# be started again); a model server that stopped is started again by start_worker.sh --servers-only,
+# restarted with start_site.sh --restart (a job running at that moment shows as interrupted and its
+# document must be uploaded again); a model server that stopped is started again by start_worker.sh --servers-only,
 # which leaves the servers that still run alone.
 #
 # TRANSFORMX_WATCHDOG_SECONDS (60) sets the time between checks, TRANSFORMX_WATCHDOG_FAILURES (3) the
@@ -63,7 +63,8 @@ while sleep "$every"; do
     curl -fsS --max-time 30 "http://127.0.0.1:$p/v1/models" >/dev/null 2>&1 9>&- || models="$models $p"
   done
   free_kb=$(df -Pk "$app" 2>/dev/null | awk 'NR==2{print $4}')
-  if [ -n "$free_kb" ] && [ "$free_kb" -lt $((min_free_gb * 1024 * 1024)) ]; then
+  min_kb=$(awk -v g="$min_free_gb" 'BEGIN{printf "%d", g * 1048576}')
+  if [ -n "$free_kb" ] && [ "$free_kb" -lt "$min_kb" ]; then
     [ "$disk_warned" = 0 ] && note "warning: less than ${min_free_gb} GB free on the disk of $app"
     disk_warned=1
   else

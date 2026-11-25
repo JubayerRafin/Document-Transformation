@@ -42,8 +42,8 @@ masked output as a draft that a person checks before it is shared.
   translation.
 - **Speed.** About 12.6 s per page on an L40S for first-time translations of short documents and
   6.3 s per page for a 50-page manual; the 3–5 s target is not reached yet.
-- **OCR languages.** Scanned pages are read for English, Korean, Chinese and Japanese sources.
-  Arabic, Hindi and Bengali scans are not read. Sideways scanned pages are not turned upright yet
+- **OCR languages.** Scanned pages are read in all eleven languages; Bengali and Hindi lines are
+  confirmed by a second recognition model. Sideways scanned pages are not turned upright yet
   (that needs PaddleOCR's page-orientation model, which is not installed).
 - **Dense scans.** On densely set scanned pages a translated paragraph that needs much more room
   than the original lines is set small, or keeps its source pixels when it cannot fit at the
