@@ -23,6 +23,25 @@ if [ "$host" != 127.0.0.1 ] && [ "$host" != localhost ] && [ -z "${TRANSFORMX_PA
 fi
 
 site_pattern='^[^ ]*python[0-9.]* (-u )?tools/service/local_server[.]py'
+servers_env="${TRANSFORMX_SERVERS_ENV:-/workspace/servers.env}"
+# Starting the site ends a pause made by stop_site.sh.
+rm -f "${TRANSFORMX_PAUSE_FILE:-/workspace/transformx-paused}"
+
+# The watchdog (tools/gpu/watchdog.sh) starts whatever stops; TRANSFORMX_WATCHDOG=0 leaves it off.
+# Only one runs: starting it again when one runs does nothing.
+start_watchdog() {
+  [ "${TRANSFORMX_WATCHDOG:-1}" = 0 ] && return 0
+  command -v flock >/dev/null || { echo "flock is missing: the watchdog was not started."; return 0; }
+  (
+    set -a
+    # shellcheck disable=SC1090
+    [ -f "$servers_env" ] && . "$servers_env"
+    set +a
+    TRANSFORMX_SERVERS_ENV="$servers_env" nohup bash "$app/tools/gpu/watchdog.sh" >/dev/null 2>&1 &
+  )
+  echo "Watchdog on (log: ${TRANSFORMX_WATCHDOG_LOG:-/workspace/transformx-watchdog.log})."
+}
+
 # --restart: stop the website first, so it reads changed settings (configs/transformx.toml). Running
 # jobs are stopped too and show as interrupted. Model servers keep running unless their settings changed.
 if [ "${1:-}" = "--restart" ]; then
@@ -31,11 +50,11 @@ if [ "${1:-}" = "--restart" ]; then
 fi
 if pgrep -f "$site_pattern" >/dev/null; then
   echo "TransformX is already running (log: $log)."
+  start_watchdog
   exit 0
 fi
 
 # The model servers (vLLM: translation and PII) and their settings in servers.env.
-servers_env="${TRANSFORMX_SERVERS_ENV:-/workspace/servers.env}"
 TRANSFORMX_SERVERS_ENV="$servers_env" bash "$app/tools/gpu/start_worker.sh" --servers-only
 set -a
 # shellcheck disable=SC1090
@@ -78,9 +97,11 @@ for _ in $(seq 1 120); do
     grep "Server ready for" "$log" | tail -1
     echo "TransformX is running on port $port (log: $log)."
     [ "$host" = 127.0.0.1 ] && echo "On your computer: ssh -L $port:localhost:$port <your usual ssh options>, then open http://localhost:$port"
+    start_watchdog
     exit 0
   fi
   if ! pgrep -f "$site_pattern" >/dev/null; then echo "TransformX stopped; last lines:"; tail -8 "$log"; exit 1; fi
   sleep 2
 done
 echo "TransformX started but has not reported ready yet; check $log."
+start_watchdog

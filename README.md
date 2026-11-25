@@ -148,20 +148,25 @@ TRANSFORMX_HIGH_QUALITY_SETUP=1 bash tools/gpu/setup_vllm.sh
 
 `TRANSFORMX_HIGH_QUALITY=off` starts the server without it even when it is installed.
 
-Then register the server on the website (**GPU servers → Register**), copy the downloaded
-`gpu.worker.local.json` to `configs/` on the server, and start it:
+Then build the website once and start everything:
 
 ```bash
-bash tools/gpu/start_worker.sh
+npm --prefix frontend ci && npm --prefix frontend run build     # Node 20 or newer
+bash tools/gpu/start_site.sh
 ```
 
-The script starts both model servers, sizes their GPU memory for the card, and starts the worker.
-It is safe to run again; anything already running is left alone. The worker log is
-`/workspace/cloud-worker.log`. More detail: [private GPU workers](docs/PRIVATE_GPU_WORKERS.md).
-After updating the code on the server, run `bash tools/gpu/restart_worker.sh`: it waits for the
-running job, then restarts the worker and its pre-loaded job processes so they use the new code.
-`bash tools/gpu/start_worker.sh --servers-only` starts the model servers without the site worker,
-for the [engine service](docs/ENGINE_SERVICE.md). Both read `configs/transformx.toml` when it exists;
+The script starts the model servers (sized for the card), the website with its engine on port 8080,
+and a watchdog that starts again whatever stops. It is safe to run again; anything already running
+is left alone. Open the website through an SSH tunnel (`ssh -L 8080:localhost:8080 user@<server>`,
+then http://localhost:8080), or set `TRANSFORMX_PASSWORD` and `TRANSFORMX_HOST` to open it on the
+company network. `bash tools/gpu/stop_site.sh` stops it for maintenance; after an update,
+`bash tools/gpu/start_site.sh --restart` loads the new code. Starting at boot, updating, logs,
+backups and troubleshooting: **[operations guide](docs/OPERATIONS.md)**.
+
+The older hosted mode (a website elsewhere and a GPU worker that registers with it,
+`tools/gpu/start_worker.sh`) still works; see [private GPU workers](docs/PRIVATE_GPU_WORKERS.md).
+`bash tools/gpu/start_worker.sh --servers-only` starts only the model servers, for the
+[engine service](docs/ENGINE_SERVICE.md). All of these read `configs/transformx.toml` when it exists;
 a model server set there to another machine is used instead of starting the local one.
 
 ### Measured speed
