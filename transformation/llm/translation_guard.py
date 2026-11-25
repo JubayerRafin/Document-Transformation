@@ -83,7 +83,8 @@ def joined_separator_spacing(source,values=()):
     PDF text extraction) may come back joined ("2024-03-20"). Only digit-separator-space-digit is
     joined; explicit protected spans are never changed. Returned document text is not rewritten."""
     explicit=[(m.start(),m.end()) for value in values for m in re.finditer(re.escape(value),source)]
-    return re.sub(r'(?<=\d[-/.:])[ \t]+(?=\d)',
+    # Also a code's capital-letter prefix: "RVL- 2025- 68776" (2026-11-26).
+    return re.sub(r'(?:(?<=\d[-/.:])|(?<=[A-Z][-_/]))[ \t]+(?=\d)',
                   lambda m:m.group() if any(a<m.end() and m.start()<b for a,b in explicit) else '',source)
 
 
@@ -159,6 +160,28 @@ def appended_glossary(source, target):
 # translated "(1)" was refused as an added number, every attempt, and 27 paragraphs of a Japanese
 # government deck stayed untranslated (Word and PowerPoint mass test, 2026-11-24).
 FULLWIDTH_DIGITS = str.maketrans('０１２３４５６７８９', '0123456789')
+# Bengali, Devanagari, Arabic-Indic and Persian digits are the same numbers too: "1. Any change ..."
+# translated "১. চুক্তিতে ..." (a Bengali list number) was refused as an omitted 1 (hosted-model comparison,
+# 2026-11-26). Only a number standing on its own is read this way; digits touching Latin letters or an
+# identifier separator ("INV-২০২৪") still count as a changed identifier.
+LOCAL_DIGITS = str.maketrans('০১২৩৪৫৬৭৮৯०१२३४५६७८९٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹', '0123456789' * 4)
+_LOCAL_NUMBER = re.compile(r'(?<![A-Za-z0-9_/-])[০-৯०-९٠-٩۰-۹]+(?:[.,٫٬][০-৯०-९٠-٩۰-۹]+)*(?![A-Za-z0-9_/-])')
+
+
+def western_numbers(text):
+    """Comparison-only: standalone numbers in local digits written with 0-9."""
+    return _LOCAL_NUMBER.sub(lambda m: m.group().translate(LOCAL_DIGITS).replace('٫', '.').replace('٬', ','), text)
+
+
+# French and Spanish write a space before the percent sign ("19 %", also a no-break space); English
+# writes "19%". The check counted "19" against "19%" and refused correct translations into English of
+# every French and Spanish paragraph with a percentage, for every model (hosted-model comparison, 2026-11-26).
+_SPACED_PERCENT = re.compile(r'(\d)[   ]+([%％])')
+
+
+def percent_spacing(text):
+    """Comparison-only: "19 %" as "19%"."""
+    return _SPACED_PERCENT.sub(r'\1\2', text)
 # Japanese era years: the year before each era's first year.
 ERAS = {'明治': 1867, '大正': 1911, '昭和': 1925, '平成': 1988, '令和': 2018}
 _ERA_YEAR = re.compile(r'(明治|大正|昭和|平成|令和)\s*(\d{1,2}|元)\s*年')
@@ -259,6 +282,9 @@ def validate_candidate(source, target, values=()):
         raise ValueError('Translation added words to a source without text.')
     source, target = source.translate(FULLWIDTH_DIGITS), target.translate(FULLWIDTH_DIGITS)
     values = [v.translate(FULLWIDTH_DIGITS) for v in values]
+    target = western_numbers(target)
+    if not any(_SPACED_PERCENT.search(v) for v in values):   # a protected "19 %" stays as written
+        source, target = percent_spacing(source), percent_spacing(target)
     for piece, count in Counter(glued_placeholders(source)).items():
         if target.count(piece) < count:
             raise ValueError('Translation changed, added or omitted protected literals.')
@@ -287,8 +313,16 @@ def validate_candidate(source, target, values=()):
         from transformation.llm.localized_numbers import quantity_only_translation
         if not quantity_only_translation(source,target,values):
             raise ValueError('Translation omitted all descriptive source words.')
-    if len(target.splitlines())>max(1,len(source.splitlines())) and len(source.split())<=8:
+    # A label is short in words, or in characters for scripts written without spaces: a Chinese
+    # paragraph of three sentences has two or three "words" by spaces (2026-11-26).
+    if (len(target.splitlines())>max(1,len(source.splitlines())) and len(source.split())<=8
+            and len(_NO_SPACES.findall(source))<=20):
         raise ValueError('Translation added lines to a short source label.')
+    # Lines added to a longer paragraph are one per sentence at most: a model's note on its own line
+    # ("Your text appears to cut off after ...") is more sentences than the source has (2026-11-26).
+    sentences = lambda text: len([p for p in split_sentences(text) if p.strip()])
+    if len(target.splitlines())>max(1,len(source.splitlines())) and sentences(target)>sentences(source):
+        raise ValueError('Translation added sentences on new lines.')
 
 
 def audit_candidate(endpoint, model, source, target, language, context='', values=()):
